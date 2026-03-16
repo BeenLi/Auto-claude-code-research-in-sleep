@@ -48,7 +48,7 @@ claude mcp add codex -s user -- codex mcp-server
 # 3. 在 Claude Code 中使用
 claude
 > /idea-discovery "你的研究方向"              # 工作流 1 — 方向要具体！不要 "NLP"，要 "离散扩散语言模型的 factorized gap"
-> /auto-review-loop                          # 工作流 2：审稿 → 修复 → 再审，一夜完成
+> /auto-review-loop "你的论文主题"             # 工作流 2：审稿 → 修复 → 再审，一夜完成
 > /paper-writing "NARRATIVE_REPORT.md"       # 工作流 3：研究叙事 → 精修 PDF
 > /research-pipeline "你的研究方向"            # 全流程：工作流 1 → 2 → 3 端到端
 ```
