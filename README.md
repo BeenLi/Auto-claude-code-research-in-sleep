@@ -28,7 +28,9 @@ Custom [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for 
 
 ## 📢 What's New
 
-- **2026-03-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🏆 **First community paper scored 8/10!** CS paper built entirely with ARIS — "empirical findings are stark, well-supported". Congrats to [@DefanXue](https://github.com/DefanXue) & [@Monglitay](https://github.com/Monglitay)! See [Community Showcase](#-community-showcase--papers-built-with-aris)
+- **2026-03-22** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📋 **[Templates](templates/)** — input templates for every workflow. 📄 **7 venue templates** — CVPR, ACL, AAAI, ACM MM added. 🛡️ **Anti-hallucination fix** — Workflow 2 enforces DBLP → CrossRef → [VERIFY]. 🔗 **`base repo`** — clone a GitHub repo as base codebase (`— base repo: https://github.com/org/project`)
+- **2026-03-21** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🏆 **AAAI 2026 accepted — 7/10 with pure Codex CLI!** Built with ARIS-Codex skills by [@xinbo820-web](https://github.com/xinbo820-web). See [Community Showcase](#-community-showcase--papers-built-with-aris)
+- **2026-03-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🏆 **First community paper scored 8/10!** CS paper built entirely with ARIS. Congrats to [@DefanXue](https://github.com/DefanXue) & [@Monglitay](https://github.com/Monglitay)! See [Community Showcase](#-community-showcase--papers-built-with-aris)
 - **2026-03-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🚀 **[Antigravity adaptation guide](docs/ANTIGRAVITY_ADAPTATION.md)** — use ARIS skills in [Google Antigravity](https://antigravity.google/) (agent-first IDE). Native `SKILL.md` support, dual model, MCP config, EN + [CN](docs/ANTIGRAVITY_ADAPTATION_CN.md). Community contribution by [@PeppaPigw](https://github.com/PeppaPigw)
 - **2026-03-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🖥️ **[Trae adaptation guide](docs/TRAE_ARIS_RUNBOOK_EN.md)** — use ARIS skills in [Trae](https://www.trae.ai/) (ByteDance AI IDE), EN + CN guides. Community contribution by [@Prometheus-cotigo](https://github.com/Prometheus-cotigo). 🔢 **[`formula-derivation`](skills/formula-derivation/SKILL.md)** — research formula development and verification. Community contribution by [@Falling-Flower](https://github.com/Falling-Flower)
 - **2026-03-19** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🖼️ **[`paper-poster`](skills/paper-poster/SKILL.md)** — Conference poster (tcbposter → A0/A1 PDF + PPTX + SVG). Venue colors, visual review, Codex review. Community contribution by [@dengzhe-hou](https://github.com/dengzhe-hou)
@@ -41,7 +43,7 @@ Custom [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for 
 - **2026-03-18** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🎨 **[`paper-illustration`](skills/paper-illustration/SKILL.md)** — AI-generated publication-quality architecture diagrams and method figures. Claude plans → Gemini renders → iterative refinement until score ≥ 9. Integrated into Workflow 3 (`illustration: true`, requires `GEMINI_API_KEY`). Built on [PaperBanana](https://github.com/dwzhu-pku/PaperBanana). Community contribution by [@Joseph-li343](https://github.com/Joseph-li343)
   <details><summary>Preview demo</summary><br><img src="assets/paper_illustration_demo.png" width="600" alt="paper-illustration demo" /></details>
 - **2026-03-18** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📊 **[CitationClaw](https://github.com/VisionXLab/CitationClaw)** — citation impact analysis: paper title → citation crawling, scholar identification, tiered analysis, HTML dashboard
-- **2026-03-17** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔧 **Git code sync** — `/run-experiment` now supports `code_sync: git` (`git push` → `ssh "git pull"`) as alternative to rsync. **[NARRATIVE_REPORT example](docs/NARRATIVE_REPORT_EXAMPLE.md)** for Workflow 3. **Parameter pass-through** — set any downstream parameter at any level with `— key: value` ([details](#%EF%B8%8F-customization)). 🆓 **[ModelScope guide](docs/MODELSCOPE_GUIDE.md)** — free (2000 calls/day), one key, no automation restrictions ([Alt E](#-alternative-model-combinations))
+- **2026-03-17** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔧 **Git code sync** — `/run-experiment` now supports `code_sync: git` (`git push` → `ssh "git pull"`) as alternative to rsync. **[NARRATIVE_REPORT example](templates/NARRATIVE_REPORT_TEMPLATE.md)** for Workflow 3. **Parameter pass-through** — set any downstream parameter at any level with `— key: value` ([details](#%EF%B8%8F-customization)). 🆓 **[ModelScope guide](docs/MODELSCOPE_GUIDE.md)** — free (2000 calls/day), one key, no automation restrictions ([Alt E](#-alternative-model-combinations))
 <details>
 <summary>Earlier updates (2026-03-12 — 2026-03-16)</summary>
 
@@ -79,7 +81,7 @@ claude
 > /research-pipeline "your research direction"  # Full pipeline: Workflow 1 → 1.5 → 2 → 3 end-to-end
 ```
 
-> 📝 **New to Workflow 3?** See [`docs/NARRATIVE_REPORT_EXAMPLE.md`](docs/NARRATIVE_REPORT_EXAMPLE.md) for a complete sample input — shows what claims, experiments, results, and figure descriptions to include for best results.
+> 📝 **Templates available!** See [`templates/`](templates/) for ready-to-use input templates for every workflow — [research brief](templates/RESEARCH_BRIEF_TEMPLATE.md) (Workflow 1), [experiment plan](templates/EXPERIMENT_PLAN_TEMPLATE.md) (Workflow 1.5), [narrative report](templates/NARRATIVE_REPORT_TEMPLATE.md) (Workflow 3), [paper plan](templates/PAPER_PLAN_TEMPLATE.md) (Workflow 3).
 
 > **Tip:** All pipeline behaviors are configurable via inline overrides — append `— key: value` to any command:
 >
@@ -93,6 +95,8 @@ claude
 > | `code review` | `true` | GPT-5.4 xhigh reviews experiment code before GPU deployment. Set `false` to skip |
 > | `wandb` | `false` | Auto-add W&B logging to experiment scripts. Set `true` + configure `wandb_project` in CLAUDE.md. `/monitor-experiment` pulls training curves from W&B |
 > | `illustration` | `gemini` | AI illustration in Workflow 3: `gemini` (default, needs `GEMINI_API_KEY`), `mermaid` (free), or `false` (skip) |
+> | `venue` | `ICLR` | Target venue: `ICLR`, `NeurIPS`, `ICML`, `CVPR`, `ACL`, `AAAI`, `ACM`. Determines LaTeX style file and page limit |
+> | `base repo` | `false` | GitHub repo URL to clone as base codebase (e.g., `— base repo: https://github.com/org/project`). No code? Build on top of an open-source project |
 >
 > ```
 > /research-pipeline "your topic" — AUTO_PROCEED: false                          # pause at idea selection gate
@@ -160,10 +164,15 @@ Real projects where the ARIS pipeline was used end-to-end. **If you've used ARIS
 | Paper | Rating | Venue | Built by | Notes |
 |-------|:------:|-------|----------|-------|
 | CS Paper | **8/10** — "Top 50% of accepted papers, clear accept" | CS Conference | [@DefanXue](https://github.com/DefanXue) & [@Monglitay](https://github.com/Monglitay) | Full ARIS pipeline: idea → experiments → auto-review → paper writing. Reviewer: "empirical findings are stark, well-supported, and expose a fundamental flaw" |
+| AAAI 2026 Paper | **7/10** — "Good paper, accept" | AAAI 2026 Main Technical | [@xinbo820-web](https://github.com/xinbo820-web) | Pure **Codex CLI** (ARIS-Codex skills). Accepted at AAAI 2026 |
 
-<img src="assets/community_showcase_8_10.png" width="700" alt="8/10 — Top 50% of accepted papers, clear accept" />
+<details><summary>Reviewer screenshots</summary>
+<br>
+<img src="assets/community_showcase_8_10.png" width="700" alt="8/10 — CS Paper" />
+<img src="assets/community_showcase_7_10_codex.png" width="700" alt="7/10 — AAAI 2026, Codex CLI" />
+</details>
 
-> 🎉 *This is the first community-reported paper built entirely with ARIS. Know more? Let us know!*
+> 🎉 *Papers built entirely with ARIS — from idea to acceptance. Know more? Let us know!*
 
 ## 🧩 Awesome Community Skills & Extensions
 
@@ -457,7 +466,7 @@ Already have an experiment plan (from Workflow 1 or your own)? `/experiment-brid
 
 > **One-command shortcut:** `/paper-writing "NARRATIVE_REPORT.md"` runs this entire workflow automatically.
 
-**Input:** A `NARRATIVE_REPORT.md` describing the research: claims, experiments, results, figures. The more detailed the narrative (especially figure descriptions and quantitative results), the better the output. See [`docs/NARRATIVE_REPORT_EXAMPLE.md`](docs/NARRATIVE_REPORT_EXAMPLE.md) for a complete example.
+**Input:** A `NARRATIVE_REPORT.md` describing the research: claims, experiments, results, figures. The more detailed the narrative (especially figure descriptions and quantitative results), the better the output. See [`templates/NARRATIVE_REPORT_TEMPLATE.md`](templates/NARRATIVE_REPORT_TEMPLATE.md) for a complete example.
 
 **Output:** A submission-ready `paper/` directory with LaTeX source, clean `.bib` (only cited entries), and compiled PDF.
 
@@ -629,6 +638,24 @@ cp -r skills/* ~/.claude/skills/
 cp -r skills/auto-review-loop ~/.claude/skills/
 cp -r skills/research-lit ~/.claude/skills/
 ```
+
+### Update Skills
+
+```bash
+cd Auto-claude-code-research-in-sleep
+git pull
+
+# Option A: Full update (overwrites all skills with latest version)
+cp -r skills/* ~/.claude/skills/
+
+# Option B: Safe update (only add NEW skills, keep your customizations)
+cp -rn skills/* ~/.claude/skills/
+
+# Option C: Update specific skills only
+cp -r skills/experiment-bridge ~/.claude/skills/
+```
+
+> 💡 **Which option?** Use **A** if you haven't customized any skills. Use **B** if you've modified skills locally (new skills get added, your changes are preserved — but you'll miss upstream bug fixes in modified files). Use **C** to selectively update.
 
 ### Usage
 
@@ -1011,6 +1038,7 @@ Skills are plain Markdown files. Fork and customize:
 | `HUMAN_CHECKPOINT` | false | When `true`, pause after each review round for approval | → `auto-review-loop` |
 | `WANDB` | false | Auto-add W&B logging to experiments | → `experiment-bridge` → `run-experiment` |
 | `CODE_REVIEW` | true | GPT-5.4 reviews experiment code before deployment | → `experiment-bridge` |
+| `BASE_REPO` | false | GitHub repo URL to clone as base codebase for experiments | → `experiment-bridge` |
 | `ILLUSTRATION` | `gemini` | AI illustration: `gemini` (default), `mermaid` (free), or `false` (skip) | → `paper-writing` |
 
 Override inline: `/research-pipeline "topic" — auto proceed: false, illustration: mermaid`
@@ -1045,8 +1073,9 @@ Override inline: `/idea-discovery "topic" — pilot budget: 4h per idea, sources
 | `SANITY_FIRST` | true | Run smallest experiment first to catch setup bugs before full deployment |
 | `MAX_PARALLEL_RUNS` | 4 | Maximum experiments to deploy in parallel (limited by available GPUs) |
 | `WANDB` | false | Auto-add W&B logging. Requires `wandb_project` in CLAUDE.md |
+| `BASE_REPO` | false | GitHub repo URL to clone as base codebase for experiments |
 
-Override inline: `/experiment-bridge — code review: false, wandb: true`
+Override inline: `/experiment-bridge — base repo: https://github.com/org/project`
 
 ### Literature Search (`research-lit`)
 
@@ -1065,7 +1094,7 @@ Override inline: `/research-lit "topic" — sources: zotero, web`, `/research-li
 | Constant | Default | Description |
 |----------|---------|-------------|
 | `DBLP_BIBTEX` | true | Fetch real BibTeX from DBLP/CrossRef instead of LLM-generated entries |
-| `TARGET_VENUE` | `ICLR` | Target venue format: `ICLR`, `NeurIPS`, `ICML` |
+| `TARGET_VENUE` | `ICLR` | Target venue: `ICLR`, `NeurIPS`, `ICML`, `CVPR`, `ACL`, `AAAI`, `ACM` |
 | `ANONYMOUS` | true | Use anonymous author block for blind review |
 | `MAX_PAGES` | 9 | Main body page limit (excluding references) |
 | `ILLUSTRATION` | `gemini` | AI illustration mode: `gemini` (default, needs `GEMINI_API_KEY`), `mermaid` (free), or `false` (skip) |
@@ -1198,6 +1227,7 @@ claude
 - [ ] **Daemon mode** — auto-restart Claude Code session via `launchd`/`systemd` for true unattended operation. Currently the orchestration layer requires an active CLI session; state files (`REVIEW_STATE.json`, `AUTO_REVIEW.md`) support resuming across sessions, but relaunch is manual ([#11](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/11))
 - [ ] **Reference-style figure generation** — read figures from reference PDFs → identify chart type, color scheme, layout → generate same-style figures with your own data. Sub-goal remaining: **Data charts** (extract color/font style → matplotlib rcParams). Method diagrams ✅ solved by `paper-illustration`
 - [ ] **Workflow execution report** — after each workflow (1/1.5/2/3) completes, auto-generate a structured summary: what was done, key decisions made, experiments run, results obtained, scores, and time spent. Output as `WORKFLOW_REPORT.md` for progress tracking, team reporting, and supervisor updates
+- [ ] **Document-based pipeline input** — support passing a detailed document (e.g., `RESEARCH_BRIEF.md`) as input to `/research-pipeline` or `/idea-discovery` instead of a one-line prompt. Many research directions need nuanced context (prior results, constraints, domain knowledge) that can't fit in a single sentence. The document would be parsed for problem definition, constraints, existing results, and specific requirements
 - [ ] **Auto hyperparameter tuning skill** — rewrite [auto-hparam-tuning](https://github.com/zxh0916/auto-hparam-tuning) as an ARIS SKILL.md. 5-step cycle: understand project → plan tuning strategy → run experiments → analyze metrics (TensorBoard/W&B) → learn and iterate. Would plug into Workflow 1.5 (`/experiment-bridge`) or Workflow 2 (`/auto-review-loop`) when reviewer says "tune hyperparameters"
 
 ## 💬 Community
@@ -1226,7 +1256,7 @@ If you use ARIS in your research, please cite:
 
 ![GitHub stars](https://img.shields.io/github/stars/wanshuiyin/Auto-claude-code-research-in-sleep?style=social)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=wanshuiyin/Auto-claude-code-research-in-sleep&type=Date&v=20260319)](https://star-history.com/#wanshuiyin/Auto-claude-code-research-in-sleep&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=wanshuiyin/Auto-claude-code-research-in-sleep&type=Date&v=20260321)](https://star-history.com/#wanshuiyin/Auto-claude-code-research-in-sleep&Date)
 
 ## 🙏 Acknowledgements
 
