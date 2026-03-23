@@ -16,3 +16,6 @@ __pycache__/
 
 # Environment
 .env
+
+# Research
+nic-lossless-compression/

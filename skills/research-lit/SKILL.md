@@ -179,9 +179,33 @@ Plus a narrative summary of the landscape (3-5 paragraphs).
 
 If Zotero BibTeX was exported, include a `references.bib` snippet for direct use in paper writing.
 
-### Step 5: Save (if requested)
-- Save paper PDFs to `literature/` or `papers/`
-- Update related work notes in project memory
+### Step 5: Save Output
+
+**Always save the output automatically** — do not wait for the user to request it.
+
+#### Output directory structure
+
+```
+{project-root}/{topic-slug}/research-lit/{date}.md
+```
+
+Rules:
+- **`topic-slug`**: Derived from the user's topic argument — lowercase, hyphens instead of spaces, simplified but recognizable. E.g., `"NIC-side lossless compression"` → `nic-lossless-compression`.
+- **`research-lit`**: Fixed — matches this skill's directory name, so the user knows which skill produced the file.
+- **`{date}.md`**: Date the skill was run, in `YYYY-MM-DD` format.
+
+Example: `/my-project/nic-lossless-compression/research-lit/2026-03-21.md`
+
+#### File content
+
+The saved file must include:
+1. A header with the generation date, skill name, and original topic query
+2. The full literature table
+3. The narrative landscape summary
+4. All reference links
+
+#### Additional saves (optional)
+- If `ARXIV_DOWNLOAD = true`, save downloaded PDFs to `{topic-slug}/papers/`
 - If Obsidian is available, optionally create a literature review note in the vault
 
 ## Key Rules
