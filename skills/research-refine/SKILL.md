@@ -15,9 +15,11 @@ Use this skill when the research problem is already visible but the technical ro
 Four principles dominate this skill:
 
 1. **Do not lose the original problem.** Freeze an immutable **Problem Anchor** and reuse it in every round.
-2. **The smallest adequate mechanism wins.** Prefer the minimal intervention that directly fixes the bottleneck.
+2. **The smallest adequate mechanism wins.** Prefer the minimal hardware intervention that directly fixes the bottleneck.
 3. **One paper, one dominant contribution.** Prefer one sharp thesis plus at most one supporting contribution.
-4. **Modern leverage is a prior, not a decoration.** When LLM / VLM / Diffusion / RL / distillation / inference-time scaling naturally fit the bottleneck, use them concretely. Do not bolt them on as buzzwords.
+4. **Platform leverage is a prior, not a decoration.** When SmartNIC/DPU capabilities, P4 programmability, FPGA primitives, or RDMA protocol hooks naturally fit the bottleneck, use them concretely. Do not bolt on trendy hardware features as buzzwords.
+
+> **Domain context**: This skill is configured for **computer architecture / RDMA systems** research. "Frontier primitives" means modern hardware platforms (BlueField DPU, CX7, FPGA SmartNIC), not ML models. "Training recipe" means hardware design flow (RTL → simulation → FPGA synthesis). See `## Research Domain` in CLAUDE.md.
 
 ```
 User input (PROBLEM + vague APPROACH)
@@ -82,15 +84,15 @@ If later reviewer feedback would change the problem being solved, mark that as *
 
 #### Step 1.1: Scan Grounding Material
 
-Check `papers/` and `literature/` first. Read only the relevant parts needed to answer:
+Check `papers/`, `literature/`, and topic-specific paper library (see `## Paper Library` in CLAUDE.md) first. Read only the relevant parts needed to answer:
 
-- What mechanism do current methods use?
-- Where exactly do they fail for this problem?
-- Which recent LLM / VLM / Diffusion / RL era techniques are actually relevant here?
-- What training objectives, representations, or interfaces are reusable?
-- What details distinguish a real method from a renamed high-level idea?
+- What hardware/software mechanism do current systems use?
+- Where exactly do they fail for this problem (throughput bottleneck? latency overhead? protocol mismatch?)?
+- Which modern platform capabilities (DPU offload engines, P4 pipelines, FPGA IP blocks, RDMA verbs) are actually relevant here?
+- What existing IP blocks, open-source RTL, or platform APIs are reusable?
+- What details distinguish a real hardware contribution from a renamed system-level idea?
 
-If local material is insufficient, search recent top-venue/arXiv work online. Focus on **method sections, training setup, and failure modes**, not just abstracts.
+If local material is insufficient, search recent MICRO/ISCA/HPCA/NSDI/SIGCOMM papers on IEEE Xplore or ACM DL. Focus on **micro-architecture sections, evaluation methodology, and hardware overhead analysis**, not just abstracts.
 
 #### Step 1.2: Identify the Technical Gap
 
@@ -98,8 +100,8 @@ Do not stop at generic research questions. Make the gap operational:
 
 1. **Current pipeline failure point**: where does the baseline break?
 2. **Why naive fixes are insufficient**: larger context, more data, prompting, memory bank, or stacking more modules.
-3. **Smallest adequate intervention**: what is the least additional mechanism that could plausibly fix the bottleneck?
-4. **Frontier-native alternative**: is there a more current route using foundation-model-era primitives that better matches the bottleneck?
+3. **Smallest adequate intervention**: what is the least additional hardware mechanism that could plausibly fix the bottleneck?
+4. **Platform-native alternative**: is there a more current route using modern DPU/SmartNIC/FPGA platform capabilities that better matches the bottleneck?
 5. **Core technical claim**: what exact mechanism claim could survive top-venue scrutiny?
 6. **Required evidence**: what minimum proof is needed to defend that claim?
 
@@ -107,8 +109,8 @@ Do not stop at generic research questions. Make the gap operational:
 
 Before locking the method, compare two candidate routes if both are plausible:
 
-- **Route A: Elegant minimal route** — the smallest mechanism that directly targets the bottleneck.
-- **Route B: Frontier-native route** — a more modern route that uses LLM / VLM / Diffusion / RL / distillation / inference-time scaling *only if* it gives a cleaner or stronger story.
+- **Route A: Elegant minimal route** — the smallest hardware mechanism that directly targets the bottleneck.
+- **Route B: Platform-native route** — a more modern route that exploits DPU offload engines / P4 programmable logic / FPGA IP blocks / RDMA protocol hooks *only if* it gives a cleaner or stronger story.
 
 Then decide:
 
@@ -128,11 +130,11 @@ Cover:
 2. **Contribution focus**: one dominant contribution and at most one supporting contribution.
 3. **Complexity budget**: what is frozen or reused, what is new, and what tempting additions are intentionally excluded.
 4. **System graph**: modules, data flow, inputs, outputs.
-5. **Representation design**: what latent, embedding, plan token, reward signal, memory state, or alignment space is used?
-6. **Training recipe**: data source, supervision, pseudo-labeling, negatives, curriculum, losses, weighting, stagewise vs joint training.
-7. **Inference path**: how the trained components are used at test time and what signals flow where.
-8. **Why the mechanism stays small**: why a larger stack is unnecessary.
-9. **Exact role of any frontier primitive**: if you use an LLM / VLM / Diffusion / RL component, specify whether it acts as planner, teacher, critic, reward model, generator prior, search controller, or distillation source.
+5. **Data path design**: what hardware state, buffer, queue, or pipeline register is used; where in the Tx/Rx path does the new mechanism insert?
+6. **Implementation plan**: RTL vs HLS vs P4, pipeline stages, clock domain, critical path estimate, FPGA/ASIC synthesis target.
+7. **Runtime data path**: how the mechanism operates at line rate and what control signals flow between host, NIC, and network.
+8. **Why the mechanism stays small**: why a larger hardware block is unnecessary (area/power budget argument).
+9. **Exact role of any platform primitive**: if you use a DPU offload engine / P4 match-action table / FPGA IP block / RDMA verb extension, specify its role: compression engine, flow steering, credit manager, checksum offload, etc.
 10. **Failure handling**: what could go wrong and what fallback or diagnostic exists?
 11. **Novelty and elegance argument**: why this is more than naming a module and why the paper still looks focused.
 
@@ -206,16 +208,16 @@ Use this structure:
 - Training signal / loss:
 - Why it does not create contribution sprawl:
 
-### Modern Primitive Usage
-- Which LLM / VLM / Diffusion / RL-era primitive is used:
-- Exact role in the pipeline:
-- Why it is more natural than an old-school alternative:
+### Platform Primitive Usage
+- Which DPU / SmartNIC / FPGA / P4 / RDMA platform capability is used:
+- Exact role in the data path (Tx/Rx/offload engine/match-action/etc.):
+- Why it is more natural than a pure software or host-CPU alternative:
 
-### Integration into Base Generator / Downstream Pipeline
-[Where the new method attaches, what is frozen, what is trainable, inference order]
+### Integration into Host / NIC / Network Stack
+[Where the new mechanism attaches in the data path, what existing blocks are reused, Tx/Rx integration order]
 
-### Training Plan
-[Stagewise or joint training, losses, data construction, pseudo-labels, schedules]
+### Implementation Plan
+[RTL vs HLS vs P4, pipeline depth, synthesis target (FPGA/ASIC), simulation approach, estimated LUT/BRAM/DSP]
 
 ### Failure Modes and Diagnostics
 - [Failure mode]:
@@ -259,22 +261,24 @@ mcp__codex__codex:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    You are a senior ML reviewer for a top venue (NeurIPS/ICML/ICLR).
-    This is an early-stage, method-first research proposal.
+    You are a senior computer architecture / systems researcher reviewing for MICRO/ISCA/HPCA/ASPLOS/NSDI.
+    Domain: NIC/DPU-side hardware systems and RDMA networking.
+    This is an early-stage, mechanism-first research proposal.
 
-    Your job is NOT to reward extra modules, contribution sprawl, or a giant benchmark checklist.
-    Your job IS to stress-test whether the proposed method:
-    (1) still solves the original anchored problem,
-    (2) is concrete enough to implement,
-    (3) presents a focused, elegant contribution,
-    (4) uses foundation-model-era techniques appropriately when they are the natural fit.
+    Your job is NOT to reward more hardware blocks, feature sprawl, or a giant benchmark checklist.
+    Your job IS to stress-test whether the proposed mechanism:
+    (1) still solves the original anchored bottleneck,
+    (2) is concrete enough to implement in RTL/HLS or prototype on real hardware,
+    (3) presents a focused, elegant hardware contribution,
+    (4) uses modern platform capabilities (DPU/SmartNIC/FPGA/RDMA) appropriately when they are the natural fit.
 
     Review principles:
-    - Prefer the smallest adequate mechanism over a larger system.
+    - Prefer the smallest adequate hardware mechanism over a larger system.
     - Penalize parallel contributions that make the paper feel unfocused.
-    - If a modern LLM / VLM / Diffusion / RL route would clearly produce a better paper, say so concretely.
-    - If the proposal is already modern enough, do NOT force trendy components.
+    - If a modern DPU platform capability or P4/FPGA route would clearly produce a better paper, say so concretely.
+    - If the proposal is already platform-appropriate, do NOT force trendy hardware components.
     - Do not ask for extra experiments unless they are needed to prove the core claims.
+    - Architecture reviewers care about: micro-architectural detail, area/power overhead, real measurement vs simulation, generalizability across workloads.
 
     Read the Problem Anchor first. If your suggested fix would change the problem being solved,
     call that out explicitly as drift instead of treating it as a normal revision request.
@@ -285,31 +289,31 @@ mcp__codex__codex:
 
     Score these 7 dimensions from 1-10:
 
-    1. **Problem Fidelity**: Does the method still attack the original bottleneck, or has it drifted into solving something easier or different?
+    1. **Problem Fidelity**: Does the mechanism still attack the original bottleneck (e.g., throughput, latency, RDMA integration overhead), or has it drifted into solving something easier or different?
 
-    2. **Method Specificity**: Are the interfaces, representations, losses, training stages, and inference path concrete enough that an engineer could start implementing?
+    2. **Method Specificity**: Are the pipeline stages, data path interfaces, hardware resources (LUT/BRAM/DSP), implementation approach (RTL/HLS/P4), and runtime control path concrete enough that an engineer could start implementing?
 
-    3. **Contribution Quality**: Is there one dominant mechanism-level contribution with real novelty, good parsimony, and no obvious contribution sprawl?
+    3. **Contribution Quality**: Is there one dominant mechanism-level contribution with real novelty, good parsimony, and no obvious hardware feature sprawl?
 
-    4. **Frontier Leverage**: Does the proposal use current foundation-model-era primitives appropriately when they are the right tool, instead of defaulting to old-school module stacking?
+    4. **Platform Leverage**: Does the proposal use modern platform capabilities (DPU offload engines, FPGA IP blocks, P4 match-action, RDMA verb extensions) appropriately, instead of defaulting to host-CPU software?
 
-    5. **Feasibility**: Can this method be trained and integrated with the stated resources and data assumptions?
+    5. **Feasibility**: Can this mechanism be implemented and validated with the stated resources (FPGA board / BlueField DPU / RTL simulator)?
 
-    6. **Validation Focus**: Are the proposed experiments minimal but sufficient to validate the core claims? Is there unnecessary experimental bloat?
+    6. **Validation Focus**: Are the proposed experiments minimal but sufficient to validate the core claims? Is there unnecessary benchmark bloat?
 
-    7. **Venue Readiness**: If executed well, would the contribution feel sharp and timely enough for a top venue?
+    7. **Venue Readiness**: If executed well, would the contribution feel sharp and timely enough for MICRO/ISCA/HPCA/NSDI?
 
-    **OVERALL SCORE** (1-10): Weighted toward Problem Fidelity, Method Specificity, Contribution Quality, and Frontier Leverage.
-    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Frontier Leverage 15%, Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
+    **OVERALL SCORE** (1-10): Weighted toward Problem Fidelity, Method Specificity, Contribution Quality, and Platform Leverage.
+    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Platform Leverage 15%, Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
 
     For each dimension scoring < 7, provide:
     - The specific weakness
-    - A concrete fix at the method level (interface / loss / training recipe / integration point / deletion of unnecessary parts)
+    - A concrete fix at the mechanism level (pipeline interface / data path integration / hardware resource / RTL design choice / deletion of unnecessary blocks)
     - Priority: CRITICAL / IMPORTANT / MINOR
 
     Then add:
-    - **Simplification Opportunities**: 1-3 concrete ways to delete, merge, or reuse components while preserving the main claim. Write "NONE" if already tight.
-    - **Modernization Opportunities**: 1-3 concrete ways to replace old-school pieces with more natural foundation-model-era primitives if genuinely better. Write "NONE" if already modern enough.
+    - **Simplification Opportunities**: 1-3 concrete ways to delete, merge, or reuse hardware blocks while preserving the main claim. Write "NONE" if already tight.
+    - **Platform Leverage Opportunities**: 1-3 concrete ways to replace host-CPU software with more natural DPU/FPGA/P4 platform capabilities if genuinely better. Write "NONE" if already platform-appropriate.
     - **Drift Warning**: "NONE" if the proposal still solves the anchored problem; otherwise explain the drift clearly.
     - **Verdict**: READY / REVISE / RETHINK
 
@@ -342,7 +346,7 @@ Extract:
 - **Verdict**
 - **Drift Warning**
 - **Simplification Opportunities**
-- **Modernization Opportunities**
+- **Platform Leverage Opportunities**
 - **Action items** ranked by priority
 
 Update `refine-logs/score-history.md`:
@@ -350,7 +354,7 @@ Update `refine-logs/score-history.md`:
 ```markdown
 # Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Frontier Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | X                | X                  | X                    | X                 | X           | X                | X               | X       | REVISE  |
 ```
@@ -369,8 +373,8 @@ Before changing anything:
 3. Write a **Simplicity Check**:
    - What is the dominant contribution now?
    - What components can be removed, merged, or kept frozen?
-   - Which reviewer suggestions add unnecessary complexity?
-   - If a frontier primitive is central, is its role still crisp and justified?
+   - Which reviewer suggestions add unnecessary hardware complexity?
+   - If a platform primitive (DPU engine / FPGA block / P4 stage) is central, is its role still crisp and justified?
 
 Then process reviewer feedback:
 
@@ -380,13 +384,13 @@ Then process reviewer feedback:
 
 Bias the revisions toward:
 
-- a sharper central contribution
-- fewer moving parts
-- cleaner reuse of strong existing backbones
-- more natural foundation-model-era leverage when it improves the paper
-- leaner, claim-driven experiments
+- a sharper central hardware contribution
+- fewer pipeline stages and hardware blocks
+- cleaner reuse of existing platform IP (DPU offload engine, FPGA IP core, RDMA verbs)
+- more natural platform-native leverage when it improves the paper (e.g., use DPU C-engine rather than custom RTL if it suffices)
+- leaner, claim-driven experiments focused on key metrics (throughput, latency, area)
 
-Do **not** add multiple parallel contributions just to chase score. If the reviewer requests another module, first ask whether the same gain can come from a better interface, distillation signal, reward model, or inference policy on top of an existing backbone.
+Do **not** add multiple parallel hardware contributions just to chase score. If the reviewer requests another block, first ask whether the same gain can come from a better pipeline interface, smarter scheduling policy, or configuration of an existing platform primitive.
 
 Save to `refine-logs/round-N-refinement.md`:
 
@@ -455,8 +459,8 @@ mcp__codex__codex-reply:
     - State whether the Problem Anchor is preserved or drifted
     - State whether the dominant contribution is now sharper or still too broad
     - State whether the method is simpler or still overbuilt
-    - State whether the frontier leverage is now appropriate or still old-school / forced
-    - Focus new critiques on missing mechanism, weak training signal, weak integration point, pseudo-novelty, or unnecessary complexity
+    - State whether the platform leverage is now appropriate or still host-CPU / software-only / forced hardware
+    - Focus new critiques on missing micro-architectural detail, weak hardware integration point, unsupported performance claim, pseudo-novelty, or unnecessary hardware complexity
     - Use the same verdict rule: READY only if overall score >= 9 and no blocking issue remains
 
     Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items.
@@ -543,7 +547,7 @@ If the final verdict is not READY, still write the best current final version he
 
 ## Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Frontier Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | ...              | ...                | ...                  | ...               | ...         | ...              | ...             | ...     | ...     |
 
@@ -629,7 +633,7 @@ Suggested next step: /experiment-plan
 - **One paper, one dominant contribution.** Avoid multiple parallel contributions unless the paper truly needs them.
 - **The smallest adequate mechanism wins.** Bigger is not automatically better.
 - **Prefer reuse over invention.** Start from strong existing backbones and add only what the bottleneck requires.
-- **Modern techniques are a prior, not a decoration.** Use LLM / VLM / Diffusion / RL-era components when they sharpen the method, not when they only make the proposal sound trendy.
+- **Platform capabilities are a prior, not a decoration.** Use DPU offload engines / FPGA IP blocks / P4 stages / RDMA verb extensions when they sharpen the mechanism, not when they only make the proposal sound modern.
 - **Minimal experiments.** Inside this skill, experiments only need to prove the core claims.
 - **Review the mechanism, not the parts count.** A long module list is not novelty.
 - **Pushback is encouraged.** If reviewer feedback causes drift or unnecessary complexity, argue back with evidence.

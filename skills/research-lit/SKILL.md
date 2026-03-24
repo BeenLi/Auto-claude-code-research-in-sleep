@@ -12,12 +12,26 @@ Research topic: $ARGUMENTS
 ## Constants
 
 - **PAPER_LIBRARY** — Local directory containing user's paper collection (PDFs). Check these paths in order:
-  1. `papers/` in the current project directory
-  2. `literature/` in the current project directory
-  3. Custom path specified by user in `CLAUDE.md` under `## Paper Library`
+  1. Inline override: `— paper library: /path/` in the skill invocation (highest priority)
+  2. Topic-specific path in `CLAUDE.md` under `## Paper Library` (fuzzy-match topic slug against keys)
+  3. Default path in `CLAUDE.md` under `## Paper Library` (the `default:` entry)
+  4. `papers/` in the current project directory
+  5. `literature/` in the current project directory
+
+  **CLAUDE.md format for `## Paper Library`**:
+  ```markdown
+  ## Paper Library
+
+  - default: ~/papers
+  - nic-lossless-compression: /Users/bytedance/Nutstore Files/顶刊论文/IOAcc/RDMA/compression
+  - transformer-efficiency: ~/papers/transformers
+  ```
+  Topic keys are matched by normalizing both the key and the query topic to lowercase + hyphens.
+  Partial matches are accepted (e.g. key `nic-compression` matches topic `NIC-side lossless compression`).
 - **MAX_LOCAL_PAPERS = 20** — Maximum number of local PDFs to scan (read first 3 pages each). If more are found, prioritize by filename relevance to the topic.
 - **ARXIV_DOWNLOAD = false** — When `true`, download top 3-5 most relevant arXiv PDFs to PAPER_LIBRARY after search. When `false` (default), only fetch metadata (title, abstract, authors) via arXiv API — no files are downloaded.
 - **ARXIV_MAX_DOWNLOAD = 5** — Maximum number of PDFs to download when `ARXIV_DOWNLOAD = true`.
+- **EXTENDED_TOPICS = []** — Optional list of related-but-broader topics to search in addition to the primary topic. Papers found via extended topics are tagged `[cross-domain]` and reported in a separate Section 1b table. They inform the "Cross-domain transfer" gap but do NOT affect the primary paper table or the topic-slug used for saving.
 
 > 💡 Overrides:
 > - `/research-lit "topic" — paper library: ~/my_papers/` — custom local PDF path
@@ -26,6 +40,7 @@ Research topic: $ARGUMENTS
 > - `/research-lit "topic" — sources: web` — only search the web (skip all local)
 > - `/research-lit "topic" — arxiv download: true` — download top relevant arXiv PDFs
 > - `/research-lit "topic" — arxiv download: true, max download: 10` — download up to 10 PDFs
+> - `/research-lit "nic-lossless-compression" — extended topics: "memory compression", "GPU compression FPGA", "hardware compression accelerator"` — also search adjacent fields; results appear in Section 1b only
 
 ## Data Sources
 
@@ -60,23 +75,77 @@ Examples:
 
 ## Workflow
 
+### Step 0: Load Previous Review (if exists)
+
+Before doing any search, check whether a prior literature review was already generated for this topic.
+
+1. **Derive topic slug** from the query argument (lowercase, hyphens, simplified). E.g. `"NIC-side lossless compression"` → `nic-lossless-compression`.
+
+2. **Scan for prior reviews**:
+   ```
+   Glob: {project-root}/{topic-slug}/research-lit/*.md
+   ```
+
+3. **If one or more files exist**:
+   - Read the most recent file (latest date in filename)
+   - Extract the existing paper table and narrative summary
+   - Use this as the **baseline** — treat all papers already listed as known
+   - Announce to the user: _"Found prior review from {date}, building on it."_
+   - In subsequent steps, **only search for papers newer than the prior review date**, or papers not already in the table
+   - In Step 4 output, clearly mark newly added papers (e.g. `🆕`) vs papers carried over from the prior review
+
+4. **If no prior review exists**: proceed normally from scratch.
+
+> This ensures incremental refinement rather than redundant re-research. Each run adds new findings on top of existing ones.
+
 ### Step 0a: Search Zotero Library (if available)
 
 **Skip this step entirely if Zotero MCP is not configured.**
 
-Try calling a Zotero MCP tool (e.g., search). If it succeeds:
+Try calling `zotero_get_collections` first. If it succeeds, proceed with the steps below.
 
-1. **Search by topic**: Use the Zotero search tool to find papers matching the research topic
-2. **Read collections**: Check if the user has a relevant collection/folder for this topic
-3. **Extract annotations**: For highly relevant papers, pull PDF highlights and notes — these represent what the user found important
-4. **Export BibTeX**: Get citation data for relevant papers (useful for `/paper-write` later)
-5. **Compile results**: For each relevant Zotero entry, extract:
+#### Phase A: Collection Discovery (path-aware)
+
+Do NOT rely solely on keyword search — Zotero collections are organized as a user-curated hierarchy that must be traversed explicitly.
+
+1. **Get full collection tree**: Call `zotero_get_collections` to retrieve all collections with their keys and nesting.
+
+2. **Match by keyword fragments**: Decompose the topic slug into meaningful keywords. For example, `nic-lossless-compression` → `["compression", "lossless", "nic", "rdma"]`. Match any collection whose name contains **any** of these keywords (case-insensitive). Collect all matching collections at any depth level.
+   - Example: topic `nic-lossless-compression` → matches `compression` collection even if nested under `IOAcc → RDMA → compression`.
+   - Do NOT require the full slug to match — fragment matching is sufficient.
+
+3. **Retrieve items from matched collections**: For each matched collection, call `zotero_get_collection_items(collection_key)`. De-duplicate across collections.
+
+4. **Fallback text search**: Additionally run `zotero_search_items` with the original topic as query — this catches papers not yet filed into a matching collection.
+
+#### Phase B: Cross-domain Broadening (only if EXTENDED_TOPICS is set)
+
+**Skip this phase entirely if the user did not provide `— extended topics:` in the invocation.**
+
+If `EXTENDED_TOPICS` is non-empty, search each extended topic separately:
+
+1. **Search Zotero for each extended topic**: Run `zotero_search_items` with each entry in EXTENDED_TOPICS. Collect results NOT already found in Phase A.
+
+2. **Also match Zotero collections**: For each extended topic keyword, re-run the collection fragment-matching from Phase A. Papers in matching collections are included.
+
+3. **Filter by venue quality**: Keep only papers from top-tier venues (MICRO, ISCA, HPCA, ASPLOS, NSDI, SIGCOMM, OSDI, USENIX ATC, EuroSys, FCCM, DAC, IEEE TPDS, IEEE Micro, etc.). Discard workshop papers and preprints from unknown venues at this stage.
+
+4. **Tag as cross-domain**: Mark these papers with `[cross-domain]` in your working set. They will be reported in Section 1b — NOT mixed into the primary paper table. The topic-slug used for saving is always derived from the **primary topic**, not extended topics.
+
+#### Phase C: Annotation and Metadata Extraction
+
+For papers found in Phase A (primary) and Phase B (cross-domain):
+
+1. **Extract annotations**: For highly relevant papers, call `zotero_get_annotations(item_key)` — these show what the user personally highlighted as important.
+2. **Get notes**: Call `zotero_get_notes(item_key)` for any user-written notes attached to the paper.
+3. **Compile each entry**:
    - Title, authors, year, venue
+   - Collection path (e.g., `IOAcc → RDMA → compression`)
    - User's annotations/highlights (if any)
    - Tags the user assigned
-   - Which collection it belongs to
+   - `[cross-domain]` marker if applicable
 
-> 📚 Zotero annotations are gold — they show what the user personally highlighted as important, which is far more valuable than generic summaries.
+> 📚 Phase A collection traversal ensures you find papers even when the collection name doesn't match the topic slug. Phase B cross-domain broadening ensures top-venue adjacent work is not silently dropped.
 
 ### Step 0b: Search Obsidian Vault (if available)
 
@@ -100,9 +169,12 @@ Try calling an Obsidian MCP tool (e.g., search). If it succeeds:
 
 Before searching online, check if the user already has relevant papers locally:
 
-1. **Locate library**: Check PAPER_LIBRARY paths for PDF files
+1. **Locate library**: Resolve PAPER_LIBRARY path in priority order:
+   - Check for inline `— paper library:` override in the invocation arguments
+   - Read `CLAUDE.md` → `## Paper Library` section; try topic-specific key first (fuzzy match), then `default:`
+   - Fall back to `papers/` or `literature/` in project directory
    ```
-   Glob: papers/**/*.pdf, literature/**/*.pdf
+   Glob: {PAPER_LIBRARY}/**/*.pdf
    ```
 
 2. **De-duplicate against Zotero**: If Step 0a found papers, skip any local PDFs already covered by Zotero results (match by filename or title).
@@ -119,10 +191,89 @@ Before searching online, check if the user already has relevant papers locally:
 > 📚 If no local papers are found, skip to Step 1. If the user has a comprehensive local collection, the external search can be more targeted (focus on what's missing).
 
 ### Step 1: Search (external)
-- Use WebSearch to find recent papers on the topic
-- Check arXiv, Semantic Scholar, Google Scholar
-- Focus on papers from last 2 years unless studying foundational work
 - **De-duplicate**: Skip papers already found in Zotero, Obsidian, or local library
+- Focus on papers from last 2 years unless studying foundational work; for architecture/systems topics, extend to last 5 years to capture influential prior work
+- Search the following sources:
+
+**Target venues** (for reference when evaluating results):
+- Computer Architecture: MICRO, ISCA, HPCA, ASPLOS
+- Systems & Networking: NSDI, SIGCOMM, OSDI, USENIX ATC, EuroSys
+- Hardware design: FCCM, DAC, IEEE TCAD, IEEE TVLSI
+- Journals: IEEE TPDS, IEEE TON, IEEE TC, ACM TOCS, ACM Transactions on Networking
+
+> ⚠️ **ACM DL and IEEE Xplore cannot be accessed directly** (both return 403 / require login). Do NOT claim to "search ACM DL / IEEE Xplore" — use the alternative strategies below instead.
+
+**Search strategy — use in priority order:**
+
+> ⚠️ **Lessons from real runs**:
+> - Semantic Scholar API (S3) hits **429 rate limits** frequently — do NOT rely on it as primary
+> - DBLP keyword search API returns 0 results unless all terms match exactly — **do NOT use** `dblp.org/search/publ/api` for keyword queries
+> - **DBLP direct proceedings pages** (`dblp.org/db/conf/{venue}/{venue}{year}.html`) are the most reliable way to get exhaustive conference coverage — use these first
+
+**S1: DBLP direct proceedings pages** ✅ most reliable for conference coverage:
+```
+WebFetch https://dblp.org/db/conf/micro/micro2025.html   ← full paper list, no rate limits
+WebFetch https://dblp.org/db/conf/asplos/asplos2026.html
+```
+- Returns the **complete paper list** for a conference+year — exhaustive, no keyword matching needed
+- Scan the full list and filter by relevance to your topic
+- Always fetch **current year AND previous year** for each target venue
+- Known DBLP conference slugs: `micro`, `isca`, `hpca`, `asplos`, `sigcomm`, `nsdi`, `osdi`, `atc`, `eurosys`, `fccm`, `dac`
+- For journals (by volume): `WebFetch https://dblp.org/db/journals/tpds/tpds36.html` — adjust volume number to match current year
+
+**S2: Conference program pages** (for very recent conferences where DBLP not yet indexed):
+- Use when the conference was held within the last **8 weeks** and DBLP page returns incomplete results
+- **Derive the correct year** from `currentDate`. Always check current year AND previous year.
+- Known URL patterns (substitute `{YY}` = 2-digit year, `{YYYY}` = 4-digit year):
+
+| Venue | URL pattern |
+|-------|-------------|
+| ASPLOS | `https://www.asplos-conference.org/asplos{YYYY}/program/` |
+| MICRO | `https://microarch.org/micro{YY}/program.php` |
+| ISCA | `https://iscaconf.org/isca{YYYY}/program/` |
+| HPCA | `https://hpca-conf.org/{YYYY}/program/` |
+| SIGCOMM | `https://conferences.sigcomm.org/sigcomm/{YYYY}/program/` |
+| NSDI | `https://www.usenix.org/conference/nsdi{YY}/technical-sessions` |
+| OSDI | `https://www.usenix.org/conference/osdi{YY}/technical-sessions` |
+| USENIX ATC | `https://www.usenix.org/conference/atc{YY}/technical-sessions` |
+| EuroSys | `https://{YYYY}.eurosys.org/program/` |
+| FCCM | `https://www.fccm.org/fccm-{YYYY}-program/` |
+
+- If the URL pattern fails (404/redirect), fall back to WebSearch: `"{venue} {YYYY} program accepted papers"`
+
+**S3: Semantic Scholar API** (keyword search, use when S1/S2 don't cover a topic):
+```
+WebFetch https://api.semanticscholar.org/graph/v1/paper/search?query=QUERY&fields=title,year,venue,abstract,authors,externalIds&limit=10
+```
+- ⚠️ **Rate limited (HTTP 429)** — if it fails, wait and retry once; if it fails again, skip and rely on S1/S2/S4
+- Best use case: finding papers by keyword across all venues, especially for **extended topics** not covered by specific venue proceedings
+- Covers IEEE/ACM journals (TPDS/TC/TON/IEEE Micro) which DBLP journal volumes require knowing the exact volume number
+
+**S3b: IEEE Xplore API** (optional, requires free API key from developer.ieee.org):
+```
+WebFetch https://ieeexploreapi.ieee.org/api/v1/search/articles?querytext=QUERY&apikey=YOUR_KEY&max_records=10
+```
+- Useful for IEEE journals when Semantic Scholar is rate-limited
+- Skip if no API key configured
+
+**S4: WebSearch** (last resort, unreliable for venue-specific discovery):
+- Use only to find arXiv preprints of papers identified by title: `"paper title" site:arxiv.org`
+- Use to find a specific paper when you know part of its title: `"partial title" ASPLOS 2026`
+
+**Search execution order**:
+1. For each **target venue**: fetch DBLP proceedings page (S1) → scan full list → filter relevant titles
+2. For **very recent conferences** (< 8 weeks): also fetch conference program page (S2)
+3. For **keyword-based extended topics search**: try Semantic Scholar (S3), fall back to WebSearch (S4) if rate-limited
+4. Always run arXiv API search (see below) in parallel for preprints not yet in proceedings
+
+**Extended topics search** (only if `EXTENDED_TOPICS` is set):
+
+After the primary search, run a second pass for each entry in EXTENDED_TOPICS:
+- Same venues and sources as the primary search
+- Filter to top-tier venues only (same list as Step 0a Phase B)
+- De-duplicate against all papers already found in the primary pass
+- Tag all results as `[cross-domain]` — they go into Section 1b, not the primary paper table
+- Topic-slug for saving is still derived from the **primary topic** only
 
 **arXiv API search** (always runs, no download by default):
 
@@ -153,6 +304,37 @@ python3 "$SCRIPT" download ARXIV_ID --dir papers/
 - 1-second delay between downloads (rate limiting)
 - Verify each PDF > 10 KB
 
+### Step 1.5: Full-text Availability Check
+
+Before analyzing, verify which papers actually have accessible full text.
+
+**For every paper found in Step 1 (web search results only — local/Zotero/Obsidian papers already have full text):**
+
+1. **Check local library first**: Match paper title/DOI against files already in PAPER_LIBRARY. If found → mark `✅ local`.
+
+2. **Build the unavailable list**: Collect all `⚠️ NO FULL TEXT` papers into a table:
+
+   ```
+   | Title | Year | Venue | DOI / URL | 
+   |-------|------|-------|-----------|
+
+4. **If the unavailable list is non-empty → PAUSE and ask the user**:
+
+   > The following papers were found but full text is not accessible. To get deeper analysis, please download the PDFs and place them in: `{PAPER_LIBRARY}`
+   >
+   > | Title | Year | Venue | DOI / URL | |
+   > |-------|------|-------|-----------|
+   > | … | … | … | … |
+   >
+   > **Reply "continue" to proceed with available papers only, or place the PDFs in the library and reply "continue" to include them.**
+
+5. **After user replies "continue"**:
+   - Re-scan PAPER_LIBRARY for any newly added PDFs matching the unavailable list (match by filename or title keywords).
+   - Update status for any newly found papers to `✅ local`.
+   - Papers still marked `⚠️ NO FULL TEXT` will be included in the Paper Table with a ⚠️ marker, but analysis will be limited to title + abstract only (from the web search snippet).
+
+> **If all papers have accessible full text (local or open-access), skip the pause and proceed directly to Step 2.** Only pause when at least one paper has no accessible full text.
+
 ### Step 2: Analyze Each Paper
 For each relevant paper (from all sources), extract:
 - **Problem**: What gap does it address?
@@ -161,23 +343,70 @@ For each relevant paper (from all sources), extract:
 - **Relevance**: How does it relate to our work?
 - **Source**: Where we found it (Zotero/Obsidian/local/web) — helps user know what they already have vs what's new
 
-### Step 3: Synthesize
-- Group papers by approach/theme
-- Identify consensus vs disagreements in the field
-- Find gaps that our work could fill
-- If Obsidian notes exist, incorporate the user's own insights into the synthesis
+### Step 3: Synthesize — Landscape Map + Structural Gaps
+
+This step produces the analysis that both the user and downstream skills (e.g., `/idea-creator`) consume. Always produce all four sections below.
+
+#### 3a: Landscape Map (grouped by sub-direction)
+
+Group all collected papers into 3–6 sub-directions or approach clusters. For each cluster:
+- Cluster name and 1-sentence description
+- Papers belonging to it (with year and venue)
+- What the cluster has achieved and where it plateaus
+
+#### 3b: Consensus and Disagreements
+
+- Points of consensus: what does the field agree on? (e.g., "hardware LZ4 at 100Gbps is solved")
+- Active disagreements or open debates: conflicting results between papers, or competing design philosophies
+- If Obsidian notes exist, incorporate the user's own insights here
+
+#### 3c: Structural Gaps (for research ideation)
+
+Identify concrete, actionable gaps using these five lenses. Be specific — name the paper or assumption that creates each gap:
+
+1. **Cross-domain transfer**: methods proven in domain A (e.g., memory compression) not yet applied in domain B (e.g., RDMA NIC data path)
+2. **Contradictory findings**: papers that reach opposite conclusions — the discrepancy itself is a research opportunity
+3. **Untested assumptions**: things every paper takes for granted but nobody has experimentally validated (e.g., "compression ratio is stable enough to not affect flow control")
+4. **Unexplored regimes**: scales, workload types, hardware generations, or parameter ranges nobody has studied
+5. **Unasked diagnostic questions**: measurement studies or characterizations that would change how the field thinks, but haven't been done
+
+#### 3d: Competitive Landscape (for positioning)
+
+For the top 3 most directly competing papers:
+- What they claim to solve and what they leave open
+- Whether they are peer-reviewed or preprints
+- Whether they directly compete with or support a potential new contribution in this area
 
 ### Step 4: Output
-Present as a structured literature table:
 
+Present four sections:
+
+**Section 1 — Paper Table (primary)**
 ```
-| Paper | Venue | Method | Key Result | Relevance to Us | Source |
-|-------|-------|--------|------------|-----------------|--------|
+| Paper | Venue | Year | Method | Key Result | Relevance | Source |
+|-------|-------|------|--------|------------|-----------|--------|
 ```
+- Mark new papers with 🆕 if building on a prior review.
+- Mark papers from Zotero with 📚 and show their collection path (e.g., `IOAcc → RDMA → compression`).
 
-Plus a narrative summary of the landscape (3-5 paragraphs).
+**Section 1b — Cross-domain References**
+Papers from adjacent fields (tagged `[cross-domain]` in Step 0a Phase B), kept separate to avoid polluting the primary landscape:
+```
+| Paper | Venue | Year | Domain | Transferable Insight | Source |
+|-------|-------|------|--------|----------------------|--------|
+```
+These are inputs for the "Cross-domain transfer" lens in Section 3 (Structural Gaps).
 
-If Zotero BibTeX was exported, include a `references.bib` snippet for direct use in paper writing.
+**Section 2 — Landscape Map**
+Narrative by sub-direction cluster (from Step 3a). 3–5 paragraphs covering the full field.
+
+**Section 3 — Structural Gaps**
+Bulleted list from Step 3c. These are the direct inputs for `/idea-creator` Phase 2. For the "Cross-domain transfer" gap, explicitly reference papers from Section 1b.
+
+**Section 4 — Competitive Landscape**
+Top 3 competing papers with positioning notes (from Step 3d).
+
+If Zotero BibTeX was exported, append a `references.bib` snippet for direct use in paper writing.
 
 ### Step 5: Save Output
 
@@ -200,9 +429,13 @@ Example: `/my-project/nic-lossless-compression/research-lit/2026-03-21.md`
 
 The saved file must include:
 1. A header with the generation date, skill name, and original topic query
-2. The full literature table
-3. The narrative landscape summary
-4. All reference links
+2. **Section 1**: Full paper table (with 🆕 markers if incremental)
+3. **Section 2**: Landscape map by sub-direction (3–5 paragraphs)
+4. **Section 3**: Structural gaps — the 5-lens analysis (cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions)
+5. **Section 4**: Competitive landscape — top 3 competing papers with positioning
+6. All reference links
+
+> Section 3 (Structural Gaps) is the primary input consumed by `/idea-creator` in its Phase 1 Step 0. A well-written gaps section directly improves idea quality.
 
 #### Additional saves (optional)
 - If `ARXIV_DOWNLOAD = true`, save downloaded PDFs to `{topic-slug}/papers/`

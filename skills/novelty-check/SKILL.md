@@ -32,11 +32,13 @@ For EACH core claim, search using ALL available sources:
    - Search arXiv, Google Scholar, Semantic Scholar
    - Use specific technical terms from the claim
    - Try at least 3 different query formulations per claim
-   - Include year filters for 2024-2026
+   - Include year filters for 2021-2026
 
 2. **Known paper databases**: Check against:
-   - ICLR 2025/2026, NeurIPS 2025, ICML 2025/2026
-   - Recent arXiv preprints (2025-2026)
+   - **Architecture**: MICRO, ISCA, HPCA, ASPLOS
+   - **Systems/Networking**: NSDI, SIGCOMM, OSDI, USENIX ATC, EuroSys, FCCM, DAC
+   - **IEEE/ACM journals**: IEEE TPDS, ACM TOCS, IEEE TCAD, IEEE TON, IEEE TC and ACM Transactions on Networking
+   - Recent arXiv preprints in cs.AR / cs.NI / cs.DC and related categories
 
 3. **Read abstracts**: For each potentially overlapping paper, WebFetch its abstract and related work section
 
@@ -48,7 +50,8 @@ config: {"model_reasoning_effort": "xhigh"}
 Prompt should include:
 - The proposed method description
 - All papers found in Phase B
-- Ask: "Is this method novel? What is the closest prior work? What is the delta?"
+- Domain context: computer architecture / NIC/DPU systems / RDMA networking
+- Ask: "Is this method novel for a MICRO/ISCA/HPCA/NSDI venue? What is the closest prior work in hardware architecture or systems? What is the technical delta that a PC member would recognize as a genuine contribution?"
 
 ### Phase D: Novelty Report
 Output a structured report:
