@@ -1,5 +1,7 @@
 # Auto-claude-code-research-in-sleep (ARIS ⚔️🌙)
 
+💡 *你可以直接在 Claude Code / Cursor / Trae 中使用 ARIS 的 workflow，也可以通过独立 CLI 体验完整功能 — enjoy any way you like!*
+
 🔥 [**ARIS-Code CLI — 独立安装版**](docs/ARIS-Code-README_CN.md) · [English](docs/ARIS-Code-README_EN.md) | [⬇️ Download](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/releases/latest)
 
 <img src="docs/aris-code-banner.png" width="600" alt="ARIS-Code CLI">
