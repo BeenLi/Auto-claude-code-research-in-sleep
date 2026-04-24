@@ -38,7 +38,7 @@ Workflow 4:   rebuttal (post-submission external reviews)
 
 - **VENUE = `ICML`** — Default venue
 - **RESPONSE_MODE = `TEXT_ONLY`** — v1 default
-- **REVIEWER_MODEL = `gpt-5.4`** — Used via a secondary Codex agent for internal stress-testing
+- **REVIEWER_MODEL = `gpt-5.5`** — Used via a secondary Codex agent for internal stress-testing
 - **MAX_INTERNAL_DRAFT_ROUNDS = 2**
 - **MAX_STRESS_TEST_ROUNDS = 1**
 - **MAX_FOLLOWUP_ROUNDS = 3**
@@ -145,7 +145,7 @@ Run all lints:
 
 ```text
 spawn_agent:
-  model: gpt-5.4
+  model: gpt-5.5
   reasoning_effort: xhigh
   message: |
     Stress-test this rebuttal draft:

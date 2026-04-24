@@ -14,7 +14,7 @@ Periodically read WandB metrics during training to catch problems early. Do not 
 
 - **WANDB_RUN** - Read from project notes or pass as `entity/project/run_id`.
 - **CHECK_INTERVAL** - Starts at 10 minutes, then gradually increases if consistently healthy: 10 min -> 20 min -> 30 min -> 60 min (cap).
-- **REVIEWER_MODEL = `gpt-5.4`** - Used via a secondary Codex agent for ambiguous cases only.
+- **REVIEWER_MODEL = `gpt-5.5`** - Used via a secondary Codex agent for ambiguous cases only.
 
 ## When to Use
 

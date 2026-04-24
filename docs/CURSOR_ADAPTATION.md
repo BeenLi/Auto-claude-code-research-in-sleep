@@ -25,7 +25,7 @@ git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git
 
 ### 2.2 Set up Codex MCP in Cursor (for review skills)
 
-ARIS uses an external LLM (GPT-5.4 via Codex) as a critical reviewer. To enable this in Cursor:
+ARIS uses an external LLM (GPT-5.5 via Codex) as a critical reviewer. To enable this in Cursor:
 
 1. Install Codex CLI and authenticate:
    ```bash
@@ -106,8 +106,8 @@ For skills you use often, convert them to Cursor Rules so they load automaticall
    ---
    description: "Autonomous multi-round research review loop"
    globs:
-     - "AUTO_REVIEW.md"
-     - "REVIEW_STATE.json"
+     - "review-stage/AUTO_REVIEW.md"
+     - "review-stage/REVIEW_STATE.json"
    ---
 
    [Paste the full SKILL.md content here, minus the YAML frontmatter]
@@ -143,7 +143,7 @@ Use these sub-skills in sequence (the SKILL.md references them as
 5. @skills/research-refine-pipeline/SKILL.md — refine method + plan experiments
 ```
 
-> **Tip:** Cursor's context window may be smaller than Claude Code's. For long pipelines, run each phase in a separate chat and pass results via files (e.g., `IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`).
+> **Tip:** Cursor's context window may be smaller than Claude Code's. For long pipelines, run each phase in a separate chat and pass results via files (e.g., `idea-stage/IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`).
 
 ### Workflow 1.5: Experiment Bridge
 
@@ -206,14 +206,14 @@ For the full pipeline (`/research-pipeline`), break it into stages across chat s
 
 | Stage | What to do | Output files |
 |-------|-----------|-------------|
-| 1 | `@skills/idea-discovery/SKILL.md` + your direction | `IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md` |
+| 1 | `@skills/idea-discovery/SKILL.md` + your direction | `idea-stage/IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md` |
 | 2 | `@skills/experiment-bridge/SKILL.md` + `@refine-logs/EXPERIMENT_PLAN.md` + `@refine-logs/FINAL_PROPOSAL.md` | Experiment scripts, results |
-| 3 | `@skills/auto-review-loop/SKILL.md` + your topic | `AUTO_REVIEW.md` |
+| 3 | `@skills/auto-review-loop/SKILL.md` + your topic | `review-stage/AUTO_REVIEW.md` |
 | 4 | `@skills/paper-writing/SKILL.md` + `@NARRATIVE_REPORT.md` | `paper/` directory |
 
 Each stage reads the previous stage's output files, so context carries forward even across sessions.
 
-> **Note:** Stage 4 expects a `NARRATIVE_REPORT.md` describing your research story (claims, experiments, results). This is typically written by you based on `AUTO_REVIEW.md` and experiment results — see [NARRATIVE_REPORT_EXAMPLE.md](NARRATIVE_REPORT_EXAMPLE.md) for the expected format.
+> **Note:** Stage 4 expects a `NARRATIVE_REPORT.md` describing your research story (claims, experiments, results). This is typically written by you based on `review-stage/AUTO_REVIEW.md` and experiment results — see [NARRATIVE_REPORT_EXAMPLE.md](NARRATIVE_REPORT_EXAMPLE.md) for the expected format.
 
 ## 5. MCP Tool Calls
 
@@ -221,7 +221,7 @@ ARIS skills reference MCP tools by name (e.g., `mcp__codex__codex`). Cursor supp
 
 | ARIS MCP tool | What it does | Required MCP server |
 |--------------|-------------|-------------------|
-| `mcp__codex__codex` | Send prompt to GPT-5.4 | Codex |
+| `mcp__codex__codex` | Send prompt to GPT-5.5 | Codex |
 | `mcp__codex__codex-reply` | Continue conversation thread | Codex |
 | `mcp__llm-chat__chat` | Send prompt to any OpenAI-compatible model | llm-chat |
 | `mcp__zotero__*` | Search Zotero library | zotero (name may vary by config) |
@@ -233,9 +233,9 @@ ARIS workflows persist state to files for crash recovery. These work identically
 
 | File | Purpose | Written by |
 |------|---------|-----------|
-| `REVIEW_STATE.json` | Auto-review loop progress | `/auto-review-loop` |
-| `AUTO_REVIEW.md` | Cumulative review log | `/auto-review-loop` |
-| `IDEA_REPORT.md` | Ranked ideas with pilot results | `/idea-discovery` |
+| `review-stage/REVIEW_STATE.json` | Auto-review loop progress | `/auto-review-loop` |
+| `review-stage/AUTO_REVIEW.md` | Cumulative review log | `/auto-review-loop` |
+| `idea-stage/IDEA_REPORT.md` | Ranked ideas with pilot results | `/idea-discovery` |
 | `PAPER_PLAN.md` | Paper outline + claims-evidence matrix | `/paper-plan` |
 | `refine-logs/FINAL_PROPOSAL.md` | Refined method proposal | `/research-refine` |
 | `refine-logs/EXPERIMENT_PLAN.md` | Experiment roadmap | `/experiment-plan` |
@@ -245,8 +245,8 @@ If a Cursor chat session ends mid-workflow, start a new session and reference th
 
 ```
 @skills/auto-review-loop/SKILL.md
-@REVIEW_STATE.json
-@AUTO_REVIEW.md
+@review-stage/REVIEW_STATE.json
+@review-stage/AUTO_REVIEW.md
 
 Resume the auto review loop from the saved state.
 ```
@@ -268,7 +268,7 @@ Deploy the training script to the remote GPU server.
 |-----------|-----------|
 | No native slash commands | Use `@skills/skill-name/SKILL.md` to reference skills |
 | Context window may be smaller | Break long pipelines into per-stage sessions, pass results via files |
-| No auto-compact recovery | Use `REVIEW_STATE.json` to resume manually across sessions |
+| No auto-compact recovery | Use `review-stage/REVIEW_STATE.json` to resume manually across sessions |
 | `allowed-tools` not enforced | Cursor agent has access to all its tools by default — not a problem in practice |
 | Skills reference `$ARGUMENTS` | Replace with your actual arguments in the prompt |
 | SKILL.md files use `/skill-name` to call sub-skills | Cursor ignores these. For pipeline skills (`idea-discovery`, `paper-writing`), list the sub-skill `@` references explicitly in your prompt — see Workflow 1 and 3 examples |

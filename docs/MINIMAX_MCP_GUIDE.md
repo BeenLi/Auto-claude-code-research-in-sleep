@@ -72,7 +72,7 @@ pip3 install -r mcp-servers/minimax-chat/requirements.txt
 
 ## 改写所有 Skills（重要！）
 
-`auto-review-loop-minimax` 只是**一个** skill 的 MiniMax 版。项目中有 **12 个 skill** 使用 Codex MCP (`mcp__codex__codex`) 调用 GPT-5.4 做审查。如果你想全面切换到 MiniMax，需要让 Claude Code 把它们全部改写。
+`auto-review-loop-minimax` 只是**一个** skill 的 MiniMax 版。项目中有 **12 个 skill** 使用 Codex MCP (`mcp__codex__codex`) 调用 GPT-5.5 做审查。如果你想全面切换到 MiniMax，需要让 Claude Code 把它们全部改写。
 
 安装完 MCP 服务器后，在 Claude Code 对话中执行：
 
@@ -123,8 +123,8 @@ Skill 会自动检测并使用 `mcp__minimax-chat__minimax_chat` 工具。
         └── SKILL.md                 # MiniMax 版
 
 项目目录/
-├── AUTO_REVIEW.md                   # 审查日志（自动生成）
-└── REVIEW_STATE.json                # 状态持久化（自动生成）
+├── review-stage/AUTO_REVIEW.md                   # 审查日志（自动生成）
+└── review-stage/REVIEW_STATE.json                # 状态持久化（自动生成）
 ```
 
 ## MCP 服务器特性

@@ -68,7 +68,7 @@ cp -r skills/* /path/to/your/project/.agents/skills/
 
 ### 3.2 Set up Codex MCP in Antigravity (for review skills)
 
-ARIS uses an external LLM (GPT-5.4 via Codex) as a critical reviewer. To enable this in Antigravity:
+ARIS uses an external LLM (GPT-5.5 via Codex) as a critical reviewer. To enable this in Antigravity:
 
 1. Install Codex CLI and authenticate:
    ```bash
@@ -152,7 +152,7 @@ Antigravity uses `GEMINI.md` (equivalent to Claude Code's `CLAUDE.md`) for proje
 
 - Topic: [your research topic]
 - Target venue: ICLR/NeurIPS/ICML
-- Key files: NARRATIVE_REPORT.md, IDEA_REPORT.md
+- Key files: NARRATIVE_REPORT.md, idea-stage/IDEA_REPORT.md
 ```
 
 ## 4. How to Invoke Skills
@@ -210,7 +210,7 @@ Follow these sub-skills in sequence:
 5. Read and execute skills/research-refine-pipeline/SKILL.md — refine method + plan experiments
 ```
 
-> **Tip:** If the context gets long, run each phase as a separate agent task in Antigravity's Manager View. Pass results via files (e.g., `IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`).
+> **Tip:** If the context gets long, run each phase as a separate agent task in Antigravity's Manager View. Pass results via files (e.g., `idea-stage/IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`).
 
 ### Workflow 1.5: Experiment Bridge
 
@@ -269,9 +269,9 @@ For the full pipeline (`/research-pipeline`), leverage Antigravity's **multi-age
 
 | Stage | What to do | Output files |
 |-------|-----------|-------------|
-| 1 | Idea Discovery: `skills/idea-discovery/SKILL.md` + your direction | `IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md` |
+| 1 | Idea Discovery: `skills/idea-discovery/SKILL.md` + your direction | `idea-stage/IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md` |
 | 2 | Experiment Bridge: `skills/experiment-bridge/SKILL.md` | Experiment scripts, results |
-| 3 | Auto Review Loop: `skills/auto-review-loop/SKILL.md` | `AUTO_REVIEW.md` |
+| 3 | Auto Review Loop: `skills/auto-review-loop/SKILL.md` | `review-stage/AUTO_REVIEW.md` |
 | 4 | Paper Writing: `skills/paper-writing/SKILL.md` + `NARRATIVE_REPORT.md` | `paper/` directory |
 
 Each stage reads the previous stage's output files, so context carries forward across agent sessions.
@@ -284,7 +284,7 @@ ARIS skills reference MCP tools by name. These work identically in Antigravity o
 
 | ARIS MCP tool | What it does | Required MCP server |
 |--------------|-------------|-------------------|
-| `mcp__codex__codex` | Send prompt to GPT-5.4 | Codex |
+| `mcp__codex__codex` | Send prompt to GPT-5.5 | Codex |
 | `mcp__codex__codex-reply` | Continue conversation thread | Codex |
 | `mcp__llm-chat__chat` | Send prompt to any OpenAI-compatible model | llm-chat |
 | `mcp__zotero__*` | Search Zotero library | zotero (name may vary) |
@@ -296,9 +296,9 @@ ARIS workflows persist state to files for crash recovery. These work identically
 
 | File | Purpose | Written by |
 |------|---------|----|
-| `REVIEW_STATE.json` | Auto-review loop progress | `auto-review-loop` |
-| `AUTO_REVIEW.md` | Cumulative review log | `auto-review-loop` |
-| `IDEA_REPORT.md` | Ranked ideas with pilot results | `idea-discovery` |
+| `review-stage/REVIEW_STATE.json` | Auto-review loop progress | `auto-review-loop` |
+| `review-stage/AUTO_REVIEW.md` | Cumulative review log | `auto-review-loop` |
+| `idea-stage/IDEA_REPORT.md` | Ranked ideas with pilot results | `idea-discovery` |
 | `PAPER_PLAN.md` | Paper outline + claims-evidence matrix | `paper-plan` |
 | `refine-logs/FINAL_PROPOSAL.md` | Refined method proposal | `research-refine` |
 | `refine-logs/EXPERIMENT_PLAN.md` | Experiment roadmap | `experiment-plan` |
@@ -307,7 +307,7 @@ ARIS workflows persist state to files for crash recovery. These work identically
 If an Antigravity agent session ends mid-workflow, start a new session and reference the state file:
 
 ```
-Read skills/auto-review-loop/SKILL.md, then read REVIEW_STATE.json and AUTO_REVIEW.md.
+Read skills/auto-review-loop/SKILL.md, then read review-stage/REVIEW_STATE.json and review-stage/AUTO_REVIEW.md.
 Resume the auto review loop from the saved state.
 ```
 
@@ -351,8 +351,8 @@ Antigravity includes a built-in browser. Useful for:
 
 ### Artifact System
 Antigravity's artifact system (implementation plans, walkthroughs) maps naturally to ARIS outputs:
-- `IDEA_REPORT.md` → implementation plan artifact
-- `AUTO_REVIEW.md` → walkthrough artifact
+- `idea-stage/IDEA_REPORT.md` → implementation plan artifact
+- `review-stage/AUTO_REVIEW.md` → walkthrough artifact
 - `PAPER_PLAN.md` → implementation plan artifact
 
 ### Knowledge Persistence

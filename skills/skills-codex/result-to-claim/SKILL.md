@@ -12,7 +12,7 @@ Experiments produce numbers; this gate decides what those numbers *mean*. Collec
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.4`** - Used via a secondary Codex agent for objective claim assessment.
+- **REVIEWER_MODEL = `gpt-5.5`** - Used via a secondary Codex agent for objective claim assessment.
 
 ## When to Use
 

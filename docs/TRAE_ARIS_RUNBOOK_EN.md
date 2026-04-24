@@ -187,7 +187,7 @@ Use the following sub-skills in order:
 5. Use research-refine-pipeline skill — Method refinement + Experiment planning
 ```
 
-> **Tip:** If context is too long, split each stage into separate conversations and pass results via files (e.g., `IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`).
+> **Tip:** If context is too long, split each stage into separate conversations and pass results via files (e.g., `idea-stage/IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`).
 
 ### Workflow 1.5: Experiment Bridge
 
@@ -244,9 +244,9 @@ Use the following sub-skills in order:
 
 | Stage | Execution | Output Files |
 |--------|-----------|--------------|
-| 1 | Idea Discovery: Use `idea-discovery` skill + research direction | `IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md` |
+| 1 | Idea Discovery: Use `idea-discovery` skill + research direction | `idea-stage/IDEA_REPORT.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md` |
 | 2 | Experiment Bridge: Use `experiment-bridge` skill | Experiment scripts and results |
-| 3 | Auto Review: Use `auto-review-loop` skill | `AUTO_REVIEW.md` |
+| 3 | Auto Review: Use `auto-review-loop` skill | `review-stage/AUTO_REVIEW.md` |
 | 4 | Paper Writing: Use `paper-writing` skill + `NARRATIVE_REPORT.md` | `paper/` directory |
 
 Each stage reads output files from the previous stage, so context can be passed across different conversations.
@@ -255,7 +255,7 @@ Each stage reads output files from the previous stage, so context can be passed 
 
 | ARIS MCP tool | Purpose | Required MCP server |
 |---|---|---|
-| `mcp__codex__codex` | Send review prompt to GPT-5.4 | codex |
+| `mcp__codex__codex` | Send review prompt to GPT-5.5 | codex |
 | `mcp__codex__codex-reply` | Continue review thread | codex |
 | `mcp__llm-chat__chat` | Send prompt to OpenAI-compatible models | llm-chat |
 
@@ -263,9 +263,9 @@ Each stage reads output files from the previous stage, so context can be passed 
 
 | File | Purpose | Typical workflow |
 |---|---|---|
-| `REVIEW_STATE.json` | Tracks auto-review progress | auto-review-loop |
-| `AUTO_REVIEW.md` | Cumulative review log | auto-review-loop |
-| `IDEA_REPORT.md` | Ranked ideas and initial findings | idea-discovery |
+| `review-stage/REVIEW_STATE.json` | Tracks auto-review progress | auto-review-loop |
+| `review-stage/AUTO_REVIEW.md` | Cumulative review log | auto-review-loop |
+| `idea-stage/IDEA_REPORT.md` | Ranked ideas and initial findings | idea-discovery |
 | `PAPER_PLAN.md` | Outline + claim-evidence matrix | paper-plan |
 | `PAPER_IMPROVEMENT_LOG.md` | Paper improvement rounds log | auto-paper-improvement-loop |
 
@@ -273,8 +273,8 @@ Recovery example:
 
 ```text
 @skills/auto-review-loop/SKILL.md
-@REVIEW_STATE.json
-@AUTO_REVIEW.md
+@review-stage/REVIEW_STATE.json
+@review-stage/AUTO_REVIEW.md
 Resume the auto review loop from saved state.
 ```
 

@@ -17,7 +17,8 @@ Given a broad research direction from the user, systematically generate, validat
 - **PILOT_TIMEOUT_HOURS = 3** — Hard timeout: kill pilots exceeding 3 hours. Collect partial results if available.
 - **MAX_PILOT_IDEAS = 3** — Pilot at most 3 ideas in parallel. Additional ideas are validated on paper only.
 - **MAX_TOTAL_GPU_HOURS = 8** — Total GPU budget for all pilots combined.
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via a secondary Codex agent for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`).
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via a secondary Codex agent for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
+- **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 
 > 💡 Override via argument, e.g., `/idea-creator "topic" — pilot budget: 4h per idea, 20h total`.
 
@@ -108,9 +109,9 @@ Eliminate ideas that fail any of these. Typically 8-12 ideas reduce to 4-6.
 
 For each surviving idea, run a deeper evaluation:
 
-1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + GPT-5.4 cross-verification) for each idea
+1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + GPT-5.5 cross-verification) for each idea
 
-2. **Critical review**: Use GPT-5.4 via `send_input` (same agent):
+2. **Critical review**: Use GPT-5.5 via `send_input` (same agent):
    ```
    Here are our top ideas after filtering:
    [paste surviving ideas with novelty check results]
@@ -122,7 +123,7 @@ For each surviving idea, run a deeper evaluation:
    - Which 2-3 would you actually work on?
    ```
 
-3. **Combine rankings**: Merge your assessment with GPT-5.4's ranking. Select top 2-3 ideas for pilot experiments.
+3. **Combine rankings**: Merge your assessment with GPT-5.5's ranking. Select top 2-3 ideas for pilot experiments.
 
 ### Phase 5: Parallel Pilot Experiments (for top 2-3 ideas)
 
@@ -154,7 +155,7 @@ Note: Skip this phase if the ideas are purely theoretical or if no GPU is availa
 
 ### Phase 6: Output — Ranked Idea Report
 
-Write a structured report to `IDEA_REPORT.md` in the project root:
+Write a structured report to `idea-stage/IDEA_REPORT.md`:
 
 ```markdown
 # Research Idea Report
@@ -206,6 +207,13 @@ Write a structured report to `IDEA_REPORT.md` in the project root:
 - [ ] Scale up Idea 1 to full experiment (multi-seed, full dataset)
 - [ ] If confirmed, invoke /auto-review-loop for full iteration
 ```
+
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
 
 ## Key Rules
 

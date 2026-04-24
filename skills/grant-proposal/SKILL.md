@@ -34,7 +34,7 @@ Grant proposals argue for **future work** (feasibility + potential), not complet
 
 - **GRANT_TYPE = `KAKENHI`** — Default grant type. Supported: `KAKENHI`, `NSF`, `NSFC`, `ERC`, `DFG`, `SNSF`, `ARC`, `NWO`, `GENERIC`. Override via argument (e.g., `/grant-proposal "topic — NSF"`).
 - **GRANT_SUBTYPE = `auto`** — Sub-type within the grant agency. Examples: KAKENHI `Start-up`/`Wakate`/`Kiban-B`; NSFC `Youth`/`Excellent-Youth`/`Distinguished`/`Overseas`/`Key`; NSF `CAREER`/`CRII`/`Standard`. Auto-detected from argument or defaults to the most common sub-type.
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for proposal review. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`).
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for proposal review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
 - **OUTPUT_FORMAT = `markdown`** — Output format. Supported: `markdown`, `latex`. LaTeX uses grant-specific templates when available.
 - **MAX_REVIEW_ROUNDS = 2** — Maximum external review-revise cycles before finalizing.
 - **OUTPUT_DIR = `grant-proposal/`** — Directory for generated proposal files.
@@ -163,10 +163,10 @@ Parse `$ARGUMENTS` to extract:
 
 Then gather context from the project directory:
 
-1. Read `IDEA_REPORT.md` if it exists (from `/idea-discovery`)
+1. Read `idea-stage/IDEA_REPORT.md` if it exists (from `/idea-discovery`); fall back to `./IDEA_REPORT.md` if not found
 2. Read `refine-logs/FINAL_PROPOSAL.md` if it exists (from `/research-refine`)
 3. Read `refine-logs/EXPERIMENT_PLAN.md` if it exists (from `/experiment-plan`)
-4. Read `AUTO_REVIEW.md` if it exists (from `/auto-review-loop` — prior review feedback is gold for grants)
+4. Read `review-stage/AUTO_REVIEW.md` if it exists (from `/auto-review-loop` — prior review feedback is gold for grants); fall back to `./AUTO_REVIEW.md` if not found
 5. Read `NARRATIVE_REPORT.md` or `STORY.md` if they exist
 6. Read any existing literature notes or survey documents
 7. Scan for the user's publication list (e.g., `publications.md`, `cv.md`, `bio.md`, `CV.pdf`)
@@ -176,7 +176,7 @@ If insufficient context exists:
 - No research idea at all → suggest running `/idea-discovery` first
 - No literature survey → will invoke `/research-lit` inline in Phase 1
 - No publication list → leave PI qualification section with `[TODO: Add publications]` placeholders
-- Has AUTO_REVIEW.md → extract reviewer feedback and use it to strengthen the feasibility narrative
+- Has review-stage/AUTO_REVIEW.md → extract reviewer feedback and use it to strengthen the feasibility narrative
 
 ### Phase 1: Literature & Landscape Positioning
 
@@ -290,7 +290,7 @@ Timeline: [timeline]
 ```
 
 **What this does:**
-- GPT-5.4 xhigh acts as a grant review panelist (not a paper reviewer)
+- GPT-5.5 xhigh acts as a grant review panelist (not a paper reviewer)
 - Evaluates aims independence, narrative arc, risk identification, timeline realism
 - Identifies the single biggest reviewer concern
 - Provides actionable fixes ranked by severity
@@ -306,7 +306,7 @@ Apply structural feedback before proceeding to drafting.
 - Aim 2: [title] — Risk: MEDIUM
 - Aim 3: [title] — Risk: LOW
 - Timeline: [summary]
-- Reviewer feedback: [key points from GPT-5.4]
+- Reviewer feedback: [key points from GPT-5.5]
 
 Proceed to section drafting? Or adjust the structure?
 ```
@@ -327,7 +327,7 @@ Draft each section according to the grant type template. Write **complete prose*
 
 **What this does:**
 - Writes all required sections in the agency-specific language and tone
-- Pulls content from IDEA_REPORT.md, FINAL_PROPOSAL.md, and literature notes
+- Pulls content from idea-stage/IDEA_REPORT.md, FINAL_PROPOSAL.md, and literature notes
 - Uses `/paper-illustration` for figure generation (if user requests)
 - Leaves `[TODO]` only for PI-specific information, `[AMOUNT]` for budget figures
 - Outputs `grant-proposal/GRANT_PROPOSAL.md`
@@ -404,7 +404,7 @@ Which should I generate? (e.g., "1 and 3", "all", "skip")
 
 #### For Each Section
 
-1. **Pull relevant content** from IDEA_REPORT.md, FINAL_PROPOSAL.md, literature notes
+1. **Pull relevant content** from idea-stage/IDEA_REPORT.md, FINAL_PROPOSAL.md, literature notes
 2. **Write complete prose** — no `[TODO]` except for PI-specific information
 3. **Include figure/table placeholders** where appropriate (e.g., `[Figure 1: System architecture]`)
 4. **Cite references properly** — use citation keys, will build bibliography later
@@ -419,7 +419,7 @@ Invoke `/research-review` on the complete draft for grant-type-specific evaluati
 ```
 
 **What this does:**
-- GPT-5.4 xhigh acts as a grant review panelist
+- GPT-5.5 xhigh acts as a grant review panelist
 - Scores each section 1-5 using agency-specific criteria
 - Identifies fatal flaws and recommends funding/revisions/rejection
 - Provides ranked action items for improvement
@@ -541,7 +541,7 @@ Before declaring done:
 - Language: [language]
 - Aims: [N] aims covering [summary]
 - Timeline: [N] years
-- Review score: [summary from GPT-5.4]
+- Review score: [summary from GPT-5.5]
 - Output: grant-proposal/GRANT_PROPOSAL.md
 
 Files saved to grant-proposal/. Please review and customize:
@@ -587,7 +587,7 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 | `max review rounds` | 2 | External review cycles | — |
 | `sources` | all | Literature sources | → `/research-lit` |
 | `arxiv download` | false | Download arXiv PDFs | → `/research-lit` |
-| `reviewer model` | gpt-5.4 | Codex review model | → Codex MCP |
+| `reviewer model` | gpt-5.5 | Codex review model | → Codex MCP |
 | `auto proceed` | false | Skip checkpoints | — |
 
 ## Composing with Other Skills
@@ -618,3 +618,10 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 ```
 /idea-discovery → /experiment-bridge → /auto-review-loop → /paper-writing → submit
 ```
+
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting

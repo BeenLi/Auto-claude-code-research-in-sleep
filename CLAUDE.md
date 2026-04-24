@@ -60,7 +60,7 @@ Key overridable parameters: `AUTO_PROCEED` (true), `human_checkpoint` (false), `
 ## MCP Servers
 
 ```bash
-# Codex CLI (GPT-5.4 reviewer)
+# Codex CLI (GPT-5.5 reviewer)
 npm install -g @openai/codex && codex setup
 claude mcp add codex -s user -- codex mcp-server
 

@@ -199,7 +199,7 @@ Save all snippets to `figures/latex_includes.tex` for easy copy-paste into the p
 
 ### Step 7: Figure Quality Review with REVIEWER_MODEL
 
-Send figure descriptions and captions to GPT-5.4 for review:
+Send figure descriptions and captions to GPT-5.5 for review:
 
 ```
 mcp__claude-review__review_start:
@@ -248,6 +248,13 @@ figures/
 ├── latex_includes.tex           # LaTeX snippets for all figures
 └── TABLE_*.tex                  # standalone table LaTeX files
 ```
+
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
 
 ## Key Rules
 

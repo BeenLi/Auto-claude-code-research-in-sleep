@@ -9,7 +9,7 @@ Generate a structured, section-by-section paper outline from: **$ARGUMENTS**
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via a secondary Codex agent for outline review. Must be an OpenAI model.
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via a secondary Codex agent for outline review. Must be an OpenAI model.
 - **TARGET_VENUE = `ICLR`** — Default venue. User can override (e.g., `/paper-plan "topic" — venue: NeurIPS`). Supported: `ICLR`, `NeurIPS`, `ICML`, `CVPR`, `ACL`, `AAAI`, `ACM`, `IEEE_JOURNAL` (IEEE Transactions / Letters), `IEEE_CONF` (IEEE conferences).
 - **MAX_PAGES** — Page limit. For ML conferences: main body to Conclusion end (excluding references, appendix). ICLR=9, NeurIPS=9, ICML=8. **For IEEE venues: references ARE included in page count.** IEEE journal Transactions ≈ 12-14 pages total, Letters ≈ 4-5 pages total; IEEE conference ≈ 5-8 pages total (including references).
 
@@ -18,9 +18,9 @@ Generate a structured, section-by-section paper outline from: **$ARGUMENTS**
 The skill expects one or more of these in the project directory:
 
 1. **NARRATIVE_REPORT.md** or **STORY.md** — research narrative with claims and evidence
-2. **GPT54_AUTO_REVIEW.md** — auto-review loop conclusions
+2. **review-stage/AUTO_REVIEW.md** — auto-review loop conclusions *(fall back to `./AUTO_REVIEW.md` if not found)*
 3. **Experiment results** — JSON files in `figures/`, screen logs, tables
-4. **IDEA_REPORT.md** — from idea-discovery pipeline (if applicable)
+4. **idea-stage/IDEA_REPORT.md** — from idea-discovery pipeline (if applicable) *(fall back to `./IDEA_REPORT.md` if not found)*
 5. **CLAIMS_FROM_RESULTS.md** — structured claim judgment from `/result-to-claim` (preferred if available)
 
 If none exist, ask the user to describe the paper's contribution in 3-5 sentences.
@@ -195,11 +195,11 @@ For each section, list required citations:
 
 ### Step 6: Cross-Review with REVIEWER_MODEL
 
-Send the complete outline to GPT-5.4 xhigh for feedback:
+Send the complete outline to GPT-5.5 xhigh for feedback:
 
 ```
 spawn_agent:
-  model: gpt-5.4
+  model: gpt-5.5
   reasoning_effort: xhigh
   message: |
     Review this paper outline for a [VENUE] submission.
@@ -269,3 +269,10 @@ Save the final outline to `PAPER_PLAN.md` in the project root:
 ## Acknowledgements
 
 Outline methodology inspired by [Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills) (claim-evidence mapping), [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar) (citation verification), and [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills) (claim verification protocol).
+
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting

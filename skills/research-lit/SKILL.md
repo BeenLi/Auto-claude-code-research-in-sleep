@@ -11,6 +11,8 @@ Research topic: $ARGUMENTS
 
 ## Constants
 
+
+- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 - **PAPER_LIBRARY** — Local directory containing user's paper collection (PDFs). Check these paths in order:
   1. Inline override: `— paper library: /path/` in the skill invocation (highest priority)
   2. Topic-specific path in `CLAUDE.md` under `## Paper Library` (fuzzy-match topic slug against keys)
@@ -39,6 +41,8 @@ Research topic: $ARGUMENTS
 > - `/research-lit "topic" — sources: zotero` — only search Zotero
 > - `/research-lit "topic" — sources: web` — only search the web (skip all local)
 > - `/research-lit "topic" — sources: web, semantic-scholar` — also search Semantic Scholar for published venue papers (IEEE, ACM, etc.)
+> - `/research-lit "topic" — sources: deepxiv` — only search via DeepXiv progressive retrieval
+> - `/research-lit "topic" — sources: all, deepxiv` — use default sources plus DeepXiv
 > - `/research-lit "topic" — arxiv download: true` — download top relevant arXiv PDFs
 > - `/research-lit "topic" — arxiv download: true, max download: 10` — download up to 10 PDFs
 > - `/research-lit "nic-lossless-compression" — extended topics: "memory compression", "GPU compression FPGA", "hardware compression accelerator"` — also search adjacent fields; results appear in Section 1b only
@@ -50,8 +54,8 @@ This skill checks multiple sources **in priority order**. All are optional — i
 ### Source Selection
 
 Parse `$ARGUMENTS` for a `— sources:` directive:
-- **If `— sources:` is specified**: Only search the listed sources (comma-separated). Valid values: `zotero`, `obsidian`, `local`, `web`, `semantic-scholar`, `all`.
-- **If not specified**: Default to `all` — search every available source in priority order (`semantic-scholar` is **excluded** from `all`; it must be explicitly listed).
+- **If `— sources:` is specified**: Only search the listed sources (comma-separated). Valid values: `zotero`, `obsidian`, `local`, `web`, `semantic-scholar`, `deepxiv`, `exa`, `all`.
+- **If not specified**: Default to `all` — search every available source in priority order (`semantic-scholar`, `deepxiv`, and `exa` are **excluded** from `all`; they must be explicitly listed).
 
 Examples:
 ```
@@ -62,7 +66,11 @@ Examples:
 /research-lit "diffusion models" — sources: local                   → local PDFs only
 /research-lit "topic" — sources: obsidian, local, web               → skip Zotero
 /research-lit "topic" — sources: web, semantic-scholar              → web + S2 API (IEEE/ACM venue papers)
+/research-lit "topic" — sources: deepxiv                            → DeepXiv only
+/research-lit "topic" — sources: all, deepxiv                       → default sources + DeepXiv
 /research-lit "topic" — sources: all, semantic-scholar              → all + S2 API
+/research-lit "topic" — sources: exa                               → Exa only (broad web + content extraction)
+/research-lit "topic" — sources: all, exa                          → default sources + Exa web search
 ```
 
 ### Source Table
@@ -74,6 +82,8 @@ Examples:
 | 3 | **Local PDFs** | `local` | `Glob: papers/**/*.pdf, literature/**/*.pdf` | Raw PDF content (first 3 pages) |
 | 4 | **Web search** | `web` | Always available (WebSearch) | arXiv, Semantic Scholar, Google Scholar |
 | 5 | **Semantic Scholar API** | `semantic-scholar` | `tools/semantic_scholar_fetch.py` exists | Published venue papers (IEEE, ACM, Springer) with structured metadata: citation counts, venue info, TLDR. **Only runs when explicitly requested** via `— sources: semantic-scholar` or `— sources: web, semantic-scholar` |
+| 6 | **DeepXiv CLI** | `deepxiv` | `tools/deepxiv_fetch.py` and installed `deepxiv` CLI | Progressive paper retrieval: search, brief, head, section, trending, web search. **Only runs when explicitly requested** via `— sources: deepxiv` or `— sources: all, deepxiv` |
+| 7 | **Exa Search** | `exa` | `tools/exa_search.py` and installed `exa-py` SDK | AI-powered broad web search with content extraction (highlights, text, summaries). Covers blogs, docs, news, companies, and research papers beyond arXiv/S2. **Only runs when explicitly requested** via `— sources: exa` or `— sources: all, exa` |
 
 > **Graceful degradation**: If no MCP servers are configured, the skill works exactly as before (local PDFs + web search). Zotero and Obsidian are pure additions.
 
@@ -319,6 +329,54 @@ If `semantic_scholar_fetch.py` is not found, skip silently.
 - If the S2 match has no venue (still just a preprint indexed by S2): keep the arXiv version as-is.
 - S2 results without `externalIds.ArXiv` are **venue-only papers** not on arXiv — these are the unique value of this source.
 
+**DeepXiv search** (only when `deepxiv` is in sources):
+
+When the user explicitly requests `— sources: deepxiv` (or includes `deepxiv` in a combined source list), use the DeepXiv adapter for progressive retrieval:
+
+```bash
+python3 tools/deepxiv_fetch.py search "QUERY" --max 10
+```
+
+Then deepen only for the most relevant papers:
+
+```bash
+python3 tools/deepxiv_fetch.py paper-brief ARXIV_ID
+python3 tools/deepxiv_fetch.py paper-head ARXIV_ID
+python3 tools/deepxiv_fetch.py paper-section ARXIV_ID "Experiments"
+```
+
+If `tools/deepxiv_fetch.py` or the `deepxiv` CLI is unavailable, skip this source gracefully and continue with the remaining requested sources.
+
+**Why use DeepXiv?** It is useful when a broad search should be followed by staged reading rather than immediate full-paper loading. This reduces unnecessary context while still surfacing structure, TLDRs, and the most relevant sections.
+
+**De-duplication against arXiv and S2**:
+- Match by arXiv ID first, DOI second, normalized title third
+- If DeepXiv and arXiv refer to the same preprint, keep one canonical paper row and record `deepxiv` as an additional source
+- If DeepXiv overlaps with S2 on a published paper, prefer S2 venue/citation metadata in the final table, but keep DeepXiv-derived section notes when they add value
+
+**Exa search** (only when `exa` is in sources):
+
+When the user explicitly requests `— sources: exa` (or includes `exa` in a combined source list), use the Exa tool for broad AI-powered web search with content extraction:
+
+```bash
+EXA_SCRIPT=$(find tools/ -name "exa_search.py" 2>/dev/null | head -1)
+
+# Search for research papers with highlights
+python3 "$EXA_SCRIPT" search "QUERY" --max 10 --category "research paper" --content highlights
+
+# Search for broader web content (blogs, docs, news)
+python3 "$EXA_SCRIPT" search "QUERY" --max 10 --content highlights
+```
+
+If `tools/exa_search.py` or the `exa-py` SDK is unavailable, skip this source gracefully and continue with the remaining requested sources.
+
+**Why use Exa?** Exa provides AI-powered search across the broader web (blogs, documentation, news, company pages) with built-in content extraction. It fills a gap between academic databases (arXiv, S2) and generic WebSearch by returning richer content with each result.
+
+**De-duplication against arXiv, S2, and DeepXiv**:
+- Match by URL first, then normalized title
+- If Exa returns an arXiv paper already found by arXiv/S2, prefer the structured metadata from those sources
+- Exa results from non-academic domains (blogs, docs, news) are unique value not covered by other sources
+
 **Optional PDF download** (only when `ARXIV_DOWNLOAD = true`):
 
 After all sources are searched and papers are ranked by relevance:
@@ -342,25 +400,15 @@ Before analyzing, verify which papers actually have accessible full text.
 2. **Build the unavailable list**: Collect all `⚠️ NO FULL TEXT` papers into a table:
 
    ```
-   | Title | Year | Venue | DOI / URL | 
+   | Title | Year | Venue | DOI / URL |
    |-------|------|-------|-----------|
+   ```
 
-4. **If the unavailable list is non-empty → PAUSE and ask the user**:
-
-   > The following papers were found but full text is not accessible. To get deeper analysis, please download the PDFs and place them in: `{PAPER_LIBRARY}`
-   >
-   > | Title | Year | Venue | DOI / URL | |
-   > |-------|------|-------|-----------|
-   > | … | … | … | … |
-   >
-   > **Reply "continue" to proceed with available papers only, or place the PDFs in the library and reply "continue" to include them.**
-
-5. **After user replies "continue"**:
-   - Re-scan PAPER_LIBRARY for any newly added PDFs matching the unavailable list (match by filename or title keywords).
-   - Update status for any newly found papers to `✅ local`.
-   - Papers still marked `⚠️ NO FULL TEXT` will be included in the Paper Table with a ⚠️ marker, but analysis will be limited to title + abstract only (from the web search snippet).
-
-> **If all papers have accessible full text (local or open-access), skip the pause and proceed directly to Step 2.** Only pause when at least one paper has no accessible full text.
+3. **Degraded Processing**:
+   - Do NOT pause execution. The pipeline must remain fully autonomous.
+   - For papers marked `⚠️ NO FULL TEXT`, include them in the final Paper Table with the ⚠️ marker.
+   - Limit their analysis (in Step 2) strictly to the title and abstract (from the web search snippet or API metadata).
+   - Add a note in the final output recommending the user to download these PDFs later for deeper analysis.
 
 ### Step 2: Analyze Each Paper
 For each relevant paper (from all sources), extract:
@@ -406,7 +454,7 @@ For the top 3 most directly competing papers:
 
 ### Step 4: Output
 
-Present four sections:
+Present five sections:
 
 **Section 1 — Paper Table (primary)**
 ```
@@ -467,6 +515,47 @@ The saved file must include:
 #### Additional saves (optional)
 - If `ARXIV_DOWNLOAD = true`, save downloaded PDFs to `{topic-slug}/papers/`
 - If Obsidian is available, optionally create a literature review note in the vault
+
+### Step 6: Update Research Wiki
+
+**Required when `research-wiki/` exists.** Skip entirely (no action, no
+error) if the directory is absent. Per
+[`shared-references/integration-contract.md`](../shared-references/integration-contract.md),
+this step follows the canonical ingest contract — business logic lives
+in `tools/research_wiki.py`, not in this prose.
+
+```
+📋 Research Wiki ingest (runs once, at end of research-lit):
+   [ ] 1. Predicate: `research-wiki/` exists? If no, skip this step.
+   [ ] 2. For each of the top 8–12 relevant papers (arxiv IDs collected above):
+          python3 tools/research_wiki.py ingest_paper research-wiki/ \
+              --arxiv-id <id> [--thesis "<one-line>"] [--tags <t1>,<t2>]
+   [ ] 3. For each explicit relationship to an existing wiki entity,
+          add an edge:
+          python3 tools/research_wiki.py add_edge research-wiki/ \
+              --from "paper:<slug>" --to "<target_node_id>" \
+              --type <extends|contradicts|addresses_gap|inspired_by|...> \
+              --evidence "<one-sentence quote or reasoning>"
+   [ ] 4. Confirm papers/<slug>.md files were created (helper prints
+          "Paper ingested: ..."); if any failed with a network error,
+          retry or fall back to the --title/--authors/--year manual form.
+```
+
+`ingest_paper` handles slug generation, arXiv metadata fetch, dedup
+(skips an existing paper by arXiv id), page rendering, `index.md`
+rebuild, `query_pack.md` rebuild, and log append in a single call —
+**do not manually write `papers/<slug>.md`**. If the helper is
+unavailable (e.g., offline on a non-ARIS machine), log the gap and let
+`/research-wiki sync --arxiv-ids …` backfill later.
+
+For non-arXiv sources (Semantic Scholar only, IEEE/ACM journals without
+arXiv mirrors, blog posts), pass manual metadata instead:
+
+```
+python3 tools/research_wiki.py ingest_paper research-wiki/ \
+    --title "<full title>" --authors "A, B, C" --year <yyyy> \
+    --venue "<venue>" [--external-id-doi "<doi>"] [--thesis "..."]
+```
 
 ## Key Rules
 - Always include paper citations (authors, year, venue)

@@ -264,8 +264,8 @@ claude
     └── ...（其余 11 个 skill 类似）
 
 项目目录（运行时生成）/
-├── AUTO_REVIEW.md                       # 审查日志（自动追加）
-└── REVIEW_STATE.json                    # 状态持久化，支持断点恢复
+├── review-stage/AUTO_REVIEW.md                       # 审查日志（自动追加）
+└── review-stage/REVIEW_STATE.json                    # 状态持久化，支持断点恢复
 ```
 
 ---
@@ -275,7 +275,7 @@ claude
 | | 默认方案 | **本方案（Coding Plan）** | MiniMax 方案 | GLM + DeepSeek |
 |---|---|---|---|---|
 | 执行器 | Claude Opus/Sonnet | kimi-k2.5 / qwen3.5-plus | GLM-5 (Z.ai) | GLM-5 (Z.ai) |
-| 审查器 | GPT-5.4 (Codex MCP) | glm-5 / MiniMax-M2.7 | MiniMax-M2.7 | DeepSeek |
+| 审查器 | GPT-5.5 (Codex MCP) | glm-5 / MiniMax-M2.7 | MiniMax-M2.7 | DeepSeek |
 | 需要 Claude API | 是 | **否** | 否 | 否 |
 | 需要 OpenAI API | 是 | **否** | 否 | 否 |
 | API Key 数量 | 2 个 | **1 个** | 2 个 | 2 个 |

@@ -12,7 +12,7 @@ Systematically design ablation studies that answer the questions reviewers will 
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.4`** - Used via a secondary Codex agent for reviewer-style ablation design.
+- **REVIEWER_MODEL = `gpt-5.5`** - Used via a secondary Codex agent for reviewer-style ablation design.
 
 ## When to Use
 
