@@ -12,10 +12,13 @@
 
 ### Candidate 1: [Idea Name]
 - **One-line**: [What it does]
+- **AI infra layer**: [compute/accelerator | memory/data movement | interconnect/network | storage/checkpoint/data pipeline | runtime/serving]
+- **Hardware bottleneck**: [Concrete resource pressure or timing path]
+- **Validation backend**: [analytical_model | gem5 | htsim | cosim_gem5_htsim | trace_replay | RTL/HLS | FPGA/DPU_microbench]
 - **Novelty score**: X/10
 - **Reviewer assessment**: [Key strength + key risk]
 - **Pilot result**: [POSITIVE/NEGATIVE/NOT TESTED — one-line metric]
-- **Estimated effort**: [GPU hours, implementation complexity]
+- **Estimated effort**: [simulator/prototype hours, implementation complexity]
 - **Why not selected first**: [Reason — e.g., higher risk, needs more data, less novel]
 
 ### Candidate 2: [Idea Name]
@@ -23,7 +26,7 @@
 - **Novelty score**: X/10
 - **Reviewer assessment**: [Key strength + key risk]
 - **Pilot result**: [POSITIVE/NEGATIVE/NOT TESTED]
-- **Estimated effort**: [GPU hours, implementation complexity]
+- **Estimated effort**: [simulator/prototype hours, implementation complexity]
 - **Why not selected first**: [Reason]
 
 ### Candidate 3: [Idea Name]

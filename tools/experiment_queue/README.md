@@ -1,103 +1,105 @@
 # experiment-queue Tools
 
-Scheduler and manifest builder for `/experiment-queue` skill.
+Scheduler and manifest builder for simulator-first ARIS experiments.
 
 ## Files
 
-- `build_manifest.py` — Expands grid spec (YAML/JSON) into explicit job manifest
-- `queue_manager.py` — Scheduler that runs on the remote host; polls, launches, retries, cleans
+- `build_manifest.py` — expands YAML/JSON grid specs into explicit job manifests.
+- `queue_manager.py` — runs jobs across generic resource slots, tracks state, retries transient failures, and verifies required outputs.
+- `cosim_protocol.py` — defines the window-level gem5 + Broadcom/csg-htsim exchange contract for Rx decompression expansion pressure.
 
-## Install on Remote
+## Resource Model
 
-The skill auto-installs these on the SSH host under `~/.aris_queue/`:
+The queue no longer treats GPUs as the default resource. Simulator manifests should declare generic slots:
 
-```bash
-ssh <server> 'mkdir -p ~/.aris_queue'
-scp queue_manager.py build_manifest.py <server>:~/.aris_queue/
-```
-
-## Example
-
-### 1. Write grid spec (on local or remote)
-
-`grid_spec.yaml`:
 ```yaml
-project: dllm_distill
-cwd: /home/rfyang/rfyang_code/dllm_experiments_torch
-conda: dllm
-gpus: [0, 1, 2, 3, 4, 5, 6, 7]
-max_parallel: 8
-oom_retry: {delay: 120, max_attempts: 3}
+project: rx_pressure
+backend: cosim_gem5_htsim
+cwd: /home/user/rx-pressure
+env:
+  setup: source env.sh
+resources:
+  slots:
+    - {id: sim0, type: cpu_sim}
+    - {id: sim1, type: cpu_sim}
+max_parallel: 2
+cosim:
+  coordinator: external
+  window_us: 100
+  worker_lifecycle: persistent_file_handshake
+  htsim_variant: broadcom_csg_htsim
+  ground_truth: rx_decompression_expansion_pressure
+```
 
+Jobs request a slot type:
+
+```yaml
 phases:
-  - name: distill
+  - name: sanity
     grid:
-      N: [64, 128, 256]
-      seed: [42, 200, 201]
-      n_train_subset: [50000, 150000, 500000, 652000]
+      ratio: [1.5, 2.0]
     template:
-      id: "s${seed}_N${N}_n${n_train_subset}"
-      cmd: >
-        python run_pc_distill_exp.py --backbone softmax --lam 0.5
-        --t_max_distill 0 --K 500 --L 96 --W 16 --n_steps 30000
-        --batch_size 128 --lr 1e-4 --seed ${seed} --subset_seed 2024
-        --n_hidden ${N} --n_train_subset ${n_train_subset}
-      expected_output: "figures/pcdistill_sw_N${N}_*_seed${seed}.json"
+      id: rx_ratio_${ratio}
+      adapter: cosim_gem5_htsim
+      cmd: python3 run_cosim.py --ratio ${ratio}
+      resources: {slot_type: cpu_sim, cpu_cores: 4, memory_gb: 16}
+      outputs:
+        required:
+          - results/rx_ratio_${ratio}.json
+          - exchange/cosim_trace.jsonl
+      metrics:
+        - rx_pressure
+        - decompression_expansion_ratio
+        - accepted_compressed_bytes
+        - dropped_compressed_bytes
+        - sender_retransmission_policy
 ```
 
-### 2. Build manifest
+## gem5 + Broadcom/csg-htsim Co-simulation
+
+The first co-simulation target is Rx decompression expansion pressure:
+
+- compressed wire bytes can expand into larger host-memory writes after Rx decompression,
+- bursty multi-flow arrivals can overflow Rx decompression buffers or PCIe/memory capacity,
+- the network is lossy, but RDMA completion is reliable,
+- drops are performance events recovered by sender-side RTO retransmission,
+- the coordinator records window summaries but does not simulate retransmission itself.
+
+The protocol uses persistent workers plus file-based JSON handshakes at window boundaries. It exchanges flow/QP summaries, not packet-level events.
+
+## Launch
+
+Build a manifest:
 
 ```bash
-python3 build_manifest.py --config grid_spec.yaml --output manifest.json
+python3 tools/experiment_queue/build_manifest.py \
+  --config grid_spec.yaml \
+  --output manifest.json
 ```
 
-### 3. Launch scheduler
+Launch the scheduler:
 
 ```bash
-ssh <server> 'nohup python3 ~/.aris_queue/queue_manager.py \
-    --manifest /tmp/manifest.json \
-    --state /tmp/queue_state.json \
-    --log-dir /home/rfyang/rfyang_code/dllm_experiments_torch \
-    > /tmp/queue_mgr.log 2>&1 &'
+nohup python3 tools/experiment_queue/queue_manager.py \
+  --manifest manifest.json \
+  --state queue_state.json \
+  --log-dir logs \
+  > queue_mgr.log 2>&1 &
 ```
 
-### 4. Monitor
+Monitor:
 
 ```bash
-ssh <server> 'jq ".jobs | group_by(.status) | map({(.[0].status): length}) | add" /tmp/queue_state.json'
+jq '.jobs | group_by(.status) | map({(.[0].status): length}) | add' queue_state.json
 ```
 
-Returns:
-```json
-{"completed": 30, "running": 6, "pending": 0}
-```
+## Legacy GPU Manifests
 
-## State Machine
-
-```
-pending → running → completed
-                  ↘ failed_oom → pending (after delay, up to max_attempts)
-                               ↘ stuck (after max_attempts)
-                  ↘ failed_other → stuck
-```
+Old manifests with `gpus: [...]` still work through a compatibility path. New architecture experiments should use `resources.slots`.
 
 ## Dependencies
 
 - Python 3.8+
-- `nvidia-smi` on remote
-- `screen` on remote
-- Optional: `pyyaml` (only if using YAML grid specs)
-
-## Invariants
-
-- **No GPU overlap**: scheduler only assigns GPU with `memory.used < 500 MiB`
-- **State is source of truth**: `queue_state.json` is written atomically every step
-- **Idempotent**: safe to kill and restart the scheduler; picks up from state
-- **Output-based completion**: completion is verified by `expected_output` existing, not just by screen/process exit
-
-## Not Yet Supported
-
-- Mid-run GPU reshuffling (if GPU becomes unavailable mid-job)
-- Automatic GPU-per-job count (all jobs assumed single-GPU)
-- Distributed multi-node queues
-- Auto-sync results back to local
+- `screen`
+- Optional: `pyyaml` for YAML grid specs
+- Optional simulator toolchains: gem5, Broadcom/csg-htsim, VCS/Vivado, or project-specific wrappers

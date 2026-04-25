@@ -4,30 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 
 ## Research Domain
 
-This ARIS instance is configured for **computer architecture research**, specifically **NIC/DPU-side lossless compression in RDMA networks**. All skills should apply this domain context unless overridden inline.
+This ARIS instance is configured for **Computer Architecture / AI Infrastructure for LLM** research with a hardware-leaning systems focus. The current active idea is NIC/DPU-side compression for RDMA traffic in LLM infrastructure, but Workflow 1 should search across the full AI infrastructure stack rather than defaulting to network-only topics.
 
 ### Domain Profile
 
-- **Field**: Computer Architecture / Systems / Networking
+- **Field**: Computer Architecture / Systems / Networking / AI Infrastructure for LLM
 - **Target venues**: MICRO, ISCA, HPCA, ASPLOS, NSDI, OSDI, SIGCOMM, DAC, EuroSys, FCCM, IEEE TPDS, IEEE TC, IEEE TON, IEEE TVLSI, IEEE TCAD, ACM TACO
-- **Experimental paradigm**: FPGA prototype / RTL simulation / analytical model / gem5/systemC modeling / micro-benchmark on real hardware
-- **Key metrics**: throughput (Gbps), latency (ns/μs), compression ratio, FPGA resource (LUT/BRAM/DSP), power (W), PCIe/RDMA bandwidth utilization
-- **Platform primitives**: SmartNIC/DPU (NVIDIA BlueField, CX7), P4 programmable switches, FPGA-based RNIC prototype with compression hardware, ns-3 network simulator, htsim network simulator, gem5 simulator
-- **Pilot experiments**: analytical throughput/latency model, gem5 modeling, RTL implementation and simulation in Vivado/VCS, or micro-benchmark on available hardware (e.g., BlueField-2)
-- **Reviewer persona**: senior MICRO/ISCA/HPCA/ASPLOS program committee member — cares about: micro-architecture detail, real measurement vs simulation, hardware area/power overhead, generalizability across workloads
-
-### Skill Behavior Overrides
-
-When any skill references ML-specific concepts, apply the architecture equivalent:
-
-| ML Concept (in skill) | Architecture Equivalent (apply this) |
-|----------------------|--------------------------------------|
-| NeurIPS / ICML / ICLR venues | MICRO / ISCA / HPCA / ASPLOS |
-| GPU pilot experiment | RTL simulation / analytical model / FPGA micro-benchmark |
-| `PILOT_MAX_HOURS` GPU budget | Implementation complexity (days of RTL work) |
-| "Training recipe" / loss function | Hardware design flow: RTL → simulation → FPGA synthesis |
-| "senior ML researcher" reviewer | "senior computer architecture researcher" reviewer |
-| Semantic Scholar / arXiv cs.LG | DBLP proceedings / ACM DL / USENIX / IEEE Xplore |
+- **AI infrastructure layers**: compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, runtime/serving
+- **Evidence and validation**: Workflow 1 uses lightweight evidence for idea ranking: analytical models, small simulator runs, trace replay, microbenchmarks, RTL/HLS sketches, and gem5/htsim smoke runs. Full experiment execution is handled by Workflow 1.5.
+- **Current simulator-first anchor**: gem5 + Broadcom/csg-htsim + `cosim_gem5_htsim`, with window-level co-simulation for Rx decompression expansion pressure.
+- **Key metrics**: serving/system (tokens/s, requests/s, TTFT, TPOT, tail latency, completion time); data movement (HBM/CXL/PCIe/NIC/storage bandwidth, memory copy amplification, queue/buffer occupancy); network/RDMA (goodput, FCT, retransmitted bytes, drop/stall/congestion signals); compression (compression ratio, decompression expansion ratio, accepted/dropped compressed bytes); hardware cost (area, LUT/BRAM/DSP/SRAM footprint, timing/frequency, power/energy).
+- **Platform primitives**: accelerators, HBM/CXL memory systems, SmartNIC/DPU/RNIC datapaths, FPGA/ASIC prototypes, P4 programmable switches, storage datapaths, gem5, Broadcom/csg-htsim, ns-3, SystemC, RTL/HLS.
+- **Reviewer persona**: senior MICRO/ISCA/HPCA/ASPLOS program committee member; cares about microarchitecture detail, concrete bottleneck models, validation credibility, hardware cost, and generality across LLM infrastructure workloads.
 
 ## Workflows
 

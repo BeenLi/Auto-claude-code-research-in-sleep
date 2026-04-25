@@ -4,8 +4,20 @@ without triggering the module-level sys.stdout/stdin manipulation.
 """
 
 import os
-import httpx
 import tempfile
+
+try:
+    import httpx
+except ModuleNotFoundError:
+    class _MissingHttpx:
+        class ConnectError(Exception):
+            pass
+
+        class Client:
+            def __init__(self, *args, **kwargs):
+                raise RuntimeError("httpx is required for live MiniMax API calls")
+
+    httpx = _MissingHttpx()
 
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = os.environ.get("MINIMAX_BASE_URL", "https://api.minimax.io/v1")

@@ -1,6 +1,6 @@
 ---
 name: research-refine
-description: 'Turn a vague research direction into a problem-anchored, elegant, frontier-aware, implementation-oriented method plan via iterative GPT-5.5 review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
+description: 'Turn a vague research direction into a problem-anchored, elegant, platform-aware, implementation-oriented method plan via iterative GPT-5.5 review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
@@ -10,22 +10,22 @@ Refine and concretize: **$ARGUMENTS**
 
 ## Overview
 
-Use this skill when the research problem is already visible but the technical route is still fuzzy. The goal is not to produce a bloated proposal or a benchmark shopping list. The goal is to turn a vague direction into a **problem -> focused method -> minimal validation** document that is concrete enough to implement, elegant enough to feel paper-worthy, and current enough to resonate in the foundation-model era.
+Use this skill when the research problem is already visible but the technical route is still fuzzy. The goal is not to produce a bloated proposal or a benchmark shopping list. The goal is to turn a vague direction into a **problem -> focused mechanism -> minimal validation** document that is concrete enough to implement, elegant enough to feel paper-worthy, and current enough for AI infrastructure for LLM.
 
 Four principles dominate this skill:
 
 1. **Do not lose the original problem.** Freeze an immutable **Problem Anchor** and reuse it in every round.
-2. **The smallest adequate mechanism wins.** Prefer the minimal hardware intervention that directly fixes the bottleneck.
+2. **The smallest adequate mechanism wins.** Prefer the minimal architecture intervention that directly fixes the bottleneck.
 3. **One paper, one dominant contribution.** Prefer one sharp thesis plus at most one supporting contribution.
-4. **Platform leverage is a prior, not a decoration.** When SmartNIC/DPU capabilities, P4 programmability, FPGA primitives, or RDMA protocol hooks naturally fit the bottleneck, use them concretely. Do not bolt on trendy hardware features as buzzwords.
+4. **Platform leverage is a prior, not a decoration.** When accelerator, memory hierarchy, CXL/HBM, SmartNIC/DPU, P4, FPGA, storage, or runtime hooks naturally fit the bottleneck, use them concretely. Do not bolt on trendy hardware features as buzzwords.
 
-> **Domain context**: This skill is configured for **computer architecture / RDMA systems** research. "Frontier primitives" means modern hardware platforms (BlueField DPU, CX7, FPGA SmartNIC), not ML models. "Training recipe" means hardware design flow (RTL → simulation → FPGA synthesis). See `## Research Domain` in CLAUDE.md.
+> **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving. "Frontier primitives" means modern hardware and system substrates (accelerators, HBM/CXL, SmartNIC/DPU, FPGA, storage datapaths, simulators), not ML models. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
 
 ```
 User input (PROBLEM + vague APPROACH)
   -> Phase 0 (Claude): Freeze Problem Anchor
   -> Phase 1 (Claude): Scan grounding papers -> identify technical gap -> choose the sharpest route -> write focused proposal
-  -> Phase 2 (Codex/GPT-5.5): Review for fidelity, specificity, contribution quality, and frontier leverage
+  -> Phase 2 (Codex/GPT-5.5): Review for fidelity, specificity, contribution quality, and platform leverage
   -> Phase 3 (Claude): Anchor check + simplicity check -> revise method -> rewrite full proposal
   -> Phase 4 (Codex, same thread): Re-evaluate revised proposal
   -> Repeat Phase 3-4 until OVERALL SCORE >= 9 or MAX_ROUNDS reached
@@ -42,7 +42,7 @@ User input (PROBLEM + vague APPROACH)
 - **MAX_LOCAL_PAPERS = 15** — Maximum local papers/notes to scan for grounding.
 - **MAX_CORE_EXPERIMENTS = 3** — Default cap for core validation blocks inside this skill.
 - **MAX_PRIMARY_CLAIMS = 2** — Soft cap for paper-level claims. Prefer one dominant claim plus one supporting claim.
-- **MAX_NEW_TRAINABLE_COMPONENTS = 2** — Soft cap for genuinely new trainable pieces. Exceed only if the paper breaks otherwise.
+- **MAX_NEW_ARCHITECTURE_MECHANISMS = 2** — Soft cap for genuinely new hardware/system mechanisms. Exceed only if the paper breaks otherwise.
 
 > Override via argument if needed, e.g. `/research-refine "problem | approach" -- max rounds: 3, threshold: 9`.
 
@@ -162,7 +162,7 @@ Do not stop at generic research questions. Make the gap operational:
 1. **Current pipeline failure point**: where does the baseline break?
 2. **Why naive fixes are insufficient**: larger context, more data, prompting, memory bank, or stacking more modules.
 3. **Smallest adequate intervention**: what is the least additional hardware mechanism that could plausibly fix the bottleneck?
-4. **Platform-native alternative**: is there a more current route using modern DPU/SmartNIC/FPGA platform capabilities that better matches the bottleneck?
+4. **Platform-native alternative**: is there a more current route using modern accelerator, memory hierarchy, SmartNIC/DPU, FPGA, storage, or runtime substrate capabilities that better matches the bottleneck?
 5. **Core technical claim**: what exact mechanism claim could survive top-venue scrutiny?
 6. **Required evidence**: what minimum proof is needed to defend that claim?
 
@@ -171,7 +171,7 @@ Do not stop at generic research questions. Make the gap operational:
 Before locking the method, compare two candidate routes if both are plausible:
 
 - **Route A: Elegant minimal route** — the smallest hardware mechanism that directly targets the bottleneck.
-- **Route B: Platform-native route** — a more modern route that exploits DPU offload engines / P4 programmable logic / FPGA IP blocks / RDMA protocol hooks *only if* it gives a cleaner or stronger story.
+- **Route B: Platform-native route** — a more modern route that exploits accelerator features, HBM/CXL, DPU offload engines, P4 programmable logic, FPGA IP blocks, storage datapaths, or protocol/runtime hooks *only if* it gives a cleaner or stronger story.
 
 Then decide:
 
@@ -193,9 +193,9 @@ Cover:
 4. **System graph**: modules, data flow, inputs, outputs.
 5. **Data path design**: what hardware state, buffer, queue, or pipeline register is used; where in the Tx/Rx path does the new mechanism insert?
 6. **Implementation plan**: RTL vs HLS vs P4, pipeline stages, clock domain, critical path estimate, FPGA/ASIC synthesis target.
-7. **Runtime data path**: how the mechanism operates at line rate and what control signals flow between host, NIC, and network.
+7. **Runtime data path**: how the mechanism operates at the target rate and what control signals flow between host, accelerator, memory, NIC, storage, and runtime.
 8. **Why the mechanism stays small**: why a larger hardware block is unnecessary (area/power budget argument).
-9. **Exact role of any platform primitive**: if you use a DPU offload engine / P4 match-action table / FPGA IP block / RDMA verb extension, specify its role: compression engine, flow steering, credit manager, checksum offload, etc.
+9. **Exact role of any platform primitive**: if you use an accelerator primitive, HBM/CXL tier, DPU offload engine, P4 match-action table, FPGA IP block, storage datapath, or RDMA verb extension, specify its role concretely.
 10. **Failure handling**: what could go wrong and what fallback or diagnostic exists?
 11. **Novelty and elegance argument**: why this is more than naming a module and why the paper still looks focused.
 
@@ -216,7 +216,7 @@ Additional rules:
 
 - Ensure one experiment block directly supports the **Problem Anchor**.
 - If complexity risk exists, include one **simplification or deletion check**.
-- If a frontier primitive is central, include one **necessity check** showing why that choice matters.
+- If a platform primitive is central, include one **necessity check** showing why that choice matters.
 - Default to **1-3 core experiment blocks** and leave the full execution roadmap to `/experiment-plan`.
 
 #### Step 1.6: Write the Initial Proposal
@@ -241,7 +241,7 @@ Use this structure:
 ## Method Thesis
 - One-sentence thesis:
 - Why this is the smallest adequate intervention:
-- Why this route is timely in the foundation-model era:
+- Why this route is timely for AI infrastructure for LLM:
 
 ## Contribution Focus
 - Dominant contribution:
@@ -250,8 +250,8 @@ Use this structure:
 
 ## Proposed Method
 ### Complexity Budget
-- Frozen / reused backbone:
-- New trainable components:
+- Frozen / reused substrate:
+- New architecture mechanisms:
 - Tempting additions intentionally not used:
 
 ### System Overview
@@ -260,18 +260,18 @@ Use this structure:
 ### Core Mechanism
 - Input / output:
 - Architecture or policy:
-- Training signal / loss:
+- Hardware state / data path / control path:
 - Why this is the main novelty:
 
 ### Optional Supporting Component
 - Only include if truly necessary:
 - Input / output:
-- Training signal / loss:
+- Hardware state / data path / control path:
 - Why it does not create contribution sprawl:
 
 ### Platform Primitive Usage
-- Which DPU / SmartNIC / FPGA / P4 / RDMA platform capability is used:
-- Exact role in the data path (Tx/Rx/offload engine/match-action/etc.):
+- Which accelerator / memory hierarchy / DPU / SmartNIC / FPGA / P4 / RDMA / storage / runtime capability is used:
+- Exact role in the data path or control path:
 - Why it is more natural than a pure software or host-CPU alternative:
 
 ### Integration into Host / NIC / Network Stack
@@ -304,12 +304,12 @@ Use this structure:
 ## Experiment Handoff Inputs
 - Must-prove claims:
 - Must-run ablations:
-- Critical datasets / metrics:
+- Critical workloads / traces / metrics:
 - Highest-risk assumptions:
 
-## Compute & Timeline Estimate
-- Estimated GPU-hours:
-- Data / annotation cost:
+## Validation & Timeline Estimate
+- Estimated simulator/prototype hours:
+- Trace / workload / platform setup cost:
 - Timeline:
 ```
 
@@ -317,15 +317,15 @@ Use this structure:
 
 ### Phase 2: External Method Review (Round 1)
 
-Send the full proposal to GPT-5.5 for an **elegance-first, frontier-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
+Send the full proposal to GPT-5.5 for an **elegance-first, platform-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
 
 ```
 mcp__codex__codex:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    You are a senior computer architecture / systems researcher reviewing for MICRO/ISCA/HPCA/ASPLOS/NSDI.
-    Domain: NIC/DPU-side hardware systems and RDMA networking.
+    You are a senior computer architecture / systems researcher reviewing for MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM.
+    Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving.
     This is an early-stage, mechanism-first research proposal.
 
     Your job is NOT to reward more hardware blocks, feature sprawl, or a giant benchmark checklist.
@@ -333,12 +333,12 @@ mcp__codex__codex:
     (1) still solves the original anchored bottleneck,
     (2) is concrete enough to implement in RTL/HLS or prototype on real hardware,
     (3) presents a focused, elegant hardware contribution,
-    (4) uses modern platform capabilities (DPU/SmartNIC/FPGA/RDMA) appropriately when they are the natural fit.
+    (4) uses modern platform capabilities (accelerators, HBM/CXL, DPU/SmartNIC, FPGA, storage datapaths, RDMA, or runtime hooks) appropriately when they are the natural fit.
 
     Review principles:
     - Prefer the smallest adequate hardware mechanism over a larger system.
     - Penalize parallel contributions that make the paper feel unfocused.
-    - If a modern DPU platform capability or P4/FPGA route would clearly produce a better paper, say so concretely.
+    - If a modern accelerator, memory, DPU, P4/FPGA, storage, or runtime route would clearly produce a better paper, say so concretely.
     - If the proposal is already platform-appropriate, do NOT force trendy hardware components.
     - Do not ask for extra experiments unless they are needed to prove the core claims.
     - Architecture reviewers care about: micro-architectural detail, area/power overhead, real measurement vs simulation, generalizability across workloads.
@@ -358,9 +358,9 @@ mcp__codex__codex:
 
     3. **Contribution Quality**: Is there one dominant mechanism-level contribution with real novelty, good parsimony, and no obvious hardware feature sprawl?
 
-    4. **Platform Leverage**: Does the proposal use modern platform capabilities (DPU offload engines, FPGA IP blocks, P4 match-action, RDMA verb extensions) appropriately, instead of defaulting to host-CPU software?
+    4. **Platform Leverage**: Does the proposal use modern platform capabilities (accelerators, memory hierarchy, CXL/HBM, DPU offload engines, FPGA IP blocks, P4 match-action, RDMA verb extensions, storage datapaths, or runtime hooks) appropriately, instead of defaulting to host-CPU software?
 
-    5. **Feasibility**: Can this mechanism be implemented and validated with the stated resources (FPGA board / BlueField DPU / RTL simulator)?
+    5. **Feasibility**: Can this mechanism be implemented and validated with the stated resources (analytical model / gem5 / htsim / RTL or HLS simulator / FPGA or DPU microbenchmark / trace replay)?
 
     6. **Validation Focus**: Are the proposed experiments minimal but sufficient to validate the core claims? Is there unnecessary benchmark bloat?
 
@@ -578,7 +578,7 @@ This file is the high-level round-by-round review record. It should answer: each
 ## Final Status
 - Anchor status: [preserved / corrected / unresolved]
 - Focus status: [tight / slightly broad / still diffuse]
-- Modernity status: [appropriately frontier-aware / intentionally conservative / still old-school]
+- Platform status: [platform-native / simulator-first / intentionally conservative]
 - Strongest parts of final method:
 - Remaining weaknesses:
 ```
@@ -678,8 +678,8 @@ Anchor status:
 Focus status:
 - [tight / slightly broad / still diffuse]
 
-Modernity status:
-- [appropriately frontier-aware / intentionally conservative / still old-school]
+Platform status:
+- [platform-native / intentionally simulator-first / intentionally conservative]
 
 Key method upgrades:
 - [method change 1]
@@ -710,15 +710,15 @@ Suggested next step: /experiment-plan
 - **Anchor first, every round.** Always carry forward the same Problem Anchor.
 - **One paper, one dominant contribution.** Avoid multiple parallel contributions unless the paper truly needs them.
 - **The smallest adequate mechanism wins.** Bigger is not automatically better.
-- **Prefer reuse over invention.** Start from strong existing backbones and add only what the bottleneck requires.
-- **Platform capabilities are a prior, not a decoration.** Use DPU offload engines / FPGA IP blocks / P4 stages / RDMA verb extensions when they sharpen the mechanism, not when they only make the proposal sound modern.
+- **Prefer reuse over invention.** Start from strong existing substrates and add only what the bottleneck requires.
+- **Platform capabilities are a prior, not a decoration.** Use accelerator primitives, HBM/CXL, DPU offload engines, FPGA IP blocks, P4 stages, storage datapaths, RDMA verb extensions, or runtime hooks when they sharpen the mechanism, not when they only make the proposal sound modern.
 - **Minimal experiments.** Inside this skill, experiments only need to prove the core claims.
 - **Review the mechanism, not the parts count.** A long module list is not novelty.
 - **Pushback is encouraged.** If reviewer feedback causes drift or unnecessary complexity, argue back with evidence.
 - **ALWAYS use `config: {"model_reasoning_effort": "xhigh"}`** for all Codex review calls.
 - **Save `threadId` from Phase 2** and use `mcp__codex__codex-reply` for later rounds.
 - **Do not fabricate results.** Only describe expected evidence and planned experiments.
-- **Be specific about compute and data assumptions.** Vague "we'll train a model" is not enough.
+- **Be specific about validation and workload assumptions.** Vague "we'll simulate it" is not enough.
 - **Document everything.** Save every raw review, every anchor check, every simplicity check, and every major method change.
 
 ## Composing with Other Skills
@@ -737,7 +737,7 @@ This skill sits between idea discovery and execution:
 Typical flow:
 
 1. `/idea-creator` or local reading gives you a problem and a vague method direction
-2. `/research-refine` turns that into an anchored, elegant, frontier-aware method plan
+2. `/research-refine` turns that into an anchored, elegant, platform-aware method plan
 3. `/experiment-plan` turns the final proposal into a detailed claim-driven experiment roadmap
 4. `/research-refine-pipeline` is the one-shot wrapper when the user wants both stages in a single request
 5. `/run-experiment` executes the chosen runs

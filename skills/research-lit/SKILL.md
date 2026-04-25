@@ -21,6 +21,9 @@ Research topic: $ARGUMENTS
 - **ARXIV_DOWNLOAD = false** — When `true`, download top 3-5 most relevant arXiv PDFs to PAPER_LIBRARY after search. When `false` (default), only fetch metadata (title, abstract, authors) via arXiv API — no files are downloaded.
 - **ARXIV_MAX_DOWNLOAD = 5** — Maximum number of PDFs to download when `ARXIV_DOWNLOAD = true`.
 - **EXTENDED_TOPICS = []** — Optional list of related-but-broader topics to search in addition to the primary topic. Papers found via extended topics are tagged `[cross-domain]` and reported in a separate Section 1b table. They inform the "Cross-domain transfer" gap but do NOT affect the primary paper table or the topic-slug used for saving.
+- **AI_INFRA_LAYER = `auto`** — Inferred AI infrastructure for LLM layer unless overridden: `compute`, `memory`, `interconnect`, `storage`, `runtime`, or `multi`.
+- **NEIGHBORHOOD = `same-layer`** — Expand the user's topic with same-layer aliases, platform names, and metrics. Use `explicit` to search only the original topic plus `EXTENDED_TOPICS`.
+- **EVIDENCE_POLICY = `arxiv-ok`** — Preprints may anchor frontier gaps, but every claim must carry an `evidence_level` (`peer-reviewed`, `preprint`, `local-note`, or `title-abstract-only`).
 
 > 💡 Overrides:
 > - `/research-lit "topic" — paper library: ~/my_papers/` — custom local PDF path
@@ -32,7 +35,36 @@ Research topic: $ARGUMENTS
 > - `/research-lit "topic" — sources: all, deepxiv` — use default sources plus DeepXiv
 > - `/research-lit "topic" — arxiv download: true` — download top relevant arXiv PDFs
 > - `/research-lit "topic" — arxiv download: true, max download: 10` — download up to 10 PDFs
-> - `/research-lit "nic-lossless-compression" — extended topics: "memory compression", "GPU compression FPGA", "hardware compression accelerator"` — also search adjacent fields; results appear in Section 1b only
+> - `/research-lit "KV cache CXL" — ai-infra layer: memory, neighborhood: same-layer` — expand within the memory/data movement layer
+> - `/research-lit "nic-lossless-compression" — extended topics: "memory compression", "hardware compression accelerator"` — also search adjacent fields; results appear in Section 1b only
+
+## AI Infrastructure Scope
+
+This skill is the evidence entrypoint for **AI infrastructure for LLM** research with a computer architecture / systems bias. Do not assume the topic is machine learning method research or RDMA-only networking. Classify the topic into one or more of these layers:
+
+| Layer | Typical topic terms | Same-layer expansion examples | Hardware bottleneck signals |
+|-------|---------------------|-------------------------------|-----------------------------|
+| `compute/accelerator` | tensor cores, sparsity, attention kernels, inference accelerator, near-data compute | systolic array, dataflow, quantization hardware, HLS/RTL accelerator, GPGPU-Sim, Accel-Sim | TOPS/W, utilization, pipeline stalls, on-chip SRAM pressure |
+| `memory/data movement` | KV cache, HBM, CXL, prefetch, memory compression, disaggregation | cache hierarchy, paging, NUMA, CXL.mem, bandwidth amplification, memory controller | GB/s, tail latency, miss rate, write amplification, capacity pressure |
+| `interconnect/network` | RDMA, NIC, DPU, collective, congestion, compression, htsim | RoCE, DCQCN, PFC/ECN, SmartNIC, Broadcom/csg-htsim, gem5+htsim | goodput, FCT, retransmission, PCIe utilization, Rx pressure |
+| `storage/checkpoint/data pipeline` | checkpointing, dataset loading, shuffle, object store, SSD | burst buffer, compression, DMA, GPUDirect Storage, log-structured writes | checkpoint time, IOPS, write endurance, recovery time |
+| `runtime/serving` | scheduler, batching, KV placement, prefill/decode, disaggregated serving | admission control, memory tiering, NIC offload, accelerator partitioning | only include when the idea exposes or controls a concrete hardware bottleneck |
+
+When `AI_INFRA_LAYER = auto`, infer the narrowest layer that matches the topic. If the topic is runtime/serving and no concrete hardware bottleneck is visible, mark it as **software-only / out-of-scope for Workflow 1** unless the user explicitly asks for pure systems software.
+
+### Topic Neighborhood Expansion
+
+Use topic-neighborhood search, not a full five-layer scan by default:
+
+1. Infer the primary AI infrastructure layer.
+2. Add same-layer aliases, representative platforms, and decisive metrics to the query set.
+3. Keep `EXTENDED_TOPICS` as the only automatic cross-layer broadening mechanism.
+4. Record the final query set in the output so downstream skills can see what was and was not searched.
+
+Examples:
+- `KV cache CXL` -> `memory/data movement`; expand with `HBM`, `CXL.mem`, `tiered memory`, `prefetch`, `paging`, `bandwidth`, `tail latency`.
+- `RDMA NIC compression for LLM` -> `interconnect/network`; expand with `RoCE`, `SmartNIC`, `DPU`, `PFC`, `DCQCN`, `PCIe`, `Rx decompression expansion pressure`.
+- `checkpointing for LLM training` -> `storage/checkpoint/data pipeline`; expand with `burst buffer`, `SSD`, `object store`, `compression`, `recovery time`.
 
 ## Data Sources
 
@@ -403,10 +435,12 @@ For each relevant paper (from all sources), extract:
 - **Results**: Key numbers/claims
 - **Relevance**: How does it relate to our work?
 - **Source**: Where we found it (Zotero/Obsidian/local/web) — helps user know what they already have vs what's new
+- **AI infrastructure layer**: compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, runtime/serving, or multi-layer
+- **Evidence level**: `peer-reviewed`, `preprint`, `local-note`, or `title-abstract-only`
 
 ### Step 3: Synthesize — Landscape Map + Structural Gaps
 
-This step produces the analysis that both the user and downstream skills (e.g., `/idea-creator`) consume. Always produce all four sections below.
+This step produces the analysis that both the user and downstream skills (e.g., `/idea-creator`) consume. Always produce the sections below, then end with the structured **Landscape Pack**.
 
 #### 3a: Landscape Map (grouped by sub-direction)
 
@@ -438,9 +472,52 @@ For the top 3 most directly competing papers:
 - Whether they are peer-reviewed or preprints
 - Whether they directly compete with or support a potential new contribution in this area
 
+#### 3e: Landscape Pack (for `/idea-creator`)
+
+The **Landscape Pack** is a fixed Markdown contract consumed by Workflow 1. It is still human-readable, but the headings and field names should remain stable.
+
+```markdown
+## Landscape Pack
+
+### Topic Scope
+- original_topic:
+- inferred_ai_infra_layer:
+- included_layers:
+- excluded_layers:
+- search_neighborhood:
+- expanded_terms:
+
+### Bottleneck Evidence
+| bottleneck_id | layer | bottleneck | evidence_level | supporting_papers | decisive_metrics |
+|---------------|-------|------------|----------------|-------------------|------------------|
+
+### Mechanism Clusters
+| cluster | layer | mechanism_family | representative_papers | plateau_or_missing_piece |
+|---------|-------|------------------|-----------------------|--------------------------|
+
+### Simulator / Prototype Readiness
+| backend | readiness | fits_layers | what_it_can_validate | blocker |
+|---------|-----------|-------------|-----------------------|---------|
+| analytical_model | ready | all | first-order throughput/latency/resource pressure | none |
+| gem5 | ready/partial | compute, memory, interconnect-host | CPU/memory/PCIe/cache effects | model integration |
+| Broadcom/csg-htsim | ready/partial | interconnect/network | flow-level congestion and retransmission sensitivity | adapter availability |
+| cosim_gem5_htsim | ready/partial | memory + interconnect | window-level closed-loop host/network pressure | persistent-worker setup |
+| RTL/HLS/FPGA | partial | compute, NIC, storage datapath | area, timing, line-rate pipeline feasibility | platform bring-up |
+
+### Gap Seeds
+| gap_id | gap_type | layer | hardware_bottleneck | supporting_papers | evidence_level | possible_mechanism_hint | minimum validation backend | decisive_metric | main_risk_or_kill_reason |
+|--------|----------|-------|---------------------|-------------------|----------------|-------------------------|----------------------------|-----------------|--------------------------|
+```
+
+Rules for **Gap Seeds**:
+- Each seed must be grounded in at least one paper, preprint, local note, or explicit negative evidence from the search.
+- `runtime/serving` seeds are valid only when `hardware_bottleneck` names a concrete resource such as HBM capacity, PCIe bandwidth, NIC queue pressure, memory copy amplification, or accelerator utilization.
+- Preprint-backed seeds are allowed under `EVIDENCE_POLICY = arxiv-ok`, but the `evidence_level` must expose that risk.
+- Include **Rx decompression expansion pressure** as a valid interconnect/network seed when the topic involves NIC/DPU compression: compressed wire bytes can expand into larger PCIe/host-memory writes, creating Rx buffer overflow, stalls, drops, and sender-side retransmission pressure.
+
 ### Step 4: Output
 
-Present five sections:
+Present six sections:
 
 **Section 1 — Paper Table (primary)**
 ```
@@ -466,6 +543,9 @@ Bulleted list from Step 3c. These are the direct inputs for `/idea-creator` Phas
 
 **Section 4 — Competitive Landscape**
 Top 3 competing papers with positioning notes (from Step 3d).
+
+**Section 5 — Landscape Pack**
+The fixed `Landscape Pack` block from Step 3e. This is the primary machine-readable handoff for `/idea-creator`; include `Gap Seeds` even if only 2-3 high-quality seeds exist.
 
 If Zotero BibTeX was exported, append a `references.bib` snippet for direct use in paper writing.
 
@@ -494,9 +574,10 @@ The saved file must include:
 3. **Section 2**: Landscape map by sub-direction (3–5 paragraphs)
 4. **Section 3**: Structural gaps — the 5-lens analysis (cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions)
 5. **Section 4**: Competitive landscape — top 3 competing papers with positioning
-6. All reference links
+6. **Section 5**: Landscape Pack — topic scope, bottleneck evidence, mechanism clusters, simulator/prototype readiness, and Gap Seeds
+7. All reference links
 
-> Section 3 (Structural Gaps) is the primary input consumed by `/idea-creator` in its Phase 1 Step 0. A well-written gaps section directly improves idea quality.
+> Section 5 (Landscape Pack) is the primary input consumed by `/idea-creator`. Section 3 remains useful for human reading, but downstream idea generation should prioritize `Gap Seeds`.
 
 #### Additional saves (optional)
 - If `ARXIV_DOWNLOAD = true`, save downloaded PDFs to `{topic-slug}/papers/`

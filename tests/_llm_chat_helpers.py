@@ -4,8 +4,20 @@ without triggering the module-level sys.stdout/stdin manipulation.
 """
 
 import os
-import httpx
 import tempfile
+
+try:
+    import httpx
+except ModuleNotFoundError:
+    class _MissingHttpx:
+        class ConnectError(Exception):
+            pass
+
+        class Client:
+            def __init__(self, *args, **kwargs):
+                raise RuntimeError("httpx is required for live LLM API calls")
+
+    httpx = _MissingHttpx()
 
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")

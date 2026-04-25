@@ -1,6 +1,6 @@
 ---
 name: experiment-plan
-description: 'Turn a refined research proposal or method idea into a detailed, claim-driven experiment roadmap. Use after `research-refine`, or when the user asks for a detailed experiment plan, ablation matrix, evaluation protocol, run order, compute budget, or paper-ready validation that supports the core problem, novelty, simplicity, and any LLM / VLM / Diffusion / RL-based contribution.'
+description: 'Turn a refined research proposal or method idea into a detailed, claim-driven experiment roadmap. Use after `research-refine`, or when the user asks for a detailed experiment plan, ablation matrix, evaluation protocol, run order, validation budget, or paper-ready validation for AI infrastructure / computer architecture research.'
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent
 ---
 
@@ -17,7 +17,7 @@ The goal is not to generate a giant benchmark wishlist. The goal is to turn a pr
 1. the method actually solves the anchored problem
 2. the dominant contribution is real and focused
 3. the method is elegant enough that extra complexity is unnecessary
-4. any frontier-model-era component is genuinely useful, not decorative
+4. any modern platform primitive is genuinely useful, not decorative
 
 ## Constants
 
@@ -25,7 +25,7 @@ The goal is not to generate a giant benchmark wishlist. The goal is to turn a pr
 - **MAX_PRIMARY_CLAIMS = 2** — Prefer one dominant claim plus one supporting claim.
 - **MAX_CORE_BLOCKS = 5** — Keep the must-run experimental story compact.
 - **MAX_BASELINE_FAMILIES = 3** — Prefer a few strong baselines over many weak ones.
-- **DEFAULT_SEEDS = 3** — Use 3 seeds when stochastic variance matters and budget allows.
+- **DEFAULT_REPETITIONS = 3** — Use 3 repetitions when simulator or workload variance matters and budget allows.
 
 ## Workflow
 
@@ -43,8 +43,8 @@ Extract:
 - **Dominant contribution**
 - **Optional supporting contribution**
 - **Critical reviewer concerns**
-- **Data / compute / timeline constraints**
-- **Which frontier primitive is central, if any**
+- **Workload / simulator / prototype / timeline constraints**
+- **Which platform primitive is central, if any**
 
 If these files do not exist, derive the same information from the user's prompt.
 
@@ -56,7 +56,7 @@ Use this structure:
 
 - **Primary claim**: the main mechanism-level contribution
 - **Supporting claim**: optional, only if it directly strengthens the main paper story
-- **Anti-claim to rule out**: e.g. "the gain only comes from more parameters," "the gain only comes from a larger search space," or "the modern component is just decoration"
+- **Anti-claim to rule out**: e.g. "the gain only comes from a stronger baseline configuration," "the gain is an artifact of a simulator abstraction," or "the modern platform primitive is just decoration"
 - **Minimum convincing evidence**: what would make each claim believable to a strong reviewer?
 
 Do not exceed `MAX_PRIMARY_CLAIMS` unless the paper truly has multiple inseparable claims.
@@ -68,7 +68,7 @@ Design the paper around a compact set of experiment blocks. Default to the follo
 1. **Main anchor result** — does the method solve the actual bottleneck?
 2. **Novelty isolation** — does the dominant contribution itself matter?
 3. **Simplicity / elegance check** — can a bigger or more fragmented version be avoided?
-4. **Frontier necessity check** — if an LLM / VLM / Diffusion / RL-era component is central, is it actually the right tool?
+4. **Platform necessity check** — if a modern hardware/system primitive is central, is it actually the right tool?
 5. **Failure analysis or qualitative diagnosis** — what does the method still miss?
 
 For each block, decide whether it belongs in:
@@ -85,10 +85,10 @@ For every kept block, fully specify:
 
 - **Claim tested**
 - **Why this block exists**
-- **Dataset / split / task**
+- **Workload / trace / benchmark / configuration**
 - **Compared systems**: strongest baselines, ablations, and variants only
 - **Metrics**: decisive metrics first, secondary metrics second
-- **Setup details**: backbone, frozen vs trainable parts, key hyperparameters, training budget, seeds
+- **Setup details**: simulator/prototype backend, frozen vs modified subsystems, key parameters, pilot/full-run budget, repetitions if variance matters
 - **Success criterion**: what outcome would count as convincing evidence?
 - **Failure interpretation**: if the result is negative, what does it mean?
 - **Table / figure target**: where this result should appear in the paper
@@ -96,8 +96,8 @@ For every kept block, fully specify:
 Special rules:
 
 - A **simplicity check** should usually compare the final method against either an overbuilt variant or a tempting extra component that the paper intentionally rejects.
-- A **frontier necessity check** should usually compare the chosen modern primitive against the strongest plausible simpler or older alternative.
-- If the proposal is intentionally non-frontier, say so explicitly and skip the frontier block instead of forcing one.
+- A **platform necessity check** should usually compare the chosen modern primitive against the strongest plausible simpler or older alternative.
+- If the proposal intentionally does not need a special platform primitive, say so explicitly and skip the platform-necessity block instead of forcing one.
 
 ### Phase 4: Turn the Plan Into an Execution Order
 
@@ -108,12 +108,12 @@ Use this milestone structure:
 1. **Sanity stage** — data pipeline, metric correctness, one quick overfit or toy split
 2. **Baseline stage** — reproduce the strongest baseline(s)
 3. **Main method stage** — run the final method on the primary setting
-4. **Decision stage** — run the decisive ablations for novelty, simplicity, and frontier necessity
+4. **Decision stage** — run the decisive ablations for novelty, simplicity, and platform necessity
 5. **Polish stage** — robustness, qualitative figures, appendix extras
 
 For each milestone, estimate:
 
-- compute cost
+- simulator/prototype cost
 - expected turnaround time
 - stop / go decision gate
 - risk and mitigation
@@ -148,7 +148,7 @@ Use this structure:
 ### Block 1: [Name]
 - Claim tested:
 - Why this block exists:
-- Dataset / split / task:
+- Workload / trace / benchmark / configuration:
 - Compared systems:
 - Metrics:
 - Setup details:
@@ -165,10 +165,10 @@ Use this structure:
 |-----------|------|------|---------------|------|------|
 | M0        | ...  | ...  | ...           | ...  | ...  |
 
-## Compute and Data Budget
-- Total estimated GPU-hours:
-- Data preparation needs:
-- Human evaluation needs:
+## Validation Budget
+- Total estimated simulator/prototype hours:
+- Trace / workload preparation needs:
+- Platform setup needs:
 - Biggest bottleneck:
 
 ## Risks and Mitigations
@@ -179,7 +179,7 @@ Use this structure:
 - [ ] Main paper tables are covered
 - [ ] Novelty is isolated
 - [ ] Simplicity is defended
-- [ ] Frontier contribution is justified or explicitly not claimed
+- [ ] Platform contribution is justified or explicitly not claimed
 - [ ] Nice-to-have runs are separated from must-run runs
 ```
 
@@ -232,7 +232,7 @@ Tracker file: refine-logs/EXPERIMENT_TRACKER.md
 - **Every experiment must defend a claim.** If it does not change a reviewer belief, cut it.
 - **Prefer a compact paper story.** Design the main table first, then add only the ablations that defend it.
 - **Defend simplicity explicitly.** If complexity is a concern, include a deletion study or a stronger-but-bloated variant comparison.
-- **Defend frontier choices explicitly.** If a modern primitive is central, prove why it is better than the strongest simpler alternative.
+- **Defend platform choices explicitly.** If a modern primitive is central, prove why it is better than the strongest simpler alternative.
 - **Prefer strong baselines over long baseline lists.** A short, credible comparison set is better than a padded one.
 - **Separate must-run from nice-to-have.** Do not let appendix ideas delay the core paper evidence.
 - **Reuse proposal constraints.** Do not invent unrealistic budgets or data assumptions.

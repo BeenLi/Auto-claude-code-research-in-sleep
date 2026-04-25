@@ -104,7 +104,7 @@ class TestCallLlmSuccess(unittest.TestCase):
     """Test call_llm for successful API responses."""
 
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_successful_call_returns_content(self, mock_client_cls):
         """A 200 response should return the message content."""
         mock_response = MagicMock()
@@ -124,7 +124,7 @@ class TestCallLlmSuccess(unittest.TestCase):
         self.assertIsNone(error)
 
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_custom_model_is_passed(self, mock_client_cls):
         """The requested model name should appear in the API payload."""
         mock_response = MagicMock()
@@ -144,7 +144,7 @@ class TestCallLlmSuccess(unittest.TestCase):
         self.assertEqual(payload["model"], "deepseek-chat")
 
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_api_error_status_returns_error_message(self, mock_client_cls):
         """Non-200, non-504 status should return an error string."""
         mock_response = MagicMock()
@@ -176,7 +176,7 @@ class TestCallLlm504Retry(unittest.TestCase):
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
     @patch("tests._llm_chat_helpers.DEFAULT_MODEL", "gpt-4o")
     @patch("tests._llm_chat_helpers.FALLBACK_MODEL", "gpt-4o-mini")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_504_twice_then_fallback_succeeds(self, mock_client_cls):
         """Two 504s should trigger fallback model on attempt 3."""
         resp_504 = MagicMock()
@@ -205,7 +205,7 @@ class TestCallLlm504Retry(unittest.TestCase):
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
     @patch("tests._llm_chat_helpers.DEFAULT_MODEL", "gpt-4o")
     @patch("tests._llm_chat_helpers.FALLBACK_MODEL", "gpt-4o-mini")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_504_once_then_retry_succeeds_no_fallback_note(self, mock_client_cls):
         """A single 504 followed by success should use original model (no fallback note)."""
         resp_504 = MagicMock()
@@ -231,7 +231,7 @@ class TestCallLlm504Retry(unittest.TestCase):
         self.assertNotIn("[Note:", content)
 
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_three_504s_returns_error(self, mock_client_cls):
         """Three consecutive 504s should return the gateway timeout error."""
         resp_504 = MagicMock()
@@ -252,7 +252,7 @@ class TestCallLlm504Retry(unittest.TestCase):
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
     @patch("tests._llm_chat_helpers.DEFAULT_MODEL", "primary-model")
     @patch("tests._llm_chat_helpers.FALLBACK_MODEL", "fallback-model")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_fallback_uses_different_model_name(self, mock_client_cls):
         """On attempt 3, the payload model should be FALLBACK_MODEL, not DEFAULT_MODEL."""
         resp_504 = MagicMock()
@@ -282,7 +282,7 @@ class TestToolCallFullFlow(unittest.TestCase):
     """Test the complete tools/call path through handle_request."""
 
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_tool_call_success(self, mock_client_cls):
         """Successful tool call should return content without isError."""
         mock_response = MagicMock()
@@ -305,7 +305,7 @@ class TestToolCallFullFlow(unittest.TestCase):
         self.assertEqual(resp["result"]["content"][0]["text"], "Test response")
 
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_tool_call_with_system_prompt(self, mock_client_cls):
         """System prompt should be included as first message with role='system'."""
         mock_response = MagicMock()
@@ -338,7 +338,7 @@ class TestToolCallFullFlow(unittest.TestCase):
         self.assertEqual(payload["messages"][1]["role"], "user")
 
     @patch("tests._llm_chat_helpers.LLM_API_KEY", "test-key")
-    @patch("httpx.Client")
+    @patch("tests._llm_chat_helpers.httpx.Client")
     def test_tool_call_api_error_returns_is_error(self, mock_client_cls):
         """An API error should be surfaced as isError=True in the result."""
         mock_response = MagicMock()

@@ -74,7 +74,7 @@ class TestEndToEndToolCall(unittest.TestCase):
     """Test full tool call lifecycle with mocked API."""
 
     @patch('_minimax_helpers.MINIMAX_API_KEY', 'test-integration-key')
-    @patch('httpx.Client')
+    @patch('_minimax_helpers.httpx.Client')
     def test_chat_with_system_and_temperature(self, mock_client_cls):
         """Full tool call with system prompt, custom model, and temperature."""
         mock_response = MagicMock()
@@ -125,7 +125,7 @@ class TestEndToEndToolCall(unittest.TestCase):
         self.assertEqual(payload["messages"][1]["role"], "user")
 
     @patch('_minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('httpx.Client')
+    @patch('_minimax_helpers.httpx.Client')
     def test_temperature_zero_clamped_in_full_flow(self, mock_client_cls):
         """Temperature=0 should be clamped to 0.01 in the full tool call flow."""
         mock_response = MagicMock()

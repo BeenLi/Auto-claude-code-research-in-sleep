@@ -40,19 +40,19 @@ mcp__codex__codex:
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     [Full research context + specific questions]
-    Please act as a senior computer architecture reviewer (MICRO/ISCA/HPCA/ASPLOS level).
-    Domain: NIC/DPU-side hardware systems, RDMA networking, hardware-accelerated compression.
+    Please act as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level).
+    Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
 
     Identify:
     1. Logical gaps or unjustified claims (e.g., missing area/power analysis, unrealistic throughput assumptions)
     2. Missing experiments that would strengthen the story:
        - Micro-architectural detail (pipeline stages, critical path, resource usage)
        - Real hardware measurement vs simulation — which claims need real data?
-       - Comparison with state-of-the-art (BlueField C-engine, NetZIP, CAST IP core, etc.)
-       - Generalizability: does the result hold across different workloads (LZ4-friendly vs incompressible data)?
+       - Comparison with the closest hardware/system baseline for the selected layer
+       - Generalizability: does the result hold across representative LLM infrastructure workloads?
     3. Narrative weaknesses: Is the problem clearly motivated with real system bottleneck numbers?
     4. Whether the hardware contribution is sufficient (area/power overhead acceptable? throughput competitive?)
-    5. Whether the RDMA integration story is coherent (how does this interact with RoCEv2/DCQCN/credit flow control?)
+    5. Whether the chosen AI infrastructure layer and validation backend are coherent. For RDMA/NIC compression, also check RoCEv2/DCQCN/credit flow control and Rx decompression expansion pressure.
     Please be brutally honest.
 ```
 
@@ -67,8 +67,8 @@ For each round:
 Key follow-up patterns:
 - "If we reframe X as Y, does that change your assessment?"
 - "What's the minimum experiment to satisfy concern Z?"
-- "Please design the minimal additional experiment package (highest acceptance lift per GPU week)"
-- "Please write a mock NeurIPS/ICML review with scores"
+- "Please design the minimal additional experiment package with the highest acceptance lift per simulator/prototype week"
+- "Please write a mock MICRO/ISCA/HPCA/ASPLOS review with scores"
 - "Give me a results-to-claims matrix for possible experimental outcomes"
 
 ### Step 4: Convergence
@@ -100,10 +100,10 @@ Update project memory/notes with key review conclusions.
 ## Prompt Templates
 
 ### For initial review:
-"I'm going to present a computer architecture research project for your critical review. Please act as a senior MICRO/ISCA/HPCA reviewer. Domain: NIC/DPU-side hardware systems and RDMA networking..."
+"I'm going to present a computer architecture research project for your critical review. Please act as a senior MICRO/ISCA/HPCA/ASPLOS reviewer. Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving..."
 
 ### For experiment design:
-"Please design the minimal additional experiment package that gives the highest acceptance lift. Focus on: (1) which claims need real hardware measurement vs simulation, (2) what micro-benchmark workloads cover the key cases, (3) what overhead analysis (area/power/latency) a reviewer would require. Be very specific about configurations."
+"Please design the minimal additional experiment package that gives the highest acceptance lift. Focus on: (1) which claims need real hardware measurement vs simulation, (2) what micro-benchmark or trace workloads cover the key cases, (3) what overhead analysis (area/power/latency/bandwidth) a reviewer would require. Be very specific about configurations."
 
 ### For paper structure:
 "Please turn this into a concrete paper outline with section-by-section claims and figure plan. Include: motivation with real bottleneck numbers, micro-architecture diagram, end-to-end system integration, evaluation methodology, and comparison to prior art."

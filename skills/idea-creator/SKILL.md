@@ -13,20 +13,53 @@ Generate publishable research ideas for: $ARGUMENTS
 
 Given a broad research direction from the user, systematically generate, validate, and rank concrete research ideas. This skill composes with `/research-lit`, `/novelty-check`, and `/research-review` to form a complete idea discovery pipeline.
 
+For this repository, the default domain is **AI infrastructure for LLM** with a computer architecture / systems bias. Network/RDMA/NIC/DPU ideas are first-class, but they are one layer of the stack rather than the only valid target. Runtime/serving ideas are allowed only when they expose, control, or exploit a concrete hardware bottleneck.
+
 ## Constants
 
 - **MAX_PILOT_IDEAS = 3** — Pilot at most 3 ideas. Additional ideas are validated analytically only.
+- **PILOT_MAX_HOURS = 2** — Keep each lightweight architecture pilot within two wall-clock hours. If a pilot needs platform bring-up, record `pilot_status: designed_not_run` and the blocker instead of stalling Workflow 1.
 - **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
 - **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
+- **RANKING_PROFILE = `fast-iteration`** — Apply hard gates first, then rank by simulation readiness, implementation risk, LLM bottleneck importance, hardware insight, and novelty.
 
-> 💡 **Domain context**: This skill is configured for **NIC/DPU-side lossless compression and RDMA systems** research. For this domain, every idea is in principle implementable — the real pilot judgment is (1) how deeply it modifies the NIC pipeline, and (2) whether an open-source platform exists to validate it. See `## NIC Modification Depth` below and `## Research Domain` in CLAUDE.md.
+> 💡 **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, and runtime/serving. Hardware bottlenecks and simulator/prototype readiness are mandatory; pure ML algorithm ideas and pure software schedulers without a hardware bottleneck are out of scope.
 
 > Override via argument, e.g., `/idea-creator "topic" — pilot: analytical only`.
 
-## Contribution Scope Level
+## AI Infrastructure Layer Taxonomy
 
-Use this 4-level scale to classify **where in the RDMA system an idea's contribution sits**. This determines the claim scope, the baseline (always real RDMA), and the required testbed scale. All levels are implementable — the question is what testbed you need to make credible claims.
+Classify every idea before ranking it:
+
+| Layer | Examples | Typical validation backends | Key metrics |
+|-------|----------|-----------------------------|-------------|
+| `compute/accelerator` | attention/KV kernels, sparsity datapaths, inference accelerators, near-data compute | analytical model, gem5, GPGPU-Sim/Accel-Sim, RTL/HLS | TOPS/W, utilization, latency, SRAM pressure, area/power |
+| `memory/data movement` | KV cache hierarchy, CXL memory, HBM pressure, compression, prefetch | analytical model, gem5, trace replay, microbench | GB/s, tail latency, cache miss rate, write amplification |
+| `interconnect/network` | RDMA, NIC/DPU compression, collectives, congestion, packet/flow scheduling | htsim, gem5+htsim, ns-3, DPU/FPGA microbench | goodput, FCT, retransmitted bytes, PCIe utilization, Rx pressure |
+| `storage/checkpoint/data pipeline` | checkpoint bursts, object store, SSD pipeline, data loading | analytical model, trace replay, storage microbench | checkpoint time, recovery time, IOPS, bandwidth, endurance |
+| `runtime/serving` | batching, admission, prefill/decode split, KV placement | only when tied to hardware model; analytical/gem5/trace replay | HBM capacity, accelerator utilization, PCIe/NIC traffic, tail latency |
+
+Hard gates:
+1. The problem must be an LLM infrastructure problem.
+2. The idea must name a concrete hardware bottleneck.
+3. The idea must have a minimum validation path: analytical model, gem5, htsim, gem5+htsim, trace replay, RTL/HLS, FPGA/DPU microbenchmark, or a clearly available existing backend.
+
+Default weighted score after hard gates:
+- Simulation readiness: 40%
+- Implementation risk / iteration speed: 20%
+- LLM bottleneck importance: 15%
+- Hardware insight: 15% (minimum 2/5)
+- Novelty: 10% (minimum 2/5)
+
+Backend readiness tiers:
+- **Ready**: analytical model, gem5, Broadcom/csg-htsim, `cosim_gem5_htsim`, trace replay using existing logs.
+- **Partial**: GPGPU-Sim/Accel-Sim, SimAI, RTL/HLS, FPGA/DPU microbench when setup already exists.
+- **Future**: new hardware platform bring-up, large real cluster, proprietary traces.
+
+## Architecture Contribution Scope Level
+
+Use this 4-level scale to classify how deep the architecture contribution is. For RDMA/NIC compression ideas, the examples below map directly to the network stack. For other AI infrastructure layers, reinterpret the levels as block, subsystem, protocol/control interaction, and application/system behavior.
 
 | Level | Contribution scope | What the paper claims | Required testbed | Baseline |
 |-------|-------------------|-----------------------|-----------------|---------|
@@ -141,15 +174,16 @@ Glob: {project-root}/{topic-slug}/research-lit/*.md
 - **Section 2** (landscape map) → sub-direction clusters, what's been tried
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
 - **Section 4** (competitive landscape) → top competing papers and positioning
+- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence, simulator/prototype readiness, and `Gap Seeds`
 
-Announce: _"Loaded research-lit from {date}: {N} papers, {M} structural gaps identified."_
+Announce: _"Loaded research-lit from {date}: {N} papers, {M} structural gaps, {K} Gap Seeds identified."_
 
 **If not found**: Warn the user:
 > ⚠️ No research-lit output found for topic `{topic-slug}`. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
 
 Then run a condensed version: WebSearch across MICRO/ISCA/HPCA/NSDI/SIGCOMM for top 10 papers, build a basic landscape map, and identify gaps as best as possible.
 
-> **All literature search and landscape work (including incremental web search) is done by `/research-lit`.** If the loaded output is stale or incomplete, re-run `/research-lit` first rather than searching here. idea-creator does not search for papers.
+> **All literature search and landscape work (including incremental web search) is done by `/research-lit`.** If the loaded output is stale or incomplete, re-run `/research-lit` first rather than searching here. idea-creator does not search for papers. Use `Gap Seeds` from the Landscape Pack as the main idea-generation substrate.
 
 ### Phase 2: Idea Generation (brainstorm with external LLM)
 
@@ -160,10 +194,10 @@ mcp__codex__codex:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    You are a senior computer architecture/networking researcher (MICRO/ISCA/HPCA/SIGCOMM/NSDI level) brainstorming research ideas.
+    You are a senior computer architecture / systems researcher (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level) brainstorming research ideas.
 
     Research direction: [user's direction]
-    Domain context: NIC/DPU-side systems research, RDMA networking, hardware acceleration.
+    Domain context: AI infrastructure for LLM. Valid layers are compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, and runtime/serving. Runtime/serving ideas are only valid if they expose or control a concrete hardware bottleneck.
 
     Here is the current landscape (from /research-lit Section 2):
     [paste landscape map — sub-direction clusters]
@@ -174,27 +208,28 @@ mcp__codex__codex:
     Top competing papers (from /research-lit Section 4):
     [paste competitive landscape — top 3 papers and what they leave open]
 
+    Landscape Pack (from /research-lit Section 5):
+    [paste Topic Scope, Bottleneck Evidence, Simulator / Prototype Readiness, and Gap Seeds]
+
     Generate 8-12 concrete research ideas. For each idea:
     1. One-sentence summary
     2. Core hypothesis (what you expect to find and why)
-    3. Minimum viable experiment (cheapest validation: analytical model / RTL simulation / FPGA micro-benchmark / 2-node RoCE testbed / multi-node cluster)
-    4. Expected contribution type: hardware mechanism / NIC pipeline integration / RDMA protocol co-design / network/application-level system
-    5. RDMA plane interaction — classify as one of:
-       - D (data plane only): compression in the packet fast path, no protocol change needed
-       - C (control plane only): protocol/flow-control change, no compression engine needed
-       - D+C (both, necessarily co-innovated): adding compression to the data path FORCES a new mechanism in the control plane (credit accounting, congestion control, retransmission semantics) — flag these explicitly as high-novelty
-       - N (RDMA-agnostic): compression improvement that doesn't depend on RDMA semantics
-    6. Risk level: LOW / MEDIUM / HIGH
-    7. Estimated effort: days / weeks / months
-    8. Key metric that would constitute a win (throughput Gbps, latency ns, compression ratio, credit utilization, PFC pause rate)
+    3. ai_infra_layer: one of compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, runtime/serving, or multi-layer
+    4. hardware_bottleneck: the concrete resource pressure or timing path
+    5. Minimum viable experiment (cheapest validation: analytical model / gem5 / htsim / gem5+htsim / trace replay / RTL simulation / FPGA or DPU micro-benchmark)
+    6. Expected contribution type: hardware mechanism / microarchitecture / memory hierarchy / NIC or DPU pipeline integration / protocol co-design / storage datapath / hardware-aware runtime
+    7. validation_backend and readiness tier: ready / partial / future
+    8. Risk level: LOW / MEDIUM / HIGH
+    9. Estimated effort: hours / days / weeks / platform bring-up
+    10. Key metric that would constitute a win (throughput Gbps, latency ns/us, compression ratio, goodput, retransmitted bytes, host_memory_write_gbps, PCIe utilization, area/power)
 
     Prioritize ideas that are:
-    - Validatable with an analytical model, RTL simulation, gem5 simulation, or micro-benchmark on available hardware (BlueField-2/3, 4/8 FPGA boards)
+    - Validatable with an analytical model, gem5, Broadcom/csg-htsim, cosim_gem5_htsim, trace replay, RTL simulation, or a small micro-benchmark on available hardware
     - Not "integrate X with Y" unless the integration reveals surprising performance/design insights
     - Differentiated from the 10-15 papers above
     - Targeting MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM/OSDI/USENIX ATC/EuroSys/FCCM/DAC bar
 
-    Be creative but grounded. A great architecture idea is one whose answer — positive or negative — changes how people design NIC/DPU hardware.
+    Be creative but grounded. A great architecture idea is one whose answer — positive or negative — changes how people design AI infrastructure hardware or hardware/software boundaries.
 ```
 
 Save the threadId for follow-up.
@@ -203,31 +238,30 @@ Save the threadId for follow-up.
 
 For each generated idea, quickly evaluate:
 
-1. **Feasibility check**: Two questions, not one "how long does it take?":
+1. **Hard gates**:
+   - LLM infrastructure problem: reject pure ML method ideas and unrelated architecture ideas.
+   - Hardware bottleneck claim: reject pure software scheduling unless it names a resource bottleneck and hardware-facing metric.
+   - Minimal validation path: reject ideas with no analytical, simulation, trace, RTL/HLS, FPGA, DPU, or existing benchmark route.
 
-   **Q1 — Contribution scope level** (classify using L1–L4 in `## Contribution Scope Level`):
-   - L1/L2: single FPGA board or 2-node loopback → HIGH feasibility, publishable at FCCM/DAC/MICRO
-   - L3: 2-node FPGA NIC + switch testbed → MEDIUM feasibility, core claim requires real RoCE traffic
-   - L4: multi-node cluster + switch → LOW setup friction if testbed exists; HIGH if not
+2. **Fast-iteration feasibility check**:
+   - Classify `ai_infra_layer` and contribution scope.
+   - Assign `validation_backend`: analytical model, gem5, Broadcom/csg-htsim, cosim_gem5_htsim, trace replay, RTL/HLS, FPGA/DPU microbench, or future platform bring-up.
+   - Mark readiness as `ready`, `partial`, or `future`.
+   - For RDMA/NIC ideas, keep the real-RDMA baseline rule: do not substitute Soft-RoCE for claims about real RDMA behavior.
+   - For runtime/serving ideas, keep only those tied to a measurable hardware bottleneck such as HBM capacity, PCIe/NIC traffic, accelerator utilization, or host memory copy pressure.
 
-   **Q2 — Testbed availability** (for the classified level):
-   - Is the required testbed available? (FPGA board for L1/L2; FPGA NICs + switch for L3/L4)
-   - For L4: is the multi-FPGA cluster + switch testbed ready, or does it need to be built?
-   - If testbed is unavailable: flag as "needs hardware setup" — do NOT substitute Soft-RoCE for RDMA comparisons
-   - ns-3 RDMA simulation can supplement L4 for scale-out sensitivity, but cannot replace real-hardware L3/L4 baseline numbers
+3. **Workload availability**:
+   - Prefer public traces, synthetic LLM serving/training traffic, standard compression corpora, microbenchmarks, or simulator-generated workloads.
+   - Skip or downgrade ideas that require proprietary traces with no synthetic substitute.
 
-   **Workload availability** (secondary check):
-   - Are standard compression benchmarks usable? (Silesia corpus, enwik, real RDMA traces, synthetic gradient tensors)
-   - Skip ideas that require exotic proprietary traces with no synthetic substitute
+4. **Novelty quick-check**: For each idea, do 2-3 targeted searches to see if it's already been done. Full `/novelty-check` comes later for survivors.
 
-2. **Novelty quick-check**: For each idea, do 2-3 targeted searches to see if it's already been done. Full `/novelty-check` comes later for survivors.
-
-3. **Impact estimation**: Would a reviewer care about the result?
-   - "So what?" test: if the experiment succeeds, does it change how people design NIC/DPU hardware or RDMA protocols?
+5. **Impact estimation**: Would a reviewer care about the result?
+   - "So what?" test: if the experiment succeeds, does it change how people design AI infrastructure hardware or hardware/software boundaries?
    - Is the finding actionable or just interesting?
-   - **D+C co-innovation bonus**: if an idea is tagged D+C, do NOT eliminate it for complexity. The fact that it requires co-innovating both planes means it likely has no direct prior art. Flag it as "high-effort, high-novelty" and keep it in the list — plan a staged implementation.
+   - For RDMA/NIC compression, preserve D+C co-innovation as a high-novelty signal when variable compressed bytes force a protocol/control-plane response.
 
-Eliminate ideas that fail feasibility or impact. D+C ideas survive even if implementation is hard. Typically 8-12 ideas reduce to 4-6.
+Apply the `fast-iteration` ranking profile after the gates: simulation readiness 40%, implementation risk / iteration speed 20%, LLM bottleneck importance 15%, hardware insight 15%, novelty 10%. Typically 8-12 ideas reduce to 4-6.
 
 ### Phase 4: Deep Validation (for top ideas)
 
@@ -238,48 +272,53 @@ For each surviving idea, run a deeper evaluation:
 2. **Critical review**: Use GPT-5.5 via `mcp__codex__codex-reply` (same thread):
    ```
    Here are our top ideas after filtering:
-   [paste surviving ideas with novelty check results and D/C/D+C/N classification]
+   [paste surviving ideas with novelty check results, ai_infra_layer, hardware_bottleneck, validation_backend, and pilot status]
 
    For each, play devil's advocate:
-   - What's the strongest objection a MICRO/ISCA/NSDI reviewer would raise?
-   - What's the most likely failure mode (e.g., compression ratio too low to matter, control-plane overhead dominates, incompatible with ATOMIC ops)?
+   - What's the strongest objection a MICRO/ISCA/HPCA/ASPLOS/NSDI reviewer would raise?
+   - What's the most likely failure mode (e.g., bottleneck too small, simulator abstraction too weak, area/power overhead dominates, workload not representative)?
    - How would you rank these for a top venue submission?
    - Which 2-3 would you actually work on?
 
-   For ideas tagged D+C (data+control plane co-innovation):
-   - Is the control-plane interaction genuinely necessary, or can the data-plane contribution stand alone?
-   - If both are needed, what is the minimal control-plane change that enables the data-plane contribution?
-   - Does this co-innovation represent an open problem in the RDMA community, or has it been partially solved?
+   For runtime/serving ideas:
+   - Is the hardware bottleneck real and central, or is this a pure software scheduler?
+
+   For RDMA/NIC compression ideas:
+   - Is the data/control-plane interaction genuinely necessary?
+   - Does Rx decompression expansion pressure create PCIe, host-memory, Rx buffer, stall, drop, or retransmission effects that the proposal must preserve?
    ```
 
 3. **Combine rankings**: Merge your assessment with GPT-5.5's ranking. Select top 2-3 ideas for pilot experiments.
 
 ### Phase 5: Pilot Validation (for top 2-3 ideas)
 
-Before committing to a full research effort, run cheap pilots to get early signal. For computer architecture/networking research, pilots are **analytical models, simulations, or micro-benchmarks** — not GPU training runs.
+Before committing to a full research effort, run or design cheap pilots to get early signal. For AI infrastructure architecture research, pilots are **analytical models, small simulator runs, trace replays, micro-benchmarks, or RTL/HLS sketches**. They are not full paper experiments.
 
-1. **Design pilots**: For each top idea, classify its NIC modification depth first, then choose the matching pilot type. All ideas are implementable — the pilot just needs to answer: **does the mechanism give meaningful signal before full RTL investment?**
+1. **Design pilots**: For each top idea, classify `ai_infra_layer`, `hardware_bottleneck`, and validation backend first. The pilot just needs to answer: **does the mechanism give meaningful signal before full implementation investment?**
 
-   | Scope level | Pilot approach | What to run | Success signal |
-   |-------------|---------------|-------------|---------------|
-   | **L1** | Algorithm emulation + analytical model | Python/C prototype on Silesia / gradient tensor data; first-principles throughput/latency model | Compression ratio > target; model predicts throughput at line rate |
-   | **L1/L2** | Corundum RTL sketch | 50–150 lines of Verilog/HLS for the core pipeline stage; simulate in Vivado/VCS | Pipeline depth ≤ N cycles, no throughput bubble, resource fits target FPGA |
-   | **L2** | Corundum loopback RDMA | Integrate compression stub into Corundum Tx path; run ib_send_bw / ib_read_bw over loopback RoCE | End-to-end RDMA BW within X% of uncompressed baseline; latency overhead < Y ns |
-   | **L3** | 2-node FPGA NIC + switch | Real RoCE traffic with variable-size compressed payloads; retransmit behavior under congestion ; retransmit rate < Z%; throughput improvement visible |
-   | **L4** | Multi-node FPGA cluster + switch (or ns-3 for sensitivity) | End-to-end AllReduce / storage workload on real cluster; ns-3 for configurations beyond available node count | Application-level speedup > X% |
-   | **Any** | Analytical model (first pass) | Queue-theory / pipeline model before any hardware work | Model consistent with published NetZIP / BlueField C-engine / CAST baselines |
+   | Layer / backend | Pilot approach | What to run | Success signal |
+   |-----------------|---------------|-------------|---------------|
+   | Any / analytical model | Queue, bandwidth, latency, or resource model | First-order script with published baselines and sensitivity sweep | Model shows a decisive bottleneck and plausible gain |
+   | compute/accelerator | Kernel or pipeline model | Small simulator run, HLS/RTL sketch, or accelerator utilization trace | Utilization/latency/TOPS/W improves enough to justify mechanism |
+   | memory/data movement | gem5 or trace replay | KV/cache/CXL/HBM traffic model, bandwidth amplification, prefetch or placement sensitivity | Tail latency, bandwidth, miss rate, or capacity pressure changes materially |
+   | interconnect/network | htsim or gem5+htsim | 100-1000 flow smoke, 100us window summaries, lossy RDMA/RTO sensitivity if relevant | goodput/FCT/retransmitted bytes/Rx pressure changes in expected direction |
+   | storage/checkpoint/data pipeline | trace replay or storage microbench | checkpoint burst, compression, object-store, or SSD bandwidth replay | checkpoint/recovery time or I/O amplification improves |
+   | runtime/serving | hardware-aware trace analysis | batching/admission/KV placement trace with hardware resource accounting | tail latency or throughput improves because a named hardware bottleneck is controlled |
+   | RTL/HLS/FPGA/DPU | microarchitecture sketch | Minimal datapath or existing IP configuration, no full platform build required | line-rate feasibility, area/power estimate, or platform blocker identified |
 
-   - **No Soft-RoCE substitution**: if L3/L4 testbed is not available, run only the analytical model + L1/L2 pilot and explicitly scope the paper claim down to L1/L2 until hardware is ready.
+   - Default budget: `pilot_budget: <=2h mini-run`.
+   - If the backend is unavailable, set `pilot_status: designed_not_run`, write `pilot_command_or_plan`, and record `readiness_blocker`.
+   - For RDMA/NIC compression, preserve **Rx decompression expansion pressure** in the pilot plan when relevant: model compressed wire bytes separately from decompressed PCIe/host-memory writes, Rx buffer occupancy, drops, stalls, sender-side RTO retransmission, goodput, and tail latency.
    - Clear success metric defined upfront per row above.
 
-2. **Run pilots**: Use Bash to run analytical scripts or invoke available simulators. Do NOT launch GPU jobs — there are no ML models to train here.
+2. **Run pilots when ready**: Use Bash to run analytical scripts, trace replays, small simulator invocations, or existing micro-benchmarks. Do not perform platform bring-up inside Workflow 1.
 
 3. **Collect results**: Once pilots complete, compare:
    - Which ideas showed positive signal (model predicts improvement)?
    - Which showed null/negative signal? (eliminate or deprioritize)
    - Any surprising findings that suggest a pivot?
 
-4. **Re-rank based on pilot evidence**: An idea with strong analytical/simulation signal jumps ahead of a theoretically appealing but unvalidated idea.
+4. **Re-rank based on pilot evidence**: An idea with strong analytical/simulation signal jumps ahead of a theoretically appealing but unvalidated idea, unless novelty or hardware insight is below the minimum bar.
 
 Note: Skip this phase if no simulation environment or hardware is available. Flag skipped ideas as "needs pilot validation" in the report.
 
@@ -301,16 +340,23 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 
 ### Idea 1: [title]
 - **Hypothesis**: [one sentence]
+- **ai_infra_layer**: compute/accelerator | memory/data movement | interconnect/network | storage/checkpoint/data pipeline | runtime/serving | multi-layer
+- **hardware_bottleneck**: [concrete resource pressure or timing path]
+- **validation_backend**: analytical_model | gem5 | Broadcom/csg-htsim | cosim_gem5_htsim | trace_replay | RTL/HLS | FPGA/DPU_microbench | future_platform
 - **Minimum experiment**: [concrete description]
 - **Expected outcome**: [what success/failure looks like]
 - **Novelty**: X/10 — closest work: [paper]
-- **Feasibility**: [compute, data, implementation estimates]
+- **Feasibility**: [simulator/prototype readiness, data/trace availability, implementation estimates]
 - **Risk**: LOW/MEDIUM/HIGH
-- **Contribution type**: empirical / method / theory / diagnostic
-- **Contribution scope**: L1 / L2 / L3 / L4 — [what layer of the RDMA system this claims to improve]
-- **RDMA plane interaction**: D / C / D+C / N — [one sentence: what exactly breaks or must change in each plane]
-- **Required testbed**: [single FPGA / 2-node RoCE / multi-node cluster+switch / ns-3 supplement]
-- **Pilot result**: [POSITIVE: X% gain shown / NEGATIVE: no signal / SCOPED DOWN: claim reduced to L1/L2 pending hardware / SKIPPED: testbed not available]
+- **Contribution type**: hardware mechanism / microarchitecture / memory hierarchy / protocol co-design / diagnostic / hardware-aware runtime
+- **Contribution scope**: L1 / L2 / L3 / L4 — [block, subsystem, protocol/control interaction, or application/system behavior]
+- **RDMA plane interaction**: D / C / D+C / N — [only for RDMA/NIC ideas; otherwise N/A]
+- **pilot_status**: runnable_now | completed | designed_not_run | skipped | killed
+- **pilot_budget**: <=2h mini-run by default
+- **pilot_command_or_plan**: [command if run; otherwise concrete plan]
+- **key_metric**: [decisive metric]
+- **signal**: POSITIVE / WEAK_POSITIVE / NEGATIVE / INCONCLUSIVE / NOT_RUN
+- **readiness_blocker**: [none, missing simulator adapter, platform bring-up, traces unavailable, etc.]
 - **Reviewer's likely objection**: [strongest counterargument]
 - **Why we should do this**: [1-2 sentences]
 
@@ -321,15 +367,15 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 | Idea | Reason eliminated |
 |------|-------------------|
 | ... | Already done by [paper] |
-| ... | Requires > 1 week GPU time |
+| ... | Requires unavailable simulator/platform bring-up |
 | ... | Result wouldn't be interesting either way |
 
 ## Pilot Validation Results
-| Idea | Scope | Plane | Required testbed | Pilot run | Key metric | Signal |
-|------|-------|-------|-----------------|-----------|------------|--------|
-| Idea 1 | L1 | D | Single FPGA | Corundum RTL sketch, Vivado sim | pipeline depth 3 cycles, no stall | POSITIVE |
-| Idea 2 | L3 | D+C ★ | 2-node FPGA + switch | Analytical model (testbed pending); credit window math shows underflow under variable ratio | 12% credit underflow predicted — control plane change necessary | HIGH-NOVELTY, SCOPED DOWN to L1/L2 pilot until testbed ready |
-| Idea 3 | L2 | D | 2-node loopback RoCE | Corundum loopback + ib_send_bw | +22% effective BW vs uncompressed baseline | WEAK POSITIVE |
+| Idea | ai_infra_layer | validation_backend | pilot_status | pilot_budget | pilot_command_or_plan | key_metric | signal | readiness_blocker |
+|------|----------------|--------------------|--------------|--------------|-----------------------|------------|--------|-------------------|
+| Idea 1 | interconnect/network | cosim_gem5_htsim | completed | <=2h mini-run | `python3 run_rx_pressure_smoke.py --flows 100 --window-us 100` | host_memory_write_gbps, retransmitted_bytes | POSITIVE | none |
+| Idea 2 | memory/data movement | gem5 | designed_not_run | <=2h mini-run | cache/KV trace replay with CXL bandwidth sweep | tail latency, bandwidth amplification | NOT_RUN | missing trace |
+| Idea 3 | runtime/serving | trace_replay | killed | <=2h mini-run | N/A | N/A | NEGATIVE | no hardware bottleneck claim |
 
 ## Suggested Execution Order
 1. Start with Idea 1 (positive pilot signal, lowest risk)
@@ -337,7 +383,8 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 3. Idea 2 eliminated by pilot — negative result documented
 
 ## Next Steps
-- [ ] Scale up Idea 1 to full experiment (multi-seed, full dataset)
+- [ ] Move the selected idea to `/research-refine-pipeline`
+- [ ] Let Workflow 1.5 expand the pilot into a full experiment plan and execution log
 - [ ] If confirmed, invoke /auto-review-loop for full iteration
 ```
 
@@ -384,10 +431,10 @@ if research-wiki/ exists:
 - Quantity first, quality second: brainstorm broadly, then filter ruthlessly.
 - A good negative result is just as publishable as a positive one. Prioritize ideas where the answer matters regardless of direction.
 - Don't fall in love with any idea before validating it. Be willing to kill ideas.
-- Always estimate compute cost. An idea that needs 1000 GPU-hours is not actionable for most researchers.
+- Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up is not fast-iteration actionable.
 - "Apply X to Y" is the lowest form of research idea. Push for deeper questions.
 - Include eliminated ideas in the report — they save future time by documenting dead ends.
-- **If the user's direction is too broad (e.g., "NLP", "computer vision", "reinforcement learning"), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the problem, domain, and constraint — e.g., "factorized gap in discrete diffusion LMs" or "sample efficiency of offline RL with image observations". Without sufficient specificity, generated ideas will be too vague to run experiments on.
+- **If the user's direction is too broad (e.g., "AI infrastructure" with no bottleneck, workload, or layer), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the LLM infrastructure problem, hardware bottleneck, and validation constraint — e.g., "KV cache placement under CXL memory bandwidth limits" or "Rx decompression expansion pressure for compressed RDMA traffic".
 
 ## Composing with Other Skills
 
@@ -397,7 +444,7 @@ After this skill produces the ranked report:
 /novelty-check "top idea"     → deep novelty verification (already done in Phase 4, but user can re-run)
 /research-review "top idea"   → external critical feedback
 implement                     → write code
-/run-experiment               → deploy to GPU
+/run-experiment               → execute simulator, microbenchmark, or other experiment command
 /auto-review-loop             → iterate until submission-ready
 ```
 

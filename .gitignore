@@ -24,6 +24,9 @@ CLAUDE.md
 .claude/
 .trae/
 
+# Agent local logs & state
+.aris/meta/events.jsonl
+
 # Patent output — contains confidential invention details, do not commit
 patent/
 # Allow patent framework files (skills, templates, shared references)

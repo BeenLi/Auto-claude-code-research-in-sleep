@@ -234,7 +234,7 @@ class TestCallMinimax(unittest.TestCase):
         self.assertIn("MINIMAX_API_KEY", error)
 
     @patch('tests._minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('httpx.Client')
+    @patch('tests._minimax_helpers.httpx.Client')
     def test_successful_api_call(self, mock_client_cls):
         """Successful API call should return content."""
         mock_response = MagicMock()
@@ -264,7 +264,7 @@ class TestCallMinimax(unittest.TestCase):
         self.assertAlmostEqual(payload["temperature"], 0.7)
 
     @patch('tests._minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('httpx.Client')
+    @patch('tests._minimax_helpers.httpx.Client')
     def test_api_error_status(self, mock_client_cls):
         """Non-200 status should return error."""
         mock_response = MagicMock()
@@ -282,7 +282,7 @@ class TestCallMinimax(unittest.TestCase):
         self.assertIn("401", error)
 
     @patch('tests._minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('httpx.Client')
+    @patch('tests._minimax_helpers.httpx.Client')
     def test_temperature_clamping_in_call(self, mock_client_cls):
         """Temperature should be clamped in API call."""
         mock_response = MagicMock()
@@ -309,7 +309,7 @@ class TestCallMinimax(unittest.TestCase):
 
     @patch('tests._minimax_helpers.MINIMAX_API_KEY', 'test-key')
     @patch('tests._minimax_helpers.MINIMAX_BASE_URL', 'https://api.minimax.io/v1')
-    @patch('httpx.Client')
+    @patch('tests._minimax_helpers.httpx.Client')
     def test_correct_api_url(self, mock_client_cls):
         """API call should use correct api.minimax.io URL."""
         mock_response = MagicMock()
@@ -334,7 +334,7 @@ class TestModelSupport(unittest.TestCase):
     """Test model selection support."""
 
     @patch('tests._minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('httpx.Client')
+    @patch('tests._minimax_helpers.httpx.Client')
     def test_m27_model(self, mock_client_cls):
         """M2.7 model should be accepted."""
         mock_response = MagicMock()
@@ -358,7 +358,7 @@ class TestModelSupport(unittest.TestCase):
         self.assertEqual(payload["model"], "MiniMax-M2.7")
 
     @patch('tests._minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('httpx.Client')
+    @patch('tests._minimax_helpers.httpx.Client')
     def test_m27_highspeed_model(self, mock_client_cls):
         """M2.7-highspeed model should be accepted."""
         mock_response = MagicMock()
@@ -382,7 +382,7 @@ class TestModelSupport(unittest.TestCase):
         self.assertEqual(payload["model"], "MiniMax-M2.7-highspeed")
 
     @patch('tests._minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('httpx.Client')
+    @patch('tests._minimax_helpers.httpx.Client')
     def test_default_model_is_m27(self, mock_client_cls):
         """Default model should be MiniMax-M2.7."""
         mock_response = MagicMock()

@@ -1,9 +1,13 @@
 import importlib.util
 import json
+import unittest
 from pathlib import Path
 from subprocess import CompletedProcess
 
-import pytest
+try:
+    import pytest
+except ModuleNotFoundError as exc:
+    raise unittest.SkipTest("pytest is not installed; skipping pytest-style tests") from exc
 
 
 ROOT = Path(__file__).resolve().parents[1]

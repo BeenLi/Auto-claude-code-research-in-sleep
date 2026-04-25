@@ -8,38 +8,33 @@ Usage:
 
 Grid spec YAML format:
 
-project: dllm_distill
-cwd: /home/rfyang/rfyang_code/dllm_experiments_torch
-conda: dllm
-gpus: [0, 1, 2, 3, 4, 5, 6, 7]
-max_parallel: 8
-oom_retry:
-  delay: 120
-  max_attempts: 3
-
+project: rx_pressure
+backend: cosim_gem5_htsim
+cwd: /home/user/rx-pressure
+env:
+  setup: source env.sh
+resources:
+  slots:
+    - {id: sim0, type: cpu_sim}
+    - {id: sim1, type: cpu_sim}
+cosim:
+  coordinator: external
+  window_us: 100
+  worker_lifecycle: persistent_file_handshake
+  htsim_variant: broadcom_csg_htsim
+  ground_truth: rx_decompression_expansion_pressure
 phases:
-  - name: train_teachers
+  - name: sanity
     grid:
-      N: [384, 512]
+      ratio: [1.5, 2.0]
     template:
-      id: "teacher_N${N}"
-      cmd: "python run_pc_exp.py --direction c --backbone softmax --n_hidden ${N} --L 96 --K 500 --window_size 16 --n_steps 30000 --batch_size 128 --seed 42"
-      expected_output: "checkpoints/transformer/pcc_softmax_L96_K500_N${N}_wikitext103.pt"
-
-  - name: distill
-    depends_on: [train_teachers]
-    grid:
-      N: [384, 512]
-      seed: [42, 200, 201]
-      n_train_subset: [50000, 150000, 500000, 652000]
-    template:
-      id: "s${seed}_N${N}_n${n_train_subset}"
-      cmd: >
-        python run_pc_distill_exp.py --backbone softmax --lam 0.5 --t_max_distill 0
-        --K 500 --L 96 --W 16 --n_steps 30000 --batch_size 128 --lr 1e-4
-        --seed ${seed} --subset_seed 2024 --n_hidden ${N}
-        --n_train_subset ${n_train_subset}
-      expected_output: "figures/pcdistill_sw_N${N}_n*_lam0.5_W16_L96_K500_seed${seed}.json"
+      id: "rx_ratio_${ratio}"
+      adapter: cosim_gem5_htsim
+      cmd: "python3 run_cosim.py --ratio ${ratio}"
+      resources: {slot_type: cpu_sim, cpu_cores: 4, memory_gb: 16}
+      outputs:
+        required:
+          - "results/rx_ratio_${ratio}.json"
 """
 
 import argparse
@@ -74,13 +69,36 @@ def expand_grid(grid):
 def build(config):
     out = {
         "project": config.get("project", "unknown"),
+        "backend": config.get("backend", config.get("adapter", "generic_shell")),
         "cwd": config.get("cwd", "."),
-        "conda": config.get("conda", "base"),
-        "gpus": config.get("gpus", list(range(8))),
         "max_parallel": config.get("max_parallel", 8),
-        "oom_retry": config.get("oom_retry", {"delay": 120, "max_attempts": 3}),
         "phases": [],
     }
+    for key in (
+        "adapter",
+        "env",
+        "resources",
+        "cosim",
+        "outputs",
+        "metrics",
+        "success",
+        "retry",
+        "timeout",
+        "conda",
+        "conda_hook",
+        "gpus",
+        "gpu_free_threshold_mib",
+        "oom_retry",
+    ):
+        if key in config:
+            out[key] = config[key]
+    if "resources" not in out and "gpus" in out:
+        out["resources"] = {
+            "slots": [
+                {"id": f"gpu{gpu}", "type": "gpu", "gpu": gpu}
+                for gpu in out["gpus"]
+            ]
+        }
     for phase in config.get("phases", []):
         phase_out = {
             "name": phase["name"],
@@ -91,20 +109,33 @@ def build(config):
         template = phase.get("template", {})
         if not grid:
             # Single job in this phase
-            phase_out["jobs"].append({
+            job = {
                 "id": template.get("id", phase["name"]),
                 "cmd": template["cmd"],
-                "expected_output": template.get("expected_output"),
-            })
+            }
+            for key, value in template.items():
+                if key not in job:
+                    job[key] = substitute(value, {})
+            if "outputs" in job and "expected_output" not in job:
+                required = job["outputs"].get("required", [])
+                if required:
+                    job["expected_output"] = required[0]
+            phase_out["jobs"].append(job)
         else:
             for values in expand_grid(grid):
                 job = {
                     "id": substitute(template["id"], values),
                     "cmd": substitute(template["cmd"], values),
                 }
+                for key, value in template.items():
+                    if key not in job:
+                        job[key] = substitute(value, values)
                 if "expected_output" in template:
-                    job["expected_output"] = substitute(
-                        template["expected_output"], values)
+                    job["expected_output"] = substitute(template["expected_output"], values)
+                elif "outputs" in job:
+                    required = job["outputs"].get("required", [])
+                    if required:
+                        job["expected_output"] = required[0]
                 phase_out["jobs"].append(job)
         out["phases"].append(phase_out)
     return out

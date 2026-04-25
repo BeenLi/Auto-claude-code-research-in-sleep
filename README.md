@@ -261,6 +261,8 @@ claude
 > | Parameter | Default | What it does |
 > |-----------|---------|-------------|
 > | `AUTO_PROCEED` | `true` | Auto-continue at idea selection gate. Set `false` to manually pick which idea to pursue before committing GPU time |
+> | `checkpoint mode` | `standard` | Workflow 1 checkpoint strategy: `auto`, `standard`, `strict`, or `custom`. `standard` pauses at literature scope and idea selection |
+> | `checkpoints` | `literature_scope, idea_selection` | Used when `checkpoint mode: custom`; valid values include `literature_scope`, `idea_selection`, `pre_refine`, `final_report` |
 > | `human checkpoint` | `false` | Pause after each review round so you can read the score, give custom modification instructions, skip specific fixes, or stop early |
 > | `sources` | `all` | Which literature sources to search: `zotero`, `obsidian`, `local`, `web`, `semantic-scholar`, `deepxiv`, `exa`, or `all`. Note: `semantic-scholar`, `deepxiv`, and `exa` must be explicitly listed — not included in `all` |
 > | `arxiv download` | `false` | Download top relevant arXiv PDFs during literature survey. When `false`, only fetches metadata (title, abstract, authors) |
@@ -279,6 +281,8 @@ claude
 >
 > ```
 > /research-pipeline "your topic" — AUTO_PROCEED: false                          # pause at idea selection gate
+> /research-pipeline "your topic" — checkpoint mode: standard                    # pause at literature scope and idea selection
+> /research-pipeline "your topic" — checkpoint mode: custom, checkpoints: literature_scope, idea_selection
 > /research-pipeline "your topic" — human checkpoint: true                       # pause after each review round to give feedback
 > /research-pipeline "your topic" — sources: zotero, web                         # only search Zotero + web (skip local PDFs)
 > /research-pipeline "your topic" — sources: all, deepxiv                        # default sources plus DeepXiv progressive retrieval
@@ -1746,6 +1750,8 @@ Skills are plain Markdown files. Fork and customize:
 | Constant | Default | Description | Pass-through |
 |----------|---------|-------------|:---:|
 | `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | → `idea-discovery` |
+| `CHECKPOINT_MODE` | standard | Workflow 1 checkpoint strategy: `auto`, `standard`, `strict`, `custom` | → `idea-discovery` |
+| `CHECKPOINTS` | literature_scope, idea_selection | Custom checkpoint list when `CHECKPOINT_MODE=custom` | → `idea-discovery` |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `idea-discovery` → `research-lit` |
 | `HUMAN_CHECKPOINT` | false | When `true`, pause after each review round for approval | → `auto-review-loop` |
 | `WANDB` | false | Auto-add W&B logging to experiments | → `experiment-bridge` → `run-experiment` |
@@ -1775,6 +1781,8 @@ Override inline: `/research-pipeline "topic" — auto proceed: false, illustrati
 | `MAX_PILOT_IDEAS` | 3 | Maximum number of ideas to pilot in parallel | — |
 | `MAX_TOTAL_GPU_HOURS` | 8h | Total GPU budget across all pilots | — |
 | `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | — |
+| `CHECKPOINT_MODE` | standard | Stop at literature scope and idea selection by default | — |
+| `CHECKPOINTS` | literature_scope, idea_selection | Custom checkpoint list for `CHECKPOINT_MODE=custom` | — |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `research-lit` |
 
 Override inline: `/idea-discovery "topic" — pilot budget: 4h per idea, sources: zotero, arxiv download: true`
