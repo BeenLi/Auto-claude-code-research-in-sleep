@@ -15,21 +15,8 @@ Research topic: $ARGUMENTS
 - **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 - **PAPER_LIBRARY** — Local directory containing user's paper collection (PDFs). Check these paths in order:
   1. Inline override: `— paper library: /path/` in the skill invocation (highest priority)
-  2. Topic-specific path in `CLAUDE.md` under `## Paper Library` (fuzzy-match topic slug against keys)
-  3. Default path in `CLAUDE.md` under `## Paper Library` (the `default:` entry)
-  4. `papers/` in the current project directory
-  5. `literature/` in the current project directory
-
-  **CLAUDE.md format for `## Paper Library`**:
-  ```markdown
-  ## Paper Library
-
-  - default: ~/papers
-  - nic-lossless-compression: /Users/bytedance/Nutstore Files/顶刊论文/IOAcc/RDMA/compression
-  - transformer-efficiency: ~/papers/transformers
-  ```
-  Topic keys are matched by normalizing both the key and the query topic to lowercase + hyphens.
-  Partial matches are accepted (e.g. key `nic-compression` matches topic `NIC-side lossless compression`).
+  2. `papers/` in the current project directory
+  3. `literature/` in the current project directory
 - **MAX_LOCAL_PAPERS = 20** — Maximum number of local PDFs to scan (read first 3 pages each). If more are found, prioritize by filename relevance to the topic.
 - **ARXIV_DOWNLOAD = false** — When `true`, download top 3-5 most relevant arXiv PDFs to PAPER_LIBRARY after search. When `false` (default), only fetch metadata (title, abstract, authors) via arXiv API — no files are downloaded.
 - **ARXIV_MAX_DOWNLOAD = 5** — Maximum number of PDFs to download when `ARXIV_DOWNLOAD = true`.
@@ -185,7 +172,6 @@ Before searching online, check if the user already has relevant papers locally:
 
 1. **Locate library**: Resolve PAPER_LIBRARY path in priority order:
    - Check for inline `— paper library:` override in the invocation arguments
-   - Read `CLAUDE.md` → `## Paper Library` section; try topic-specific key first (fuzzy match), then `default:`
    - Fall back to `papers/` or `literature/` in project directory
    ```
    Glob: {PAPER_LIBRARY}/**/*.pdf

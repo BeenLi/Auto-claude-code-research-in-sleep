@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working in this repository.
 
 ## Research Domain
 
@@ -38,7 +38,7 @@ When any skill references ML-specific concepts, apply the architecture equivalen
 Reads `EXPERIMENT_PLAN.md` → implements code → deploys experiments → collects initial results in `EXPERIMENT_LOG.md`
 
 **Workflow 2 — Auto Review Loop** (`/auto-review-loop "scope"`):
-Up to 4 rounds: external LLM review → identify weaknesses → Claude implements fixes → re-review until score ≥ 6/10
+Up to 4 rounds: external LLM review → identify weaknesses → Codex implements fixes → re-review until score ≥ 6/10
 
 **Workflow 3 — Paper Writing** (`/paper-writing "NARRATIVE_REPORT.md"`):
 `paper-plan` → `paper-figure` → `paper-write` → `paper-compile` → `auto-paper-improvement-loop`
@@ -89,7 +89,7 @@ Key overridable parameters: `AUTO_PROCEED` (true), `human_checkpoint` (false), `
 ```bash
 # Codex CLI (GPT-5.5 reviewer)
 npm install -g @openai/codex && codex setup
-claude mcp add codex -s user -- codex mcp-server
+Codex mcp add codex -s user -- codex mcp-server
 
 # llm-chat (OpenAI-compatible API bridge)
 pip install httpx
