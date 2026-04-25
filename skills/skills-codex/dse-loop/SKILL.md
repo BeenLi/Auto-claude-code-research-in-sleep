@@ -1,6 +1,8 @@
 ---
-name: "dse-loop"
-description: "Autonomous design space exploration loop for computer architecture and EDA. Runs a program, analyzes results, tunes parameters, and iterates until objective is met or timeout. Use when user says \\\"DSE\\\", \\\"design space exploration\\\", \\\"sweep parameters\\\", \\\"optimize\\\", \\\"find best config\\\", or wants iterative parameter tuning."
+name: dse-loop
+description: "Autonomous design space exploration loop for computer architecture and EDA. Runs a program, analyzes results, tunes parameters, and iterates until objective is met or timeout. Use when user says \"DSE\", \"design space exploration\", \"sweep parameters\", \"optimize\", \"find best config\", or wants iterative parameter tuning."
+argument-hint: [task-description — include program, parameters, objective, and timeout]
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent
 ---
 
 # DSE Loop: Autonomous Design Space Exploration
@@ -274,4 +276,3 @@ If the context window compacts mid-run, the loop recovers from `DSE_STATE.json` 
 # Real-world: PDAG-SFA formal verification tuning
 /dse-loop "Run python run_bmc.py. Tune: BMC_DEPTH, ENGINE, TIMEOUT_PER_PROP. Objective: maximize properties proved. Timeout: 2h"
 ```
-

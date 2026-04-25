@@ -1,6 +1,8 @@
 ---
-name: "analyze-results"
-description: "Analyze ML experiment results, compute statistics, generate comparison tables and insights. Use when user says \"analyze results\", \"compare\", or needs to interpret experimental data."
+name: analyze-results
+description: Analyze ML experiment results, compute statistics, generate comparison tables and insights. Use when user says "analyze results", "compare", or needs to interpret experimental data.
+argument-hint: [results-path-or-description]
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent
 ---
 
 # Analyze Experiment Results
@@ -42,4 +44,3 @@ Always include:
 1. Raw data table
 2. Key findings (numbered, concise)
 3. Suggested next experiments (if any)
-

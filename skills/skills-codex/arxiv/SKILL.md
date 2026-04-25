@@ -1,6 +1,8 @@
 ---
-name: "arxiv"
-description: "Search, download, and summarize academic papers from arXiv. Use when user says \"search arxiv\", \"download paper\", \"fetch arxiv\", \"arxiv search\", \"get paper pdf\", or wants to find and save papers from arXiv to the local paper library."
+name: arxiv
+description: Search, download, and summarize academic papers from arXiv. Use when user says "search arxiv", "download paper", "fetch arxiv", "arxiv search", "get paper pdf", or wants to find and save papers from arXiv to the local paper library.
+argument-hint: [query-or-arxiv-id]
+allowed-tools: Bash(*), Read, Write
 ---
 
 # arXiv Paper Search & Download
@@ -42,7 +44,7 @@ SCRIPT=$(python3 -c "
 import pathlib
 candidates = [
     pathlib.Path('tools/arxiv_fetch.py'),
-    pathlib.Path.home() / '.codex' / 'skills' / 'arxiv' / 'arxiv_fetch.py',
+    pathlib.Path.home() / '.claude' / 'skills' / 'arxiv' / 'arxiv_fetch.py',
 ]
 for p in candidates:
     if p.exists():
@@ -175,12 +177,34 @@ For each paper (downloaded or fetched by API):
 - **Local PDF**: papers/[ID].pdf (if downloaded)
 ```
 
-### Step 6: Final Output
+### Step 6: Update Research Wiki (if active)
+
+**Required when `research-wiki/` exists in the project**; skip silently
+otherwise. After presenting results, ingest every paper returned by
+this invocation (both the search hits shown and any downloaded PDFs)
+into the wiki:
+
+```
+if [ -d research-wiki/ ]:
+    for each arxiv_id in results:
+        python3 tools/research_wiki.py ingest_paper research-wiki/ \
+            --arxiv-id "<arxiv_id>"
+```
+
+The helper handles metadata fetch, slug, dedup, page creation, index
+rebuild, and log append in a single call — **do not handwrite
+`papers/<slug>.md`**. See
+[`shared-references/integration-contract.md`](../shared-references/integration-contract.md)
+for the canonical-helper rule. Missed ingests can be backfilled later
+with `python3 tools/research_wiki.py sync research-wiki/ --arxiv-ids <id1>,<id2>,...`.
+
+### Step 7: Final Output
 
 Summarize what was done:
 
 - `Found N papers for "query"`
 - `Downloaded: papers/2301.07041.pdf (842 KB)` (for each download)
+- `Wiki-ingested N papers` (if `research-wiki/` was present)
 - Any warnings (rate limit hit, file too small, already exists)
 
 Suggest follow-up skills:
@@ -199,4 +223,3 @@ Suggest follow-up skills:
 - Handle both arXiv ID formats: new (`2301.07041`) and old (`cs/0601001`)
 - PAPER_DIR is created automatically if it does not exist
 - If the arXiv API is unreachable, report the error clearly and suggest using `/research-lit` with `- sources: web` as a fallback
-

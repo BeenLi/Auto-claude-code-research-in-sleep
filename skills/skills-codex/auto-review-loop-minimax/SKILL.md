@@ -1,6 +1,8 @@
 ---
-name: "auto-review-loop-minimax"
-description: "Autonomous multi-round research review loop using MiniMax API. Use when you want to use MiniMax instead of Codex MCP for external review. Trigger with \"auto review loop minimax\" or \"minimax review\"."
+name: auto-review-loop-minimax
+description: Autonomous multi-round research review loop using MiniMax API. Use when you want to use MiniMax instead of Codex MCP for external review. Trigger with "auto review loop minimax" or "minimax review".
+argument-hint: [topic-or-scope]
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill
 ---
 
 # Auto Review Loop (MiniMax Version): Autonomous Research Improvement
@@ -26,7 +28,7 @@ If `mcp__minimax-chat__minimax_chat` is available, use it:
 
 ```
 mcp__minimax-chat__minimax_chat:
-  message: |
+  prompt: |
     [Review prompt content]
   model: "MiniMax-M2.7"
   system: "You are a senior machine learning researcher..."
@@ -50,9 +52,9 @@ curl -s "https://api.minimax.io/v1/chat/completions" \
   }'
 ```
 
-**API Key**: Read from `~/.codex/settings.json` under `env.MINIMAX_API_KEY`, or from environment variable.
+**API Key**: Read from `~/.claude/settings.json` under `env.MINIMAX_API_KEY`, or from environment variable.
 
-**Why MiniMax instead of a secondary Codex agent?** Codex CLI uses OpenAI's Responses API (`/v1/responses`) which is not supported by third-party providers. See: https://github.com/openai/codex/discussions/7782
+**Why MiniMax instead of Codex MCP?** Codex CLI uses OpenAI's Responses API (`/v1/responses`) which is not supported by third-party providers. See: https://github.com/openai/codex/discussions/7782
 
 ## State Persistence (Compact Recovery)
 
@@ -216,6 +218,7 @@ When loop ends (positive assessment or max rounds):
 
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 
+- **Anti-hallucination citations**: When adding references, NEVER fabricate BibTeX. Use DBLP → CrossRef → `[VERIFY]` chain. Do NOT generate BibTeX from memory.
 - Be honest — include negative results and failed experiments
 - Do NOT hide weaknesses to game a positive score
 - Implement fixes BEFORE re-reviewing (don't just promise to fix)
@@ -232,7 +235,7 @@ When loop ends (positive assessment or max rounds):
 mcp__minimax-chat__minimax_chat:
   model: "MiniMax-M2.7"
   system: "You are a senior machine learning researcher serving as a reviewer for top-tier conferences like NeurIPS, ICML, and ICLR. Provide rigorous, constructive feedback."
-  message: |
+  prompt: |
     [Round N/MAX_ROUNDS of autonomous review loop]
 
     ## Previous Review Summary (Round N-1)
@@ -281,10 +284,9 @@ curl -s "https://api.minimax.io/v1/chat/completions" \
   }'
 ```
 
-
 ## Output Protocols
 
 > Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting

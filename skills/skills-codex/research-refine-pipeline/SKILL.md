@@ -1,6 +1,7 @@
 ---
-name: "research-refine-pipeline"
-description: "Run an end-to-end workflow that chains `research-refine` and `experiment-plan`. Use when the user wants a one-shot pipeline from vague research direction to focused final proposal plus detailed experiment roadmap, or asks to \"\u4e32\u8d77\u6765\", build a pipeline, do it end-to-end, or generate both the method and experiment plan together."
+name: research-refine-pipeline
+description: 'Run an end-to-end workflow that chains `research-refine` and `experiment-plan`. Use when the user wants a one-shot pipeline from vague research direction to focused final proposal plus detailed experiment roadmap, or asks to "串起来", build a pipeline, do it end-to-end, or generate both the method and experiment plan together.'
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, spawn_agent, send_input
 ---
 
 # Research Refine Pipeline: End-to-End Method and Experiment Planning
@@ -76,7 +77,7 @@ Before the experiment stage, write a short gate check:
 - What is the dominant contribution?
 - What complexity was intentionally rejected?
 - Which reviewer concerns still matter for validation?
-- Is a frontier primitive central, optional, or absent?
+- Is a platform primitive (DPU engine / FPGA block / P4 stage / RDMA extension) central, optional, or absent?
 
 If these answers are not crisp, tighten the final proposal first.
 
@@ -158,9 +159,9 @@ Best next step:
 ## Output Protocols
 
 > Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting
 
 ## Key Rules
 
@@ -171,8 +172,8 @@ Best next step:
 - Reuse the same claims across `FINAL_PROPOSAL.md`, `EXPERIMENT_PLAN.md`, and `PIPELINE_SUMMARY.md`.
 - Keep the main paper story compact.
 - If the method is intentionally simple, defend that simplicity in the experiment plan rather than adding new components.
-- If the method uses a modern LLM / VLM / Diffusion / RL primitive, make its necessity test explicit.
-- If the method does not need a frontier primitive, say that clearly and avoid forcing one.
+- If the method uses a modern DPU / FPGA / P4 / RDMA platform primitive, make its necessity test explicit.
+- If the method does not need a platform primitive (host-CPU is sufficient), say that clearly and avoid forcing hardware complexity.
 - Prefer the staged skills when the user only needs one stage; use this skill for the integrated flow.
 
 ## Composing with Other Skills
@@ -183,4 +184,3 @@ Best next step:
 /experiment-plan   -> experiment planning only
 /run-experiment    -> execution
 ```
-

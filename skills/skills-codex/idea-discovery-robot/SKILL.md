@@ -1,6 +1,8 @@
 ---
-name: "idea-discovery-robot"
-description: "Workflow 1 adaptation for robotics and embodied AI. Orchestrates robotics-aware literature survey, idea generation, novelty check, and critical review to go from a broad robotics direction to benchmark-grounded, simulation-first ideas. Use when user says \\\"robotics idea discovery\\\", \\\"\u673a\u5668\u4eba\u627eidea\\\", \\\"embodied AI idea\\\", \\\"\u673a\u5668\u4eba\u65b9\u5411\u63a2\u7d22\\\", \\\"sim2real \u9009\u9898\\\", or wants ideas for manipulation, locomotion, navigation, drones, humanoids, or general robot learning."
+name: idea-discovery-robot
+description: "Workflow 1 adaptation for robotics and embodied AI. Orchestrates robotics-aware literature survey, idea generation, novelty check, and critical review to go from a broad robotics direction to benchmark-grounded, simulation-first ideas. Use when user says \"robotics idea discovery\", \"机器人找idea\", \"embodied AI idea\", \"机器人方向探索\", \"sim2real 选题\", or wants ideas for manipulation, locomotion, navigation, drones, humanoids, or general robot learning."
+argument-hint: [robotics-direction]
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, spawn_agent, send_input
 ---
 
 # Robotics Idea Discovery Pipeline
@@ -37,7 +39,7 @@ The goal is not to produce flashy demos. The goal is to produce ideas that are:
 - **PILOT_MODE = `sim-first`** — Prefer simulation or offline-log pilots before any hardware execution
 - **REAL_ROBOT_PILOTS = `explicit approval only`** — Never assume physical robot access or approval
 - **AUTO_PROCEED = true** — If user does not respond at checkpoints, proceed with the best sim-first option
-- **REVIEWER_MODEL = `gpt-5.5`** — External reviewer model via a secondary Codex agent
+- **REVIEWER_MODEL = `gpt-5.5`** — External reviewer model via Codex MCP
 - **TARGET_VENUES = CoRL, RSS, ICRA, IROS, RA-L** — Default novelty and reviewer framing
 
 > Override inline, e.g. `/idea-discovery-robot "bimanual manipulation" — only sim ideas, no real robot` or `/idea-discovery-robot "drone navigation" — focus on CoRL/RSS, 2 pilot ideas max`
@@ -356,7 +358,6 @@ If no simulator or benchmark is available yet, stop at the report and ask the us
 ## Output Protocols
 
 > Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
-
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting

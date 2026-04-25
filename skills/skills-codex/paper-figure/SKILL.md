@@ -1,6 +1,8 @@
 ---
-name: "paper-figure"
-description: "Generate publication-quality figures and tables from experiment results. Use when user says \\\"\u753b\u56fe\\\", \\\"\u4f5c\u56fe\\\", \\\"generate figures\\\", \\\"paper figures\\\", or needs plots for a paper."
+name: paper-figure
+description: "Generate publication-quality figures and tables from experiment results. Use when user says \"画图\", \"作图\", \"generate figures\", \"paper figures\", or needs plots for a paper."
+argument-hint: [figure-plan-or-data-path]
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, spawn_agent, send_input
 ---
 
 # Paper Figure: Publication-Quality Plots from Experiment Data
@@ -28,7 +30,7 @@ Generate all figures and tables for a paper based on: **$ARGUMENTS**
 - **COLOR_PALETTE = `tab10`** — Default matplotlib color cycle. Options: `tab10`, `Set2`, `colorblind` (deuteranopia-safe)
 - **FONT_SIZE = 10** — Base font size (matches typical conference body text)
 - **FIG_DIR = `figures/`** — Output directory for generated figures
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via a secondary Codex agent for figure quality review.
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for figure quality review.
 
 ## Inputs
 
@@ -201,8 +203,8 @@ Send figure descriptions and captions to GPT-5.5 for review:
 
 ```
 spawn_agent:
-  model: gpt-5.5
   reasoning_effort: xhigh
+  model: gpt-5.5
   message: |
     Review these figure/table plans for a [VENUE] submission.
 
@@ -276,4 +278,3 @@ figures/
 ## Acknowledgements
 
 Design pattern (type × style matrix) inspired by [baoyu-skills](https://github.com/jimliu/baoyu-skills). Publication style defaults and figure rules from [pedrohcgs/claude-code-my-workflow](https://github.com/pedrohcgs/claude-code-my-workflow). Visualization decision tree from [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills).
-

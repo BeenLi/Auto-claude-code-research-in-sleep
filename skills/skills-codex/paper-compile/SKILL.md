@@ -1,6 +1,8 @@
 ---
-name: "paper-compile"
-description: "Compile LaTeX paper to PDF, fix errors, and verify output. Use when user says \\\"\u7f16\u8bd1\u8bba\u6587\\\", \\\"compile paper\\\", \\\"build PDF\\\", \\\"\u751f\u6210PDF\\\", or wants to compile LaTeX into a submission-ready PDF."
+name: paper-compile
+description: "Compile LaTeX paper to PDF, fix errors, and verify output. Use when user says \"编译论文\", \"compile paper\", \"build PDF\", \"生成PDF\", or wants to compile LaTeX into a submission-ready PDF."
+argument-hint: [paper-directory]
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob
 ---
 
 # Paper Compile: LaTeX to Submission-Ready PDF
@@ -118,6 +120,8 @@ For each error:
 3. Apply the fix
 4. Recompile
 
+**Stuck after 2 attempts?** If Codex plugin is installed, invoke `/codex:rescue` — Codex can independently read the LaTeX source and `compile.log` to spot issues Claude missed (e.g., conflicting packages, encoding problems, subtle macro errors). If not installed, continue with Claude's own diagnosis.
+
 ### Step 5: Post-Compilation Checks
 
 After successful compilation, verify the output:
@@ -131,6 +135,16 @@ pdfinfo main.pdf | grep Pages
 # macOS: open for visual inspection
 # open main.pdf
 ```
+
+**Visual review (automated):**
+If the compiled PDF exists, read it directly to check visual presentation:
+- Figure quality: readable labels, legible text, distinguishable colors
+- Layout: no orphaned section headers, no awkward page breaks
+- Figures appear near their first text reference (not pages away)
+- Tables: aligned columns, consistent decimal precision
+- No overfull content visibly extending past margins
+
+This is a quick visual scan, not a full review — the improvement loop does deeper visual review.
 
 **Automated checks:**
 
@@ -250,4 +264,3 @@ For conference submission, additional checks:
 | ICML 2025 | `icml2025.sty` | `natbib` (`\citep`/`\citet`) | 8 pages (to Conclusion end) | No | OpenReview |
 | IEEE Journal | `IEEEtran.cls` [journal] | `cite` (`\cite{}`, numeric) | ~12-14 pages (Transactions) / ~4-5 (Letters) | **Yes** | IEEE Author Portal / ScholarOne |
 | IEEE Conference | `IEEEtran.cls` [conference] | `cite` (`\cite{}`, numeric) | 5-8 pages (varies by conf) | **Yes** | EDAS / IEEE Author Portal |
-

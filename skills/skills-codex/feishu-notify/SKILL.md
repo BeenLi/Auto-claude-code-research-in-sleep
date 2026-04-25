@@ -1,6 +1,8 @@
 ---
-name: "feishu-notify"
-description: "Send notifications to Feishu/Lark. Internal utility used by other skills, or manually via /feishu-notify. Supports push-only (webhook) and interactive (bidirectional) modes. Use when user says \\\"\u53d1\u98de\u4e66\\\", \\\"notify feishu\\\", or other skills need to send status updates."
+name: feishu-notify
+description: "Send notifications to Feishu/Lark. Internal utility used by other skills, or manually via /feishu-notify. Supports push-only (webhook) and interactive (bidirectional) modes. Use when user says \"发飞书\", \"notify feishu\", or other skills need to send status updates."
+argument-hint: [message-text]
+allowed-tools: Bash(curl *), Bash(cat *), Read, Glob
 ---
 
 # Feishu/Lark Notification
@@ -15,7 +17,7 @@ This skill provides Feishu/Lark integration for ARIS. It is designed as an **int
 
 ## Configuration
 
-The skill reads `~/.codex/feishu.json`. If this file does not exist, **all Feishu functionality is disabled** — skills behave exactly as before.
+The skill reads `~/.claude/feishu.json`. If this file does not exist, **all Feishu functionality is disabled** — skills behave exactly as before.
 
 ### Config Format
 
@@ -43,7 +45,7 @@ The skill reads `~/.codex/feishu.json`. If this file does not exist, **all Feish
 ### Step 1: Read Config
 
 ```bash
-cat ~/.codex/feishu.json 2>/dev/null
+cat ~/.claude/feishu.json 2>/dev/null
 ```
 
 - **File not found** → return silently, do nothing
@@ -118,7 +120,7 @@ Other skills should use this pattern to send notifications:
 ```markdown
 ### Feishu Notification (if configured)
 
-Check if `~/.codex/feishu.json` exists and mode is not "off":
+Check if `~/.claude/feishu.json` exists and mode is not "off":
 - If **push** mode: send webhook notification with event summary
 - If **interactive** mode: send notification and wait for user reply
 - If **off** or file absent: skip entirely (no-op)
@@ -152,4 +154,3 @@ Skills send these events at these moments:
 - **Interactive timeout = auto-proceed.** Don't hang forever waiting for a reply.
 - **Respect `AUTO_PROCEED`**: In interactive mode, if the user doesn't reply within timeout, use the same auto-proceed logic as the calling skill.
 - **No secrets in notifications.** Never include API keys, tokens, or passwords in Feishu messages.
-

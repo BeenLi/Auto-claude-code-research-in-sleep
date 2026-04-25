@@ -1,6 +1,8 @@
 ---
-name: "proof-writer"
-description: "Writes rigorous mathematical proofs for ML/AI theory. Use when asked to prove a theorem, lemma, proposition, or corollary, fill in missing proof steps, formalize a proof sketch, \u8865\u5168\u8bc1\u660e, \u5199\u8bc1\u660e, \u8bc1\u660e\u67d0\u4e2a\u547d\u9898, or determine whether a claimed proof can actually be completed under the stated assumptions."
+name: proof-writer
+description: Writes rigorous mathematical proofs for ML/AI theory. Use when asked to prove a theorem, lemma, proposition, or corollary, fill in missing proof steps, formalize a proof sketch, 补全证明, 写证明, 证明某个命题, or determine whether a claimed proof can actually be completed under the stated assumptions.
+argument-hint: [theorem-statement-and-assumptions]
+allowed-tools: Read, Write, Edit, Grep, Glob
 ---
 
 # Proof Write: Rigorous Theorem / Lemma Drafting
@@ -219,4 +221,3 @@ After writing the target proof file, respond briefly with:
 - If the statement is false as written, say so explicitly and give a counterexample or repaired statement.
 - If uncertainty remains, mark it explicitly in `Open Risks`; do not hide it inside polished prose.
 - Correctness matters more than brevity.
-

@@ -1,61 +1,93 @@
 ---
-name: "monitor-experiment"
-description: "Monitor running experiments, check progress, collect results. Use when user says \"check results\", \"is it done\", \"monitor\", or wants experiment output."
+name: monitor-experiment
+description: Monitor Computer Architecture experiments, simulator queues, logs, required artifacts, and result JSON. Use when user asks to check progress, inspect results, or see whether simulator jobs are done.
+argument-hint: [queue-state-or-run-id]
+allowed-tools: Bash(ssh *), Bash(echo *), Read, Write, Edit
 ---
 
 # Monitor Experiment Results
 
-Monitor: $ARGUMENTS
+Monitor simulator, RTL, synthesis, micro-benchmark, or co-simulation runs.
 
 ## Workflow
 
-### Step 1: Check What's Running
+### Step 1: Locate Run State
+
+Prefer queue state when available:
+
+```bash
+jq '.jobs | group_by(.status) | map({(.[0].status): length}) | add' queue_state.json
+```
+
+For remote jobs:
+
 ```bash
 ssh <server> "screen -ls"
+ssh <server> "test -f queue_state.json && cat queue_state.json"
 ```
 
-### Step 2: Collect Output from Each Screen
-For each screen session, capture the last N lines:
+### Step 2: Inspect Logs
+
+Read the latest log for running or stuck jobs:
+
 ```bash
-ssh <server> "screen -S <name> -X hardcopy /tmp/screen_<name>.txt && tail -50 /tmp/screen_<name>.txt"
+tail -80 logs/<run_id>.log
 ```
 
-If hardcopy fails, check for log files or tee output.
+Look for simulator-specific failures:
 
-### Step 3: Check for JSON Result Files
+- gem5 panic/config exception/checkpoint missing
+- htsim assertion/topology or traffic-matrix error
+- VCS/Vivado license checkout failure
+- timeout or killed process
+- missing required output
+
+### Step 3: Verify Required Artifacts
+
+Check the outputs declared in the manifest:
+
 ```bash
-ssh <server> "ls -lt <results_dir>/*.json 2>/dev/null | head -20"
+test -f results/<run_id>.json
+test -f exchange/cosim_trace.jsonl
 ```
 
-If JSON results exist, fetch and parse them:
-```bash
-ssh <server> "cat <results_dir>/<latest>.json"
+For co-simulation, inspect window summaries and the final result JSON. The Rx pressure scenario should expose:
+
+- `rx_pressure`
+- `rx_buffer_occupancy`
+- `decompression_expansion_ratio`
+- `accepted_compressed_bytes`
+- `dropped_compressed_bytes`
+- `drop_reason`
+- `sender_retransmission_policy`
+- `retransmitted_bytes`
+- `goodput_bytes`
+- `host_memory_write_gbps`
+- `pcie_utilization`
+- `rx_stall_ns`
+
+### Step 4: Summarize Raw Numbers First
+
+Report raw metrics before interpretation:
+
+```text
+| Run | Backend | Status | Key Metric | Value |
+|-----|---------|--------|------------|-------|
+| rx_ratio_2.0 | cosim_gem5_htsim | done | dropped_compressed_bytes | ... |
 ```
 
-### Step 4: Summarize Results
+### Step 5: Interpret Carefully
 
-Present results in a comparison table:
-```
-| Experiment | Metric | Delta vs Baseline | Status |
-|-----------|--------|-------------------|--------|
-| Baseline  | X.XX   | —                 | done   |
-| Method A  | X.XX   | +Y.Y              | done   |
-```
+Tie interpretation back to the claim:
 
-### Step 5: Interpret
-- Compare against known baselines
-- Flag unexpected results (negative delta, NaN, divergence)
-- Suggest next steps based on findings
-
-### Step 6: Feishu Notification (if configured)
-
-After results are collected, check `~/.codex/feishu.json`:
-- Send `experiment_done` notification: results summary table, delta vs baseline
-- If config absent or mode `"off"`: skip entirely (no-op)
+- Does Rx decompression expansion create PCIe/host-memory pressure?
+- Did Rx overflow/drop appear?
+- Did sender-side RTO retransmission reduce goodput or increase tail latency?
+- Are failures simulator/setup problems or negative scientific results?
 
 ## Key Rules
-- Always show raw numbers before interpretation
-- Compare against the correct baseline (same config)
-- Note if experiments are still running (check progress bars, iteration counts)
-- If results look wrong, check training logs for errors before concluding
 
+- Never infer completion from a dead screen alone; required outputs must exist.
+- Do not treat lossy RDMA drops as application-visible permanent loss unless the experiment explicitly says so.
+- Do not claim retransmission was modeled unless the result JSON includes sender-side retransmission metrics.
+- Always distinguish simulator walltime from simulated time.

@@ -1,6 +1,8 @@
 ---
-name: "auto-review-loop-llm"
-description: "Autonomous research review loop using any OpenAI-compatible LLM API. Configure via llm-chat MCP server or environment variables. Trigger with \"auto review loop llm\" or \"llm review\"."
+name: auto-review-loop-llm
+description: Autonomous research review loop using any OpenAI-compatible LLM API. Configure via llm-chat MCP server or environment variables. Trigger with "auto review loop llm" or "llm review".
+argument-hint: [topic-or-scope]
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill
 ---
 
 # Auto Review Loop (Generic LLM): Autonomous Research Improvement
@@ -21,14 +23,14 @@ This skill uses **any OpenAI-compatible API** for external review via the `llm-c
 
 ### Configuration via MCP Server (Recommended)
 
-Add to `~/.codex/settings.json`:
+Add to `~/.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "llm-chat": {
       "command": "/usr/bin/python3",
-      "args": ["/Users/yourname/.codex/mcp-servers/llm-chat/server.py"],
+      "args": ["/Users/yourname/.claude/mcp-servers/llm-chat/server.py"],
       "env": {
         "LLM_API_KEY": "your-api-key",
         "LLM_BASE_URL": "https://api.deepseek.com/v1",
@@ -58,7 +60,7 @@ Add to `~/.codex/settings.json`:
 
 ```
 mcp__llm-chat__chat:
-  message: |
+  prompt: |
     [Review prompt content]
   model: "deepseek-chat"
   system: "You are a senior ML reviewer..."
@@ -115,7 +117,7 @@ Persist state to `review-stage/REVIEW_STATE.json` after each round:
 ```
 mcp__llm-chat__chat:
   system: "You are a senior ML reviewer (NeurIPS/ICML level)."
-  message: |
+  prompt: |
     [Round N/MAX_ROUNDS of autonomous review loop]
 
     [Full research context: claims, methods, results, known weaknesses]
@@ -203,6 +205,7 @@ Append to `review-stage/AUTO_REVIEW.md`:
 
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 
+- **Anti-hallucination citations**: When adding references, NEVER fabricate BibTeX. Use DBLP → CrossRef → `[VERIFY]` chain. Do NOT generate BibTeX from memory.
 - Be honest about weaknesses
 - Implement fixes BEFORE re-reviewing
 - Document everything
@@ -214,7 +217,7 @@ Append to `review-stage/AUTO_REVIEW.md`:
 ```
 mcp__llm-chat__chat:
   system: "You are a senior ML reviewer (NeurIPS/ICML level)."
-  message: |
+  prompt: |
     [Round N/MAX_ROUNDS of autonomous review loop]
 
     ## Previous Review Summary (Round N-1)
@@ -238,10 +241,9 @@ mcp__llm-chat__chat:
     Be brutally honest. If the work is ready, say so clearly.
 ```
 
-
 ## Output Protocols
 
 > Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting

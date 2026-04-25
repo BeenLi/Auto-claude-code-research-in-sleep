@@ -1,6 +1,8 @@
 ---
 name: grant-proposal
 description: "Draft a structured grant proposal from research ideas and literature. Supports KAKENHI (Japan), NSF (US), NSFC (China, including 面上/青年/优青/杰青/海外优青/重点), ERC (EU), DFG (Germany), SNSF (Switzerland), ARC (Australia), NWO (Netherlands), and generic formats. Use when user says \"write grant\", \"grant proposal\", \"申請書\", \"write KAKENHI\", \"科研費\", \"基金申请\", \"写基金\", \"NSF proposal\", or wants to turn research ideas into a funding application."
+argument-hint: [research-direction — grant-type]
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, spawn_agent, send_input
 ---
 
 # Grant Proposal: From Research Ideas to Fundable Application
@@ -32,7 +34,7 @@ Grant proposals argue for **future work** (feasibility + potential), not complet
 
 - **GRANT_TYPE = `KAKENHI`** — Default grant type. Supported: `KAKENHI`, `NSF`, `NSFC`, `ERC`, `DFG`, `SNSF`, `ARC`, `NWO`, `GENERIC`. Override via argument (e.g., `/grant-proposal "topic — NSF"`).
 - **GRANT_SUBTYPE = `auto`** — Sub-type within the grant agency. Examples: KAKENHI `Start-up`/`Wakate`/`Kiban-B`; NSFC `Youth`/`Excellent-Youth`/`Distinguished`/`Overseas`/`Key`; NSF `CAREER`/`CRII`/`Standard`. Auto-detected from argument or defaults to the most common sub-type.
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via a secondary Codex agent for proposal review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for proposal review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
 - **OUTPUT_FORMAT = `markdown`** — Output format. Supported: `markdown`, `latex`. LaTeX uses grant-specific templates when available.
 - **MAX_REVIEW_ROUNDS = 2** — Maximum external review-revise cycles before finalizing.
 - **OUTPUT_DIR = `grant-proposal/`** — Directory for generated proposal files.
@@ -133,7 +135,7 @@ Grant proposal drafting is a long task that may trigger context compaction. Pers
   "grant_type": "KAKENHI",
   "grant_subtype": "Start-up",
   "language": "Japanese",
-  "agent_id": "019cfcf4-...",
+  "codex_thread_id": "019cfcf4-...",
   "gap_statement": "...",
   "aims_count": 3,
   "status": "in_progress",
@@ -317,7 +319,7 @@ Options for the user:
 - Reply **"back"** → return to Phase 1 to adjust the gap/positioning
 - Reply **"stop"** → save current structure to `grant-proposal/DRAFT_NOTES.md`
 
-**State**: Write `GRANT_STATE.json` with `phase: 2`, aims summary, and the reviewer agent id.
+**State**: Write `GRANT_STATE.json` with `phase: 2`, aims summary, and Codex threadId.
 
 ### Phase 3: Section Drafting
 
@@ -423,15 +425,16 @@ Invoke `/research-review` on the complete draft for grant-type-specific evaluati
 - Provides ranked action items for improvement
 - All feedback saved to `grant-proposal/GRANT_REVIEW.md`
 
-> ⚠️ **External review fallback**: If reviewer agents are unavailable, skip external review. Note "External review skipped — no reviewer agent available. Consider running `/auto-review-loop-llm` separately." in `GRANT_REVIEW.md`. The proposal is still usable without external review.
+> ⚠️ **Codex MCP fallback**: If `spawn_agent` is not available (no OpenAI API key), skip external review. Note "External review skipped — no Codex MCP available. Consider running `/auto-review-loop-llm` separately." in GRANT_REVIEW.md. The proposal is still usable without external review.
 
-If `/research-review` is invoked (preferred), it handles the external review internally. If you run the reviewer directly, use `spawn_agent` for Round 1 and `send_input` for follow-up rounds.
+If `/research-review` is invoked (preferred), it handles the Codex call internally. If calling Codex directly (e.g., to maintain thread context from Phase 2):
 
 #### Round 1 (full draft review):
 
 ```
-spawn_agent:
-  reasoning_effort: xhigh
+send_input:
+  threadId: [from Phase 2]
+  config: {"model_reasoning_effort": "xhigh"}
   message: |
     Review this complete [GRANT_TYPE] [GRANT_SUBTYPE] proposal draft.
 
@@ -453,15 +456,14 @@ spawn_agent:
     [PASTE FULL PROPOSAL TEXT]
 ```
 
-Save the returned reviewer agent id in `GRANT_STATE.json` if you want to continue the same dialogue in Round 2.
-
 #### Round 2+ (after revisions):
 
 If MAX_REVIEW_ROUNDS > 1 and revisions were applied:
 
 ```
 send_input:
-  agent_id: [saved from Round 1]
+  threadId: [saved from Round 1]
+  config: {"model_reasoning_effort": "xhigh"}
   message: |
     [Round N review of revised [GRANT_TYPE] [GRANT_SUBTYPE] proposal]
 
@@ -566,7 +568,7 @@ What would you like to do next?
 - **Preliminary data de-risks.** Include any pilot results, existing datasets, or prior publications that demonstrate feasibility.
 - **Reviewer-facing structure.** Bold key sentences. Use numbered lists for clarity. Make the reviewer's job easy.
 - **Cultural norms matter.** KAKENHI expects 社会的意義; NSF expects Broader Impacts; NSFC expects 国际前沿 positioning. Missing these is a red flag for reviewers.
-- **Feishu notifications are optional.** If `~/.codex/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final output. If absent, skip silently.
+- **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final output. If absent, skip silently.
 
 ## Parameter Pass-Through
 
@@ -585,7 +587,7 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 | `max review rounds` | 2 | External review cycles | — |
 | `sources` | all | Literature sources | → `/research-lit` |
 | `arxiv download` | false | Download arXiv PDFs | → `/research-lit` |
-| `reviewer model` | gpt-5.5 | Codex review model | → reviewer agent |
+| `reviewer model` | gpt-5.5 | Codex review model | → Codex MCP |
 | `auto proceed` | false | Skip checkpoints | — |
 
 ## Composing with Other Skills
@@ -620,6 +622,6 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 ## Output Protocols
 
 > Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting

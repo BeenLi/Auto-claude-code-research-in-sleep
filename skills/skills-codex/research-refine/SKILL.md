@@ -1,6 +1,7 @@
 ---
-name: "research-refine"
-description: "Turn a vague research direction into a problem-anchored, elegant, frontier-aware, implementation-oriented method plan via iterative GPT-5.5 review. Use when the user says \"refine my approach\", \"\u5e2e\u6211\u7ec6\u5316\u65b9\u6848\", \"decompose this problem\", \"\u6253\u78e8idea\", \"refine research plan\", \"\u7ec6\u5316\u7814\u7a76\u65b9\u6848\", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea."
+name: research-refine
+description: 'Turn a vague research direction into a problem-anchored, elegant, platform-aware, implementation-oriented method plan via iterative GPT-5.5 review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, spawn_agent, send_input
 ---
 
 # Research Refine: Problem-Anchored, Elegant, Frontier-Aware Plan Refinement
@@ -9,22 +10,24 @@ Refine and concretize: **$ARGUMENTS**
 
 ## Overview
 
-Use this skill when the research problem is already visible but the technical route is still fuzzy. The goal is not to produce a bloated proposal or a benchmark shopping list. The goal is to turn a vague direction into a **problem -> focused method -> minimal validation** document that is concrete enough to implement, elegant enough to feel paper-worthy, and current enough to resonate in the foundation-model era.
+Use this skill when the research problem is already visible but the technical route is still fuzzy. The goal is not to produce a bloated proposal or a benchmark shopping list. The goal is to turn a vague direction into a **problem -> focused mechanism -> minimal validation** document that is concrete enough to implement, elegant enough to feel paper-worthy, and current enough for AI infrastructure for LLM.
 
 Four principles dominate this skill:
 
 1. **Do not lose the original problem.** Freeze an immutable **Problem Anchor** and reuse it in every round.
-2. **The smallest adequate mechanism wins.** Prefer the minimal intervention that directly fixes the bottleneck.
+2. **The smallest adequate mechanism wins.** Prefer the minimal architecture intervention that directly fixes the bottleneck.
 3. **One paper, one dominant contribution.** Prefer one sharp thesis plus at most one supporting contribution.
-4. **Modern leverage is a prior, not a decoration.** When LLM / VLM / Diffusion / RL / distillation / inference-time scaling naturally fit the bottleneck, use them concretely. Do not bolt them on as buzzwords.
+4. **Platform leverage is a prior, not a decoration.** When accelerator, memory hierarchy, CXL/HBM, SmartNIC/DPU, P4, FPGA, storage, or runtime hooks naturally fit the bottleneck, use them concretely. Do not bolt on trendy hardware features as buzzwords.
+
+> **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving. "Frontier primitives" means modern hardware and system substrates (accelerators, HBM/CXL, SmartNIC/DPU, FPGA, storage datapaths, simulators), not ML models. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
 
 ```
 User input (PROBLEM + vague APPROACH)
-  -> Phase 0 (Local step): Freeze Problem Anchor
-  -> Phase 1 (Local step): Scan grounding papers -> identify technical gap -> choose the sharpest route -> write focused proposal
-  -> Phase 2 (Codex/GPT-5.5): Review for fidelity, specificity, contribution quality, and frontier leverage
-  -> Phase 3 (Local step): Anchor check + simplicity check -> revise method -> rewrite full proposal
-  -> Phase 4 (Codex, same agent): Re-evaluate revised proposal
+  -> Phase 0 (Claude): Freeze Problem Anchor
+  -> Phase 1 (Claude): Scan grounding papers -> identify technical gap -> choose the sharpest route -> write focused proposal
+  -> Phase 2 (Codex/GPT-5.5): Review for fidelity, specificity, contribution quality, and platform leverage
+  -> Phase 3 (Claude): Anchor check + simplicity check -> revise method -> rewrite full proposal
+  -> Phase 4 (Codex, same thread): Re-evaluate revised proposal
   -> Repeat Phase 3-4 until OVERALL SCORE >= 9 or MAX_ROUNDS reached
   -> Phase 5: Save full history to refine-logs/
   -> Optional handoff: /experiment-plan for a detailed execution-ready experiment roadmap
@@ -32,26 +35,26 @@ User input (PROBLEM + vague APPROACH)
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.5`** — Reviewer model used via a secondary Codex agent.
+- **REVIEWER_MODEL = `gpt-5.5`** — Reviewer model used via Codex MCP.
 - **MAX_ROUNDS = 5** — Maximum review-revise rounds.
 - **SCORE_THRESHOLD = 9** — Minimum overall score to stop.
 - **OUTPUT_DIR = `refine-logs/`** — Directory for round files and final report.
 - **MAX_LOCAL_PAPERS = 15** — Maximum local papers/notes to scan for grounding.
 - **MAX_CORE_EXPERIMENTS = 3** — Default cap for core validation blocks inside this skill.
 - **MAX_PRIMARY_CLAIMS = 2** — Soft cap for paper-level claims. Prefer one dominant claim plus one supporting claim.
-- **MAX_NEW_TRAINABLE_COMPONENTS = 2** — Soft cap for genuinely new trainable pieces. Exceed only if the paper breaks otherwise.
+- **MAX_NEW_ARCHITECTURE_MECHANISMS = 2** — Soft cap for genuinely new hardware/system mechanisms. Exceed only if the paper breaks otherwise.
 
 > Override via argument if needed, e.g. `/research-refine "problem | approach" -- max rounds: 3, threshold: 9`.
 
 ## State Persistence (Checkpoint Recovery)
 
-Long-running refinement sessions may fail mid-way (API timeout, context compaction, or session interruption). To avoid losing completed work, persist state to `refine-logs/REFINE_STATE.json` after each phase boundary:
+Long-running refinement sessions may fail mid-way (e.g., API timeout, context compaction, or session interruption). To avoid losing completed work, persist state to `refine-logs/REFINE_STATE.json` after each phase boundary:
 
 ```json
 {
   "phase": "review",
   "round": 1,
-  "agent_id": "019cd392-...",
+  "threadId": "019cd392-...",
   "last_score": 6.5,
   "last_verdict": "REVISE",
   "status": "in_progress",
@@ -59,7 +62,21 @@ Long-running refinement sessions may fail mid-way (API timeout, context compacti
 }
 ```
 
-Write after each completed phase. On completion, set `"status": "completed"`.
+**Field definitions:**
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `phase` | `"anchor"` / `"proposal"` / `"review"` / `"refine"` / `"done"` | Last **completed** phase |
+| `round` | 0–MAX_ROUNDS | Current round number |
+| `threadId` | string or null | Reviewer thread ID for `codex-reply` continuity |
+| `last_score` | number or null | Most recent overall score from reviewer |
+| `last_verdict` | string or null | Most recent verdict (READY / REVISE / RETHINK) |
+| `status` | `"in_progress"` / `"completed"` | Loop status |
+| `timestamp` | ISO 8601 | When state was last written |
+
+**Write rules:**
+- **Write after each phase completes** (not before). Overwrite each time — only the latest state matters.
+- **On completion** (Phase 5 finished), set `"status": "completed"`.
 
 ## Output Structure
 
@@ -87,15 +104,26 @@ Every `round-N-refinement.md` must contain a **full anchored proposal**, not jus
 Before starting any phase, check whether a previous run left a checkpoint:
 
 1. **Check for `refine-logs/REFINE_STATE.json`**:
-   - If it does not exist → fresh start
-   - If it exists and `status` is `"completed"` → fresh start
-   - If it exists and `status` is `"in_progress"` but `timestamp` is older than 24 hours → fresh start
-   - If it exists and `status` is `"in_progress"` within 24 hours → resume
-2. **On resume**:
-   - Read all existing `refine-logs/round-*.md` files and `score-history.md`
-   - Recover `agent_id` for reviewer continuity
-   - Resume from the next phase based on the saved `phase`
-3. **On fresh start**, ensure `refine-logs/` exists and proceed to Phase 0.
+   - If it **does not exist** → **fresh start** (proceed to Phase 0 normally)
+   - If it exists AND `status` is `"completed"` → **fresh start** (delete state file, previous run finished)
+   - If it exists AND `status` is `"in_progress"` AND `timestamp` is **older than 24 hours** → **fresh start** (stale state from a killed/abandoned run — delete the file)
+   - If it exists AND `status` is `"in_progress"` AND `timestamp` is **within 24 hours** → **resume**
+
+2. **On resume**, read the state file and recover context:
+   - Read all existing `refine-logs/round-*.md` files to restore prior work
+   - Read `refine-logs/score-history.md` if it exists
+   - Recover `threadId` for reviewer thread continuity
+   - Log to the user: `"Checkpoint found. Resuming after phase: {phase}, round: {round}."`
+   - **Jump to the next phase** based on the saved `phase` value:
+
+   | Saved `phase` | What was completed | Resume from |
+   |---------------|-------------------|-------------|
+   | `"anchor"` | Phase 0 done | Phase 1 (read anchor from round-0 context) |
+   | `"proposal"` | Phase 1 done | Phase 2 (read `round-0-initial-proposal.md`) |
+   | `"review"` | Phase 2 or 4 done | Phase 3 (read latest `round-N-review.md`) |
+   | `"refine"` | Phase 3 done | Phase 4 (read latest `round-N-refinement.md`) |
+
+3. **On fresh start**, ensure `refine-logs/` directory exists and proceed to Phase 0.
 
 ### Phase 0: Freeze the Problem Anchor
 
@@ -111,21 +139,21 @@ Write:
 
 If later reviewer feedback would change the problem being solved, mark that as **drift** and push back or adapt carefully.
 
-**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "agent_id": null, "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<now>"}`.
+**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "threadId": null, "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<now>"}`.
 
 ### Phase 1: Build the Initial Proposal
 
 #### Step 1.1: Scan Grounding Material
 
-Check `papers/` and `literature/` first. Read only the relevant parts needed to answer:
+Check `papers/`, `literature/`, and topic-specific paper library (see `## Paper Library` in CLAUDE.md) first. Read only the relevant parts needed to answer:
 
-- What mechanism do current methods use?
-- Where exactly do they fail for this problem?
-- Which recent LLM / VLM / Diffusion / RL era techniques are actually relevant here?
-- What training objectives, representations, or interfaces are reusable?
-- What details distinguish a real method from a renamed high-level idea?
+- What hardware/software mechanism do current systems use?
+- Where exactly do they fail for this problem (throughput bottleneck? latency overhead? protocol mismatch?)?
+- Which modern platform capabilities (DPU offload engines, P4 pipelines, FPGA IP blocks, RDMA verbs) are actually relevant here?
+- What existing IP blocks, open-source RTL, or platform APIs are reusable?
+- What details distinguish a real hardware contribution from a renamed system-level idea?
 
-If local material is insufficient, search recent top-venue/arXiv work online. Focus on **method sections, training setup, and failure modes**, not just abstracts.
+If local material is insufficient, search recent MICRO/ISCA/HPCA/NSDI/SIGCOMM papers on IEEE Xplore or ACM DL. Focus on **micro-architecture sections, evaluation methodology, and hardware overhead analysis**, not just abstracts.
 
 #### Step 1.2: Identify the Technical Gap
 
@@ -133,8 +161,8 @@ Do not stop at generic research questions. Make the gap operational:
 
 1. **Current pipeline failure point**: where does the baseline break?
 2. **Why naive fixes are insufficient**: larger context, more data, prompting, memory bank, or stacking more modules.
-3. **Smallest adequate intervention**: what is the least additional mechanism that could plausibly fix the bottleneck?
-4. **Frontier-native alternative**: is there a more current route using foundation-model-era primitives that better matches the bottleneck?
+3. **Smallest adequate intervention**: what is the least additional hardware mechanism that could plausibly fix the bottleneck?
+4. **Platform-native alternative**: is there a more current route using modern accelerator, memory hierarchy, SmartNIC/DPU, FPGA, storage, or runtime substrate capabilities that better matches the bottleneck?
 5. **Core technical claim**: what exact mechanism claim could survive top-venue scrutiny?
 6. **Required evidence**: what minimum proof is needed to defend that claim?
 
@@ -142,8 +170,8 @@ Do not stop at generic research questions. Make the gap operational:
 
 Before locking the method, compare two candidate routes if both are plausible:
 
-- **Route A: Elegant minimal route** — the smallest mechanism that directly targets the bottleneck.
-- **Route B: Frontier-native route** — a more modern route that uses LLM / VLM / Diffusion / RL / distillation / inference-time scaling *only if* it gives a cleaner or stronger story.
+- **Route A: Elegant minimal route** — the smallest hardware mechanism that directly targets the bottleneck.
+- **Route B: Platform-native route** — a more modern route that exploits accelerator features, HBM/CXL, DPU offload engines, P4 programmable logic, FPGA IP blocks, storage datapaths, or protocol/runtime hooks *only if* it gives a cleaner or stronger story.
 
 Then decide:
 
@@ -163,11 +191,11 @@ Cover:
 2. **Contribution focus**: one dominant contribution and at most one supporting contribution.
 3. **Complexity budget**: what is frozen or reused, what is new, and what tempting additions are intentionally excluded.
 4. **System graph**: modules, data flow, inputs, outputs.
-5. **Representation design**: what latent, embedding, plan token, reward signal, memory state, or alignment space is used?
-6. **Training recipe**: data source, supervision, pseudo-labeling, negatives, curriculum, losses, weighting, stagewise vs joint training.
-7. **Inference path**: how the trained components are used at test time and what signals flow where.
-8. **Why the mechanism stays small**: why a larger stack is unnecessary.
-9. **Exact role of any frontier primitive**: if you use an LLM / VLM / Diffusion / RL component, specify whether it acts as planner, teacher, critic, reward model, generator prior, search controller, or distillation source.
+5. **Data path design**: what hardware state, buffer, queue, or pipeline register is used; where in the Tx/Rx path does the new mechanism insert?
+6. **Implementation plan**: RTL vs HLS vs P4, pipeline stages, clock domain, critical path estimate, FPGA/ASIC synthesis target.
+7. **Runtime data path**: how the mechanism operates at the target rate and what control signals flow between host, accelerator, memory, NIC, storage, and runtime.
+8. **Why the mechanism stays small**: why a larger hardware block is unnecessary (area/power budget argument).
+9. **Exact role of any platform primitive**: if you use an accelerator primitive, HBM/CXL tier, DPU offload engine, P4 match-action table, FPGA IP block, storage datapath, or RDMA verb extension, specify its role concretely.
 10. **Failure handling**: what could go wrong and what fallback or diagnostic exists?
 11. **Novelty and elegance argument**: why this is more than naming a module and why the paper still looks focused.
 
@@ -188,7 +216,7 @@ Additional rules:
 
 - Ensure one experiment block directly supports the **Problem Anchor**.
 - If complexity risk exists, include one **simplification or deletion check**.
-- If a frontier primitive is central, include one **necessity check** showing why that choice matters.
+- If a platform primitive is central, include one **necessity check** showing why that choice matters.
 - Default to **1-3 core experiment blocks** and leave the full execution roadmap to `/experiment-plan`.
 
 #### Step 1.6: Write the Initial Proposal
@@ -213,7 +241,7 @@ Use this structure:
 ## Method Thesis
 - One-sentence thesis:
 - Why this is the smallest adequate intervention:
-- Why this route is timely in the foundation-model era:
+- Why this route is timely for AI infrastructure for LLM:
 
 ## Contribution Focus
 - Dominant contribution:
@@ -222,8 +250,8 @@ Use this structure:
 
 ## Proposed Method
 ### Complexity Budget
-- Frozen / reused backbone:
-- New trainable components:
+- Frozen / reused substrate:
+- New architecture mechanisms:
 - Tempting additions intentionally not used:
 
 ### System Overview
@@ -232,25 +260,25 @@ Use this structure:
 ### Core Mechanism
 - Input / output:
 - Architecture or policy:
-- Training signal / loss:
+- Hardware state / data path / control path:
 - Why this is the main novelty:
 
 ### Optional Supporting Component
 - Only include if truly necessary:
 - Input / output:
-- Training signal / loss:
+- Hardware state / data path / control path:
 - Why it does not create contribution sprawl:
 
-### Modern Primitive Usage
-- Which LLM / VLM / Diffusion / RL-era primitive is used:
-- Exact role in the pipeline:
-- Why it is more natural than an old-school alternative:
+### Platform Primitive Usage
+- Which accelerator / memory hierarchy / DPU / SmartNIC / FPGA / P4 / RDMA / storage / runtime capability is used:
+- Exact role in the data path or control path:
+- Why it is more natural than a pure software or host-CPU alternative:
 
-### Integration into Base Generator / Downstream Pipeline
-[Where the new method attaches, what is frozen, what is trainable, inference order]
+### Integration into Host / NIC / Network Stack
+[Where the new mechanism attaches in the data path, what existing blocks are reused, Tx/Rx integration order]
 
-### Training Plan
-[Stagewise or joint training, losses, data construction, pseudo-labels, schedules]
+### Implementation Plan
+[RTL vs HLS vs P4, pipeline depth, synthesis target (FPGA/ASIC), simulation approach, estimated LUT/BRAM/DSP]
 
 ### Failure Modes and Diagnostics
 - [Failure mode]:
@@ -276,12 +304,12 @@ Use this structure:
 ## Experiment Handoff Inputs
 - Must-prove claims:
 - Must-run ablations:
-- Critical datasets / metrics:
+- Critical workloads / traces / metrics:
 - Highest-risk assumptions:
 
-## Compute & Timeline Estimate
-- Estimated GPU-hours:
-- Data / annotation cost:
+## Validation & Timeline Estimate
+- Estimated simulator/prototype hours:
+- Trace / workload / platform setup cost:
 - Timeline:
 ```
 
@@ -289,29 +317,31 @@ Use this structure:
 
 ### Phase 2: External Method Review (Round 1)
 
-Send the full proposal to GPT-5.5 for an **elegance-first, frontier-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
+Send the full proposal to GPT-5.5 for an **elegance-first, platform-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
 
 ```
 spawn_agent:
-  model: REVIEWER_MODEL
   reasoning_effort: xhigh
+  model: REVIEWER_MODEL
   message: |
-    You are a senior ML reviewer for a top venue (NeurIPS/ICML/ICLR).
-    This is an early-stage, method-first research proposal.
+    You are a senior computer architecture / systems researcher reviewing for MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM.
+    Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving.
+    This is an early-stage, mechanism-first research proposal.
 
-    Your job is NOT to reward extra modules, contribution sprawl, or a giant benchmark checklist.
-    Your job IS to stress-test whether the proposed method:
-    (1) still solves the original anchored problem,
-    (2) is concrete enough to implement,
-    (3) presents a focused, elegant contribution,
-    (4) uses foundation-model-era techniques appropriately when they are the natural fit.
+    Your job is NOT to reward more hardware blocks, feature sprawl, or a giant benchmark checklist.
+    Your job IS to stress-test whether the proposed mechanism:
+    (1) still solves the original anchored bottleneck,
+    (2) is concrete enough to implement in RTL/HLS or prototype on real hardware,
+    (3) presents a focused, elegant hardware contribution,
+    (4) uses modern platform capabilities (accelerators, HBM/CXL, DPU/SmartNIC, FPGA, storage datapaths, RDMA, or runtime hooks) appropriately when they are the natural fit.
 
     Review principles:
-    - Prefer the smallest adequate mechanism over a larger system.
+    - Prefer the smallest adequate hardware mechanism over a larger system.
     - Penalize parallel contributions that make the paper feel unfocused.
-    - If a modern LLM / VLM / Diffusion / RL route would clearly produce a better paper, say so concretely.
-    - If the proposal is already modern enough, do NOT force trendy components.
+    - If a modern accelerator, memory, DPU, P4/FPGA, storage, or runtime route would clearly produce a better paper, say so concretely.
+    - If the proposal is already platform-appropriate, do NOT force trendy hardware components.
     - Do not ask for extra experiments unless they are needed to prove the core claims.
+    - Architecture reviewers care about: micro-architectural detail, area/power overhead, real measurement vs simulation, generalizability across workloads.
 
     Read the Problem Anchor first. If your suggested fix would change the problem being solved,
     call that out explicitly as drift instead of treating it as a normal revision request.
@@ -322,31 +352,31 @@ spawn_agent:
 
     Score these 7 dimensions from 1-10:
 
-    1. **Problem Fidelity**: Does the method still attack the original bottleneck, or has it drifted into solving something easier or different?
+    1. **Problem Fidelity**: Does the mechanism still attack the original bottleneck (e.g., throughput, latency, RDMA integration overhead), or has it drifted into solving something easier or different?
 
-    2. **Method Specificity**: Are the interfaces, representations, losses, training stages, and inference path concrete enough that an engineer could start implementing?
+    2. **Method Specificity**: Are the pipeline stages, data path interfaces, hardware resources (LUT/BRAM/DSP), implementation approach (RTL/HLS/P4), and runtime control path concrete enough that an engineer could start implementing?
 
-    3. **Contribution Quality**: Is there one dominant mechanism-level contribution with real novelty, good parsimony, and no obvious contribution sprawl?
+    3. **Contribution Quality**: Is there one dominant mechanism-level contribution with real novelty, good parsimony, and no obvious hardware feature sprawl?
 
-    4. **Frontier Leverage**: Does the proposal use current foundation-model-era primitives appropriately when they are the right tool, instead of defaulting to old-school module stacking?
+    4. **Platform Leverage**: Does the proposal use modern platform capabilities (accelerators, memory hierarchy, CXL/HBM, DPU offload engines, FPGA IP blocks, P4 match-action, RDMA verb extensions, storage datapaths, or runtime hooks) appropriately, instead of defaulting to host-CPU software?
 
-    5. **Feasibility**: Can this method be trained and integrated with the stated resources and data assumptions?
+    5. **Feasibility**: Can this mechanism be implemented and validated with the stated resources (analytical model / gem5 / htsim / RTL or HLS simulator / FPGA or DPU microbenchmark / trace replay)?
 
-    6. **Validation Focus**: Are the proposed experiments minimal but sufficient to validate the core claims? Is there unnecessary experimental bloat?
+    6. **Validation Focus**: Are the proposed experiments minimal but sufficient to validate the core claims? Is there unnecessary benchmark bloat?
 
-    7. **Venue Readiness**: If executed well, would the contribution feel sharp and timely enough for a top venue?
+    7. **Venue Readiness**: If executed well, would the contribution feel sharp and timely enough for MICRO/ISCA/HPCA/NSDI?
 
-    **OVERALL SCORE** (1-10): Weighted toward Problem Fidelity, Method Specificity, Contribution Quality, and Frontier Leverage.
-    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Frontier Leverage 15%, Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
+    **OVERALL SCORE** (1-10): Weighted toward Problem Fidelity, Method Specificity, Contribution Quality, and Platform Leverage.
+    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Platform Leverage 15%, Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
 
     For each dimension scoring < 7, provide:
     - The specific weakness
-    - A concrete fix at the method level (interface / loss / training recipe / integration point / deletion of unnecessary parts)
+    - A concrete fix at the mechanism level (pipeline interface / data path integration / hardware resource / RTL design choice / deletion of unnecessary blocks)
     - Priority: CRITICAL / IMPORTANT / MINOR
 
     Then add:
-    - **Simplification Opportunities**: 1-3 concrete ways to delete, merge, or reuse components while preserving the main claim. Write "NONE" if already tight.
-    - **Modernization Opportunities**: 1-3 concrete ways to replace old-school pieces with more natural foundation-model-era primitives if genuinely better. Write "NONE" if already modern enough.
+    - **Simplification Opportunities**: 1-3 concrete ways to delete, merge, or reuse hardware blocks while preserving the main claim. Write "NONE" if already tight.
+    - **Platform Leverage Opportunities**: 1-3 concrete ways to replace host-CPU software with more natural DPU/FPGA/P4 platform capabilities if genuinely better. Write "NONE" if already platform-appropriate.
     - **Drift Warning**: "NONE" if the proposal still solves the anchored problem; otherwise explain the drift clearly.
     - **Verdict**: READY / REVISE / RETHINK
 
@@ -356,13 +386,13 @@ spawn_agent:
     - RETHINK: the core mechanism or framing is still fundamentally off
 ```
 
-**CRITICAL: Save the `agent_id`** from this call for all later rounds.
+**CRITICAL: Save the `threadId`** from this call for all later rounds.
 
 **CRITICAL: Save the FULL raw response** verbatim.
 
 Save review to `refine-logs/round-1-review.md` with the raw response in a `<details>` block.
 
-**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": 1, "agent_id": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
+**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": 1, "threadId": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
 
 ### Phase 3: Parse Feedback and Revise the Method
 
@@ -381,7 +411,7 @@ Extract:
 - **Verdict**
 - **Drift Warning**
 - **Simplification Opportunities**
-- **Modernization Opportunities**
+- **Platform Leverage Opportunities**
 - **Action items** ranked by priority
 
 Update `refine-logs/score-history.md`:
@@ -389,7 +419,7 @@ Update `refine-logs/score-history.md`:
 ```markdown
 # Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Frontier Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | X                | X                  | X                    | X                 | X           | X                | X               | X       | REVISE  |
 ```
@@ -408,8 +438,8 @@ Before changing anything:
 3. Write a **Simplicity Check**:
    - What is the dominant contribution now?
    - What components can be removed, merged, or kept frozen?
-   - Which reviewer suggestions add unnecessary complexity?
-   - If a frontier primitive is central, is its role still crisp and justified?
+   - Which reviewer suggestions add unnecessary hardware complexity?
+   - If a platform primitive (DPU engine / FPGA block / P4 stage) is central, is its role still crisp and justified?
 
 Then process reviewer feedback:
 
@@ -419,13 +449,13 @@ Then process reviewer feedback:
 
 Bias the revisions toward:
 
-- a sharper central contribution
-- fewer moving parts
-- cleaner reuse of strong existing backbones
-- more natural foundation-model-era leverage when it improves the paper
-- leaner, claim-driven experiments
+- a sharper central hardware contribution
+- fewer pipeline stages and hardware blocks
+- cleaner reuse of existing platform IP (DPU offload engine, FPGA IP core, RDMA verbs)
+- more natural platform-native leverage when it improves the paper (e.g., use DPU C-engine rather than custom RTL if it suffices)
+- leaner, claim-driven experiments focused on key metrics (throughput, latency, area)
 
-Do **not** add multiple parallel contributions just to chase score. If the reviewer requests another module, first ask whether the same gain can come from a better interface, distillation signal, reward model, or inference policy on top of an existing backbone.
+Do **not** add multiple parallel hardware contributions just to chase score. If the reviewer requests another block, first ask whether the same gain can come from a better pipeline interface, smarter scheduling policy, or configuration of an existing platform primitive.
 
 Save to `refine-logs/round-N-refinement.md`:
 
@@ -468,13 +498,13 @@ Save to `refine-logs/round-N-refinement.md`:
 
 ### Phase 4: Re-evaluation (Round 2+)
 
-Send the revised proposal back to GPT-5.5 in the **same agent**:
+Send the revised proposal back to GPT-5.5 in the **same thread**:
 
 ```
 send_input:
-  id: [saved from Phase 2]
+  threadId: [saved from Phase 2]
   model: REVIEWER_MODEL
-  reasoning_effort: xhigh
+  config: {"model_reasoning_effort": "xhigh"}
   message: |
     [Round N re-evaluation]
 
@@ -496,8 +526,8 @@ send_input:
     - State whether the Problem Anchor is preserved or drifted
     - State whether the dominant contribution is now sharper or still too broad
     - State whether the method is simpler or still overbuilt
-    - State whether the frontier leverage is now appropriate or still old-school / forced
-    - Focus new critiques on missing mechanism, weak training signal, weak integration point, pseudo-novelty, or unnecessary complexity
+    - State whether the platform leverage is now appropriate or still host-CPU / software-only / forced hardware
+    - Focus new critiques on missing micro-architectural detail, weak hardware integration point, unsupported performance claim, pseudo-novelty, or unnecessary hardware complexity
     - Use the same verdict rule: READY only if overall score >= 9 and no blocking issue remains
 
     Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items.
@@ -505,7 +535,7 @@ send_input:
 
 Save review to `refine-logs/round-N-review.md`.
 
-**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": N, "agent_id": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
+**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": N, "threadId": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
 
 Then return to Phase 3 until:
 
@@ -548,7 +578,7 @@ This file is the high-level round-by-round review record. It should answer: each
 ## Final Status
 - Anchor status: [preserved / corrected / unresolved]
 - Focus status: [tight / slightly broad / still diffuse]
-- Modernity status: [appropriately frontier-aware / intentionally conservative / still old-school]
+- Platform status: [platform-native / simulator-first / intentionally conservative]
 - Strongest parts of final method:
 - Remaining weaknesses:
 ```
@@ -586,7 +616,7 @@ If the final verdict is not READY, still write the best current final version he
 
 ## Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Frontier Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | ...              | ...                | ...                  | ...               | ...         | ...              | ...             | ...     | ...     |
 
@@ -648,8 +678,8 @@ Anchor status:
 Focus status:
 - [tight / slightly broad / still diffuse]
 
-Modernity status:
-- [appropriately frontier-aware / intentionally conservative / still old-school]
+Platform status:
+- [platform-native / intentionally simulator-first / intentionally conservative]
 
 Key method upgrades:
 - [method change 1]
@@ -669,9 +699,9 @@ Suggested next step: /experiment-plan
 ## Output Protocols
 
 > Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting
 
 ## Key Rules
 
@@ -680,15 +710,15 @@ Suggested next step: /experiment-plan
 - **Anchor first, every round.** Always carry forward the same Problem Anchor.
 - **One paper, one dominant contribution.** Avoid multiple parallel contributions unless the paper truly needs them.
 - **The smallest adequate mechanism wins.** Bigger is not automatically better.
-- **Prefer reuse over invention.** Start from strong existing backbones and add only what the bottleneck requires.
-- **Modern techniques are a prior, not a decoration.** Use LLM / VLM / Diffusion / RL-era components when they sharpen the method, not when they only make the proposal sound trendy.
+- **Prefer reuse over invention.** Start from strong existing substrates and add only what the bottleneck requires.
+- **Platform capabilities are a prior, not a decoration.** Use accelerator primitives, HBM/CXL, DPU offload engines, FPGA IP blocks, P4 stages, storage datapaths, RDMA verb extensions, or runtime hooks when they sharpen the mechanism, not when they only make the proposal sound modern.
 - **Minimal experiments.** Inside this skill, experiments only need to prove the core claims.
 - **Review the mechanism, not the parts count.** A long module list is not novelty.
 - **Pushback is encouraged.** If reviewer feedback causes drift or unnecessary complexity, argue back with evidence.
-- **ALWAYS use `reasoning_effort: xhigh`** for all Codex review calls.
-- **Save `agent_id` from Phase 2** and use `send_input` for later rounds.
+- **ALWAYS use `config: {"model_reasoning_effort": "xhigh"}`** for all Codex review calls.
+- **Save `threadId` from Phase 2** and use `send_input` for later rounds.
 - **Do not fabricate results.** Only describe expected evidence and planned experiments.
-- **Be specific about compute and data assumptions.** Vague "we'll train a model" is not enough.
+- **Be specific about validation and workload assumptions.** Vague "we'll simulate it" is not enough.
 - **Document everything.** Save every raw review, every anchor check, every simplicity check, and every major method change.
 
 ## Composing with Other Skills
@@ -707,7 +737,7 @@ This skill sits between idea discovery and execution:
 Typical flow:
 
 1. `/idea-creator` or local reading gives you a problem and a vague method direction
-2. `/research-refine` turns that into an anchored, elegant, frontier-aware method plan
+2. `/research-refine` turns that into an anchored, elegant, platform-aware method plan
 3. `/experiment-plan` turns the final proposal into a detailed claim-driven experiment roadmap
 4. `/research-refine-pipeline` is the one-shot wrapper when the user wants both stages in a single request
 5. `/run-experiment` executes the chosen runs

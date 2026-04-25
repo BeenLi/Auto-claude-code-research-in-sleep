@@ -1,6 +1,8 @@
 ---
-name: "novelty-check"
-description: "Verify research idea novelty against recent literature. Use when user says \"\u67e5\u65b0\", \"novelty check\", \"\u6709\u6ca1\u6709\u4eba\u505a\u8fc7\", \"check novelty\", or wants to verify a research idea is novel before implementing."
+name: novelty-check
+description: Verify research idea novelty against recent literature. Use when user says "查新", "novelty check", "有没有人做过", "check novelty", or wants to verify a research idea is novel before implementing.
+argument-hint: [method-or-idea-description]
+allowed-tools: WebSearch, WebFetch, Grep, Read, Glob, spawn_agent
 ---
 
 # Novelty Check Skill
@@ -9,7 +11,7 @@ Check whether a proposed method/idea has already been done in the literature: **
 
 ## Constants
 
-- REVIEWER_MODEL = `gpt-5.5` — Model used via a secondary Codex agent. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`)
+- REVIEWER_MODEL = `gpt-5.5` — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`)
 
 ## Instructions
 
@@ -30,23 +32,26 @@ For EACH core claim, search using ALL available sources:
    - Search arXiv, Google Scholar, Semantic Scholar
    - Use specific technical terms from the claim
    - Try at least 3 different query formulations per claim
-   - Include year filters for 2024-2026
+   - Include year filters for 2021-2026
 
 2. **Known paper databases**: Check against:
-   - ICLR 2025/2026, NeurIPS 2025, ICML 2025/2026
-   - Recent arXiv preprints (2025-2026)
+   - **Architecture**: MICRO, ISCA, HPCA, ASPLOS
+   - **Systems/Networking**: NSDI, SIGCOMM, OSDI, USENIX ATC, EuroSys, FCCM, DAC
+   - **IEEE/ACM journals**: IEEE TPDS, ACM TOCS, IEEE TCAD, IEEE TON, IEEE TC and ACM Transactions on Networking
+   - Recent arXiv preprints in cs.AR / cs.NI / cs.DC and related categories
 
 3. **Read abstracts**: For each potentially overlapping paper, WebFetch its abstract and related work section
 
 ### Phase C: Cross-Model Verification
-Call REVIEWER_MODEL via `spawn_agent` (`spawn_agent`) with xhigh reasoning:
+Call REVIEWER_MODEL via Codex MCP (`spawn_agent`) with xhigh reasoning:
 ```
-reasoning_effort: xhigh
+config: {"model_reasoning_effort": "xhigh"}
 ```
 Prompt should include:
 - The proposed method description
 - All papers found in Phase B
-- Ask: "Is this method novel? What is the closest prior work? What is the delta?"
+- Domain context: computer architecture / NIC/DPU systems / RDMA networking
+- Ask: "Is this method novel for a MICRO/ISCA/HPCA/NSDI venue? What is the closest prior work in hardware architecture or systems? What is the technical delta that a PC member would recognize as a genuine contribution?"
 
 ### Phase D: Novelty Report
 Output a structured report:
@@ -83,3 +88,6 @@ Output a structured report:
 - If the method is not novel but the FINDING would be, say so explicitly
 - Always check the most recent 6 months of arXiv — the field moves fast
 
+## Review Tracing
+
+After each `spawn_agent` or `send_input` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

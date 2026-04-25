@@ -1,6 +1,8 @@
 ---
-name: "deepxiv"
-description: "Search and progressively read open-access academic papers through DeepXiv. Use when the user wants layered paper access, section-level reading, trending papers, or DeepXiv-backed literature retrieval."
+name: deepxiv
+description: Search and progressively read open-access academic papers through DeepXiv. Use when the user wants layered paper access, section-level reading, trending papers, or DeepXiv-backed literature retrieval.
+argument-hint: [query-or-paper-id]
+allowed-tools: Bash(*), Read, Write
 ---
 
 # DeepXiv Paper Search & Progressive Reading
@@ -9,32 +11,33 @@ Search topic or paper ID: $ARGUMENTS
 
 ## Role & Positioning
 
-DeepXiv is the progressive-reading literature source:
+DeepXiv is the **progressive-reading** literature source:
 
 | Skill | Best for |
 |------|----------|
 | `/arxiv` | Direct preprint search and PDF download |
-| `/deepxiv` | Layered reading: search → brief → head → section |
+| `/semantic-scholar` | Published venue metadata, citation counts, DOI links |
+| `/deepxiv` | Layered reading: search → brief → head → section, plus trending and web search |
 
-Use DeepXiv when you want to inspect papers incrementally instead of loading the full text immediately.
+Use DeepXiv when you want to avoid loading full papers too early.
 
 ## Constants
 
 - **FETCH_SCRIPT** — `tools/deepxiv_fetch.py` relative to the current project. If unavailable, fall back to the raw `deepxiv` CLI.
-- **MAX_RESULTS = 10** — Default number of search results.
+- **MAX_RESULTS = 10** — Default number of results to return.
 
 > Overrides (append to arguments):
-> - `/deepxiv "agent memory" - max: 5`
-> - `/deepxiv "2409.05591" - brief`
-> - `/deepxiv "2409.05591" - head`
-> - `/deepxiv "2409.05591" - section: Introduction`
-> - `/deepxiv "trending" - days: 14 - max: 10`
-> - `/deepxiv "karpathy" - web`
-> - `/deepxiv "258001" - sc`
+> - `/deepxiv "agent memory" - max: 5` — top 5 results
+> - `/deepxiv "2409.05591" - brief` — quick paper summary
+> - `/deepxiv "2409.05591" - head` — metadata + section overview
+> - `/deepxiv "2409.05591" - section: Introduction` — read one section only
+> - `/deepxiv "trending" - days: 14 - max: 10` — trending papers
+> - `/deepxiv "karpathy" - web` — DeepXiv web search
+> - `/deepxiv "258001" - sc` — Semantic Scholar metadata by ID
 
 ## Setup
 
-DeepXiv is optional:
+DeepXiv is optional. If the CLI is not installed, tell the user:
 
 ```bash
 pip install deepxiv-sdk
@@ -48,67 +51,168 @@ On first use, `deepxiv` auto-registers a free token and stores it in `~/.env`.
 
 Parse `$ARGUMENTS` for:
 
-- a paper topic, arXiv ID, or Semantic Scholar ID
-- `- max: N`
-- `- brief`
-- `- head`
-- `- section: NAME`
-- `- trending`
-- `- days: 7|14|30`
-- `- web`
-- `- sc`
+- **Query or ID**: a paper topic, arXiv ID, or Semantic Scholar ID
+- **`- max: N`**: override `MAX_RESULTS`
+- **`- brief`**: fetch paper brief
+- **`- head`**: fetch metadata and section map
+- **`- section: NAME`**: fetch one named section
+- **`- trending`** or query `trending`: fetch trending papers
+- **`- days: 7|14|30`**: trending time window
+- **`- web`**: run DeepXiv web search
+- **`- sc`**: fetch Semantic Scholar metadata by ID
 
-If the input looks like an arXiv ID and no explicit mode is provided, default to `brief`.
+If the main argument looks like an arXiv ID and no explicit mode is given, default to `- brief`.
 
-### Step 2: Prefer the Adapter
+### Step 2: Locate the Adapter
+
+Prefer the ARIS adapter:
 
 ```bash
 python3 tools/deepxiv_fetch.py --help
 ```
 
-If the adapter is unavailable, fall back to raw `deepxiv` commands.
+If `tools/deepxiv_fetch.py` is not available, fall back to raw `deepxiv` commands.
 
 ### Step 3: Execute the Minimal Command
 
+**Search papers**
+
 ```bash
 python3 tools/deepxiv_fetch.py search "QUERY" --max MAX_RESULTS
-python3 tools/deepxiv_fetch.py paper-brief ARXIV_ID
-python3 tools/deepxiv_fetch.py paper-head ARXIV_ID
-python3 tools/deepxiv_fetch.py paper-section ARXIV_ID "SECTION_NAME"
-python3 tools/deepxiv_fetch.py trending --days 7 --max MAX_RESULTS
-python3 tools/deepxiv_fetch.py wsearch "QUERY"
-python3 tools/deepxiv_fetch.py sc "SEMANTIC_SCHOLAR_ID"
 ```
 
-Fallbacks:
+Fallback:
 
 ```bash
 deepxiv search "QUERY" --limit MAX_RESULTS --format json
+```
+
+**Brief summary**
+
+```bash
+python3 tools/deepxiv_fetch.py paper-brief ARXIV_ID
+```
+
+Fallback:
+
+```bash
 deepxiv paper ARXIV_ID --brief --format json
+```
+
+**Section map**
+
+```bash
+python3 tools/deepxiv_fetch.py paper-head ARXIV_ID
+```
+
+Fallback:
+
+```bash
 deepxiv paper ARXIV_ID --head --format json
+```
+
+**Specific section**
+
+```bash
+python3 tools/deepxiv_fetch.py paper-section ARXIV_ID "SECTION_NAME"
+```
+
+Fallback:
+
+```bash
 deepxiv paper ARXIV_ID --section "SECTION_NAME" --format json
+```
+
+**Trending**
+
+```bash
+python3 tools/deepxiv_fetch.py trending --days 7 --max MAX_RESULTS
+```
+
+Fallback:
+
+```bash
 deepxiv trending --days 7 --limit MAX_RESULTS --output json
+```
+
+**Web search**
+
+```bash
+python3 tools/deepxiv_fetch.py wsearch "QUERY"
+```
+
+Fallback:
+
+```bash
 deepxiv wsearch "QUERY" --output json
+```
+
+**Semantic Scholar metadata**
+
+```bash
+python3 tools/deepxiv_fetch.py sc "SEMANTIC_SCHOLAR_ID"
+```
+
+Fallback:
+
+```bash
 deepxiv sc "SEMANTIC_SCHOLAR_ID" --output json
 ```
 
 ### Step 4: Present Results
 
-For search results, present a compact literature table. For paper reads, summarize the title, authors, date, TLDR, and the next recommended depth step.
+When searching, present a compact table:
+
+```text
+| # | ID | Title | Year | Citations | Notes |
+|---|----|-------|------|-----------|-------|
+```
+
+When reading a paper, show:
+
+- title
+- arXiv ID
+- authors
+- venue/date if available
+- TLDR or abstract summary
+- suggested next step: `brief` → `head` → `section`
 
 ### Step 5: Escalate Depth Only When Needed
 
-Use the progression:
+Use this progression:
 
 1. `search`
 2. `paper-brief`
 3. `paper-head`
 4. `paper-section`
+5. full paper only if necessary
 
-Only read the full paper when the user explicitly needs it.
+Do not jump to full-paper reads when a brief or one section answers the question.
+
+### Step 6: Update Research Wiki (if active)
+
+**Required when `research-wiki/` exists in the project**; skip silently
+otherwise. Ingest papers that were meaningfully read (brief / head /
+section / full) during this invocation — mere `search` hits without a
+depth read do not need ingestion:
+
+```
+if [ -d research-wiki/ ]:
+    for each arxiv_id the user asked this skill to read in depth:
+        python3 tools/research_wiki.py ingest_paper research-wiki/ \
+            --arxiv-id "<arxiv_id>"
+```
+
+The helper handles metadata / slug / dedup / page / index / log in one
+call — **do not handwrite `papers/<slug>.md`**. See
+[`shared-references/integration-contract.md`](../shared-references/integration-contract.md).
+Backfill missed ingests with
+`python3 tools/research_wiki.py sync research-wiki/ --arxiv-ids <id1>,<id2>,...`.
 
 ## Key Rules
 
 - Prefer the adapter script over raw `deepxiv` commands when available.
-- If DeepXiv is missing, give the install command and suggest `/arxiv` or `/research-lit "topic" - sources: web`.
-- Use DeepXiv as an additive source, not a replacement for existing ARIS literature tooling.
+- DeepXiv is optional. If unavailable, give the install command and suggest `/arxiv` or `/research-lit "topic" - sources: web`.
+- Use section-level reads to save tokens.
+- Treat DeepXiv as complementary to `/arxiv` and `/semantic-scholar`, not a replacement.
+- If the result overlaps with a published venue paper from Semantic Scholar, keep the richer venue metadata in the final summary.

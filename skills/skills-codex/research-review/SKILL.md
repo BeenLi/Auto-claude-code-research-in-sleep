@@ -1,22 +1,28 @@
 ---
-name: "research-review"
-description: "Get a deep critical review of research from GPT using a secondary Codex agent. Use when user says \"review my research\", \"help me review\", \"get external review\", or wants critical feedback on research ideas, papers, or experimental results."
+name: research-review
+description: Get a deep critical review of research from GPT via Codex MCP. Use when user says "review my research", "help me review", "get external review", or wants critical feedback on research ideas, papers, or experimental results.
+argument-hint: [topic-or-scope]
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, spawn_agent, send_input
 ---
 
-# Research Review via a secondary Codex agent (xhigh reasoning)
+# Research Review via Codex MCP (xhigh reasoning)
 
 Get a multi-round critical review of research work from an external LLM with maximum reasoning depth.
 
 ## Constants
 
-- REVIEWER_MODEL = `gpt-5.5` — Model used via a secondary Codex agent. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`)
+- REVIEWER_MODEL = `gpt-5.5` — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`)
+- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 
 ## Context: $ARGUMENTS
 
 ## Prerequisites
 
-- Use `spawn_agent` and `send_input` when the user has explicitly allowed delegation or subagents.
-- If delegation is not allowed, run the same review loop locally and preserve the same deliverable structure.
+- **Codex MCP Server** configured in Claude Code:
+  ```bash
+  claude mcp add codex -s user -- codex mcp-server
+  ```
+- This gives Claude Code access to `spawn_agent` and `send_input` tools
 
 ## Workflow
 
@@ -34,11 +40,19 @@ spawn_agent:
   reasoning_effort: xhigh
   message: |
     [Full research context + specific questions]
-    Please act as a senior ML reviewer (NeurIPS/ICML level). Identify:
-    1. Logical gaps or unjustified claims
-    2. Missing experiments that would strengthen the story
-    3. Narrative weaknesses
-    4. Whether the contribution is sufficient for a top venue
+    Please act as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level).
+    Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
+
+    Identify:
+    1. Logical gaps or unjustified claims (e.g., missing area/power analysis, unrealistic throughput assumptions)
+    2. Missing experiments that would strengthen the story:
+       - Micro-architectural detail (pipeline stages, critical path, resource usage)
+       - Real hardware measurement vs simulation — which claims need real data?
+       - Comparison with the closest hardware/system baseline for the selected layer
+       - Generalizability: does the result hold across representative LLM infrastructure workloads?
+    3. Narrative weaknesses: Is the problem clearly motivated with real system bottleneck numbers?
+    4. Whether the hardware contribution is sufficient (area/power overhead acceptable? throughput competitive?)
+    5. Whether the chosen AI infrastructure layer and validation backend are coherent. For RDMA/NIC compression, also check RoCEv2/DCQCN/credit flow control and Rx decompression expansion pressure.
     Please be brutally honest.
 ```
 
@@ -53,8 +67,8 @@ For each round:
 Key follow-up patterns:
 - "If we reframe X as Y, does that change your assessment?"
 - "What's the minimum experiment to satisfy concern Z?"
-- "Please design the minimal additional experiment package (highest acceptance lift per GPU week)"
-- "Please write a mock NeurIPS/ICML review with scores"
+- "Please design the minimal additional experiment package with the highest acceptance lift per simulator/prototype week"
+- "Please write a mock MICRO/ISCA/HPCA/ASPLOS review with scores"
 - "Give me a results-to-claims matrix for possible experimental outcomes"
 
 ### Step 4: Convergence
@@ -75,28 +89,31 @@ Update project memory/notes with key review conclusions.
 
 ## Key Rules
 
-- ALWAYS use `reasoning_effort: xhigh` for reviews
+- ALWAYS use `config: {"model_reasoning_effort": "xhigh"}` for reviews
 - Send comprehensive context in Round 1 — the external model cannot read your files
 - Be honest about weaknesses — hiding them leads to worse feedback
 - Push back on criticisms you disagree with, but accept valid ones
 - Focus on ACTIONABLE feedback — "what experiment would fix this?"
-- Document the agent id for potential future resumption
+- Document the threadId for potential future resumption
 - The review document should be self-contained (readable without the conversation)
 
 ## Prompt Templates
 
 ### For initial review:
-"I'm going to present a complete ML research project for your critical review. Please act as a senior ML reviewer (NeurIPS/ICML level)..."
+"I'm going to present a computer architecture research project for your critical review. Please act as a senior MICRO/ISCA/HPCA/ASPLOS reviewer. Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving..."
 
 ### For experiment design:
-"Please design the minimal additional experiment package that gives the highest acceptance lift per GPU week. Our compute: [describe]. Be very specific about configurations."
+"Please design the minimal additional experiment package that gives the highest acceptance lift. Focus on: (1) which claims need real hardware measurement vs simulation, (2) what micro-benchmark or trace workloads cover the key cases, (3) what overhead analysis (area/power/latency/bandwidth) a reviewer would require. Be very specific about configurations."
 
 ### For paper structure:
-"Please turn this into a concrete paper outline with section-by-section claims and figure plan."
+"Please turn this into a concrete paper outline with section-by-section claims and figure plan. Include: motivation with real bottleneck numbers, micro-architecture diagram, end-to-end system integration, evaluation methodology, and comparison to prior art."
 
 ### For claims matrix:
-"Please give me a results-to-claims matrix: what claim is allowed under each possible outcome of experiments X and Y?"
+"Please give me a results-to-claims matrix: what claim is allowed under each possible outcome of experiments X and Y? (e.g., if throughput improvement < 10%, can we still claim latency benefit?)"
 
 ### For mock review:
-"Please write a mock NeurIPS review with: Summary, Strengths, Weaknesses, Questions for Authors, Score, Confidence, and What Would Move Toward Accept."
+"Please write a mock MICRO/ISCA review with: Summary, Strengths, Weaknesses, Questions for Authors, Score (1-6 scale), Confidence, and What Would Move Toward Accept."
 
+## Review Tracing
+
+After each `spawn_agent` or `send_input` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

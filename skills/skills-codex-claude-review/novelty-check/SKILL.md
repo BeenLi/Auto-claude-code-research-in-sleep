@@ -32,27 +32,26 @@ For EACH core claim, search using ALL available sources:
    - Search arXiv, Google Scholar, Semantic Scholar
    - Use specific technical terms from the claim
    - Try at least 3 different query formulations per claim
-   - Include year filters for 2024-2026
+   - Include year filters for 2021-2026
 
 2. **Known paper databases**: Check against:
-   - ICLR 2025/2026, NeurIPS 2025, ICML 2025/2026
-   - Recent arXiv preprints (2025-2026)
+   - **Architecture**: MICRO, ISCA, HPCA, ASPLOS
+   - **Systems/Networking**: NSDI, SIGCOMM, OSDI, USENIX ATC, EuroSys, FCCM, DAC
+   - **IEEE/ACM journals**: IEEE TPDS, ACM TOCS, IEEE TCAD, IEEE TON, IEEE TC and ACM Transactions on Networking
+   - Recent arXiv preprints in cs.AR / cs.NI / cs.DC and related categories
 
 3. **Read abstracts**: For each potentially overlapping paper, WebFetch its abstract and related work section
 
 ### Phase C: Cross-Model Verification
-Call REVIEWER_MODEL via `mcp__claude-review__review_start` with high-rigor review:
+Call REVIEWER_MODEL via Codex MCP (`spawn_agent`) with xhigh reasoning:
 ```
-mcp__claude-review__review_start:
-  prompt: |
-    [Full novelty briefing + prior work list + specific novelty questions]
+config: {"model_reasoning_effort": "xhigh"}
 ```
-
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 Prompt should include:
 - The proposed method description
 - All papers found in Phase B
-- Ask: "Is this method novel? What is the closest prior work? What is the delta?"
+- Domain context: computer architecture / NIC/DPU systems / RDMA networking
+- Ask: "Is this method novel for a MICRO/ISCA/HPCA/NSDI venue? What is the closest prior work in hardware architecture or systems? What is the technical delta that a PC member would recognize as a genuine contribution?"
 
 ### Phase D: Novelty Report
 Output a structured report:
@@ -88,3 +87,7 @@ Output a structured report:
 - Check both the method AND the experimental setting for novelty
 - If the method is not novel but the FINDING would be, say so explicitly
 - Always check the most recent 6 months of arXiv — the field moves fast
+
+## Review Tracing
+
+After each `spawn_agent` or `send_input` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
