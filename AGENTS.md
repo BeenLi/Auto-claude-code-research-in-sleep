@@ -43,12 +43,12 @@ stage: implementation
 idea: "Rx Expansion Budgeting for Compressed RDMA: NIC/DPU-side lossless compression with decompressed output-byte admission, scheduling, and feedback"
 contract: refine-logs/EXPERIMENT_PLAN.md
 current_branch: codex/computer-architecture
-baseline: "Uncompressed RDMA, naive compressed RDMA, static Rx output partitioning, FIFO decompression queue, wire-byte weighted fair sharing, reactive QoS controller, oracle output-byte scheduler"
-validation_status: Not started
+baseline: "Uncompressed RDMA, naive compressed RDMA, receiver decompressed-byte token bucket, static Rx output partitioning, FIFO decompression queue, wire-byte weighted fair sharing, reactive QoS controller, oracle output-byte scheduler"
+validation_status: M1 P0-only analytical sensitivity pack complete; 960 rows, 384 output-unsafe, conditional Go for M2 model plumbing only
 active_tasks: []
 language: zh
 last_updated: "2026-04-26"
-next: "Workflow 1 restarted with beast effort and clean Research Wiki. Implement Workflow 1.5 starting from the analytical break-even model and htsim/standalone smoke test. Nightmare review gate is blocked by sandbox/API connectivity, recorded in review-stage/AUTO_REVIEW.md."
+next: "Use experiments/rx-expansion/results/M1_GO_NOGO_REPORT.md for targeted Go/No-Go review or decide whether to implement M2 standalone simulator. P0-only results are analytical sensitivity only."
 ```
 
 ## State Persistence Rules

@@ -1,0 +1,70 @@
+{
+  "usable_ratio_profiles": [
+    {
+      "codec_family": "ebpc",
+      "payload_source": "ebpc_alexnet_literature",
+      "evidence_level": "P0_literature_ratio",
+      "original_bytes": 5100,
+      "compressed_bytes": 1000,
+      "ratio": 5.1,
+      "chunk_size": 4096,
+      "dtype": "int8",
+      "tensor_role": "feature_or_gradient_map",
+      "provenance": "Cavigelli et al. 2019 EBPC reports AlexNet average compression ratio of 5.1x in the local text extraction at review-stage/ebpc_2019.txt."
+    },
+    {
+      "codec_family": "ebpc",
+      "payload_source": "ebpc_vgg16_literature",
+      "evidence_level": "P0_literature_ratio",
+      "original_bytes": 4000,
+      "compressed_bytes": 1000,
+      "ratio": 4.0,
+      "chunk_size": 4096,
+      "dtype": "int8",
+      "tensor_role": "feature_or_gradient_map",
+      "provenance": "Cavigelli et al. 2019 EBPC reports VGG-16 average compression ratio of 4.0x in the local text extraction at review-stage/ebpc_2019.txt."
+    },
+    {
+      "codec_family": "ebpc",
+      "payload_source": "ebpc_resnet34_literature",
+      "evidence_level": "P0_literature_ratio",
+      "original_bytes": 2400,
+      "compressed_bytes": 1000,
+      "ratio": 2.4,
+      "chunk_size": 4096,
+      "dtype": "int8",
+      "tensor_role": "feature_or_gradient_map",
+      "provenance": "Cavigelli et al. 2019 EBPC reports ResNet-34 average compression ratio of 2.4x in the local text extraction at review-stage/ebpc_2019.txt."
+    },
+    {
+      "codec_family": "quad_e4m3",
+      "payload_source": "quad_e4m3_literature",
+      "evidence_level": "P0_literature_ratio",
+      "original_bytes": 10000,
+      "compressed_bytes": 8610,
+      "ratio": 1.1614,
+      "chunk_size": 4096,
+      "dtype": "e4m3",
+      "tensor_role": "collective_tensor",
+      "provenance": "Quad Length Codes reports 13.9% compressibility for e4m3 in the local literature summary; ratio is derived as 1/(1-0.139)."
+    },
+    {
+      "codec_family": "zipserv_like",
+      "payload_source": "zipserv_max_model_size_reduction_literature",
+      "evidence_level": "P0_literature_ratio",
+      "original_bytes": 10000,
+      "compressed_bytes": 7000,
+      "ratio": 1.4286,
+      "chunk_size": 4096,
+      "dtype": "llm_weight_like",
+      "tensor_role": "model_weight",
+      "provenance": "ZipServ is summarized locally as up to 30% model-size reduction; ratio is derived as 1/(1-0.30)."
+    }
+  ],
+  "deferred_sources": [
+    {
+      "source": "netzip_public_summary",
+      "reason": "The local artifact records NetZIP as the direct competitor and reports training-time benefit, but no public payload trace or per-payload byte ratio was found. It must remain a literature positioning note until an artifact or explicit ratio table is available."
+    }
+  ]
+}
