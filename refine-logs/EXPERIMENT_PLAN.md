@@ -1,37 +1,99 @@
 # Experiment Plan
 
+**Idea**: Rx Expansion Budgeting for Compressed RDMA  
+**Generated**: 2026-04-26 10:26 CST  
+**Effort**: beast  
+**Validation status**: Not started
+
 ## Core Claims
-1. Shared DPU compression interference is structured, not random.
-2. A compact interference map predicts harmful co-runs better than naive load signals.
-3. A QoS-aware scheduler that consults the map improves end-to-end multi-tenant utility.
-4. The system is practical: low control overhead, limited reprofiling, stable gains.
 
-## 1. Main Anchor Result: End-to-End Evaluation
-- **Testbed**: 1-2 BlueField DPU shared compression engine pools. 3 tenant classes (Latency-critical, Elastic, Best-effort).
-- **Baselines**: FIFO shared queue, Weighted fair sharing, Static partitioning, Reactive QoS controller.
-- **Metrics**: SLO-goodput, p50/p95/p99 latency, QoS violation rate, total throughput, fairness.
-- **Sweeps**: Offered load (0.4x to 1.3x saturation), Mix skew, Burstiness.
-- **Success Criteria**: >=15-20% higher SLO-goodput or >=30% lower QoS violations vs. strongest non-oracle baseline, with <2% scheduler overhead.
+1. Compressed RDMA creates a receiver-side output-byte bottleneck invisible to conventional wire-byte congestion signals.
+2. Short-window expansion-ratio estimation predicts receiver pressure accurately enough for scheduling and feedback.
+3. Expansion-aware Rx budgeting improves p99/p999 FCT, completion latency, drop/stall bytes, and fairness versus naive compressed RDMA.
+4. The mechanism is practical for NIC/DPU hardware: bounded metadata, SRAM, and scheduling latency.
 
-## 2. Novelty Isolation
-- **Interference Cartography Quality (C1, C2)**: Pairwise interference heatmaps vs. utilization/queue-depth/workload-label predictors.
-- **Scheduler Ablations (C3)**: Full system vs. scheduler without map vs. QoS objective without map vs. stale map.
-- **Overhead and Stability (C4)**: Decision latency, CPU/DPU memory footprint, map drift and rebuild cost.
+## Baselines
 
-## 3. Run Order, Budget, Decision Gates
-Total Budget: ~350-450 DPU-hours
+- Uncompressed RDMA.
+- Naive compressed RDMA: compress/decompress without output-byte control.
+- Static partitioning of Rx output bandwidth.
+- FIFO shared decompression queue.
+- Weighted fair sharing by wire bytes.
+- Reactive QoS controller using only queue occupancy.
+- Oracle output-byte scheduler (upper bound).
 
-**1. Platform bring-up and single-tenant calibration (15-20h)**
-- *Gate*: Single-tenant throughput within 10% of hardware baseline.
+## Workloads
 
-**2. Interference cartography (100-130h)**
-- *Gate*: Harmful vs benign co-runs differ by >=15-20% slowdown. Map predicts unseen states with Spearman rho >= 0.8.
+- Synthetic LLM collective flows with ratio classes: 1.0x, 1.2x, 1.5x, 2.0x, 3.0x, 4.0x.
+- Tensor-inspired phase traces: FFN/attention/embedding-style bursts, e4m3-like distributions, activation/gradient-like bursts.
+- Multi-tenant mixes: latency-critical inference traffic plus elastic training/checkpoint bursts.
+- Stress regimes: incast, mixed ratios, bursty arrivals, slow host-output path, limited Rx SRAM.
 
-**3. Offline scheduler replay and ablations (10-20h)**
-- *Gate*: Full scheduler beats best baseline by >=10-15% SLO-goodput in replay.
+## Metrics
 
-**4. Online end-to-end anchor (50-70h)**
-- *Gate*: One clear headline win on SLO-goodput/QoS violations across sweeps.
+- Network/RDMA: FCT p50/p95/p99/p999, retransmitted bytes, ECN/PFC marks, queue occupancy.
+- Receiver pressure: decompressed output_write_gbps, Rx SRAM occupancy, expansion debt, decompression engine utilization, stall/drop bytes.
+- System-facing: completion time, TTFT/TPOT proxy for serving traces, fairness/SLO-goodput.
+- Compression: ratio distribution, accepted/dropped compressed bytes, expansion prediction error.
+- Hardware cost: per-flow state bytes, scheduler cycles, SRAM footprint, estimated LUT/BRAM/DSP for optional RTL sketch.
 
-**5. Robustness and practicality (30-50h)**
-- *Gate*: Overhead <2%, map remains useful with modest drift.
+## Milestone 1 - Analytical Break-Even Model
+
+- Build a byte-domain model: wire_bw, compression_ratio, decompressor_bw, PCIe_bw, host_write_bw, Rx_sram.
+- Derive safe-admission condition: `wire_bw * expansion_ratio <= min(decompressor_bw, output_bw_budget)`.
+- Sweep 100/200/400/800Gbps links and PCIe 4/5/6 assumptions.
+- **Gate**: show at least one realistic 400Gbps regime where naive compression is wire-safe but output-unsafe.
+
+## Milestone 2 - htsim Compression-Ratio Injection
+
+- Add per-flow compressed/original byte accounting to the htsim workload adapter.
+- Model Rx output buffer as a service-rate-limited resource.
+- Compare uncompressed, naive compressed, static cap, FIFO, and EARB.
+- **Gate**: EARB reduces p99 FCT or stall bytes by >=20% versus strongest non-oracle baseline in at least two mixed-ratio regimes.
+
+## Milestone 3 - gem5/htsim Window Co-Simulation
+
+- Use window-level co-simulation: htsim emits ingress/compressed bursts; gem5 approximates host-output write/cache pressure; feedback adjusts Rx budget.
+- Track PCIe/host-memory bottleneck transitions.
+- **Gate**: closed-loop simulation reproduces the hidden-bottleneck result from Milestone 1 and validates EARB feedback.
+
+## Milestone 4 - Ablations
+
+- No expansion estimator (wire-byte only).
+- Perfect expansion oracle.
+- Stale expansion estimator.
+- No per-tenant fairness.
+- Small/medium/large Rx SRAM.
+- Fixed vs adaptive decompression-engine scheduling.
+
+## Milestone 5 - Hardware Feasibility Sketch
+
+- Estimate metadata: per-flow ratio EWMA, output-credit counter, queue pointer, tenant class.
+- Sketch scheduler critical path and SRAM table size for 1K/8K/64K flows.
+- Optional HLS/RTL micro-sketch for output-credit scheduler only; codec RTL is out of scope unless Idea 2 is selected.
+- **Gate**: metadata and scheduler latency plausibly fit NIC pipeline sideband/control path.
+
+## Run Order
+
+1. Create `experiments/rx-expansion/` model and configs.
+2. Implement analytical sweep and write JSON/CSV outputs.
+3. Add htsim adapter or standalone flow simulator if htsim setup is blocked.
+4. Run smoke tests with 3 ratio classes and 2 baselines.
+5. Expand to full multi-tenant sweep.
+6. Add gem5 window hook after htsim signal exists.
+7. Generate figures: break-even surface, FCT CDF/tail bars, Rx SRAM occupancy, ablation table.
+
+## Budget
+
+- Analytical model: 0.5-1 day.
+- Standalone/htsim flow model: 1-3 days.
+- gem5/htsim window co-sim: 3-7 days depending on existing harness health.
+- Hardware sketch: 1-2 days.
+- Full initial validation: 1-2 weeks.
+
+## Stop/Kill Criteria
+
+- If realistic ratio distributions never create output-byte pressure at 400/800Gbps, pivot to Idea 2 codec design or Idea 4 DPU QoS.
+- If htsim/gem5 integration dominates effort, first publish a standalone simulator result and keep co-sim as follow-up.
+- If EARB only helps under contrived ratios, reframe as a negative measurement paper or abandon.
+

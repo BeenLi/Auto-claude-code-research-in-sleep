@@ -1,32 +1,40 @@
 # Pipeline Summary
 
-**Problem**: Shared DPU compression engines are fast in isolation but poorly behaved under contention, creating head-of-line blocking and QoS violations.
-**Final Method Thesis**: We propose to build an interference cartography of shared DPU compression engines and use it to drive a lightweight QoS-aware scheduler that predicts harmful co-schedules and steers requests to preserve tail latency and fairness.
-**Final Verdict**: READY
-**Date**: 2026-04-24
+**Command**: `/research-pipeline "nic lossless compression"` restarted from `/idea-discovery "nic lossless compression"`  
+**Generated**: 2026-04-26 10:26 CST  
+**Effort**: beast  
+**Reviewer difficulty**: nightmare  
+**Stage reached**: Workflow 1 complete; ready for implementation bridge  
+**Nightmare review gate**: BLOCKED by sandbox/API connectivity; internal adversarial assessment saved in `review-stage/AUTO_REVIEW.md`
 
-## Final Deliverables
-- Proposal: `refine-logs/FINAL_PROPOSAL.md`
+## What Changed
+
+- Rebuilt `research-wiki/` from scratch and ingested 12 core papers.
+- Refreshed literature across NIC/DPU, RDMA, LLM codec, memory/cache, runtime/serving, storage/checkpoint, and host Rx path.
+- Rejected the prior narrow "shared DPU compression QoS" idea as the main path because it requires BlueField hardware and is less aligned with the simulator-first AGENTS.md anchor.
+- Selected **Rx Expansion Budgeting for Compressed RDMA** as the new active idea.
+
+## Selected Idea
+
+Compressed RDMA must budget decompressed output bytes, not just compressed wire bytes. The proposed EARB mechanism tracks expansion ratio, Rx output-byte credits, decompression queue pressure, and feedback to RDMA control so receiver-side PCIe/host-memory/Rx-buffer bottlenecks do not become hidden tail-latency failures.
+
+## Key Artifacts
+
+- Literature report: `nic-lossless-compression/research-lit/2026-04-26.md`
+- Idea report: `idea-stage/IDEA_REPORT.md`
+- Idea candidates: `idea-stage/IDEA_CANDIDATES.md`
+- Final proposal: `refine-logs/FINAL_PROPOSAL.md`
 - Experiment plan: `refine-logs/EXPERIMENT_PLAN.md`
+- Review gate record: `review-stage/AUTO_REVIEW.md`
+- Research wiki query pack: `research-wiki/query_pack.md`
 
-## Contribution Snapshot
-- **Dominant contribution**: A compact interference map characterizing compression workloads and a practical scheduler to mitigate DPU engine contention.
-- **Optional supporting contribution**: An offline replay simulator for DPU compression scheduling.
-- **Explicitly rejected complexity**: No hardware redesign, no cluster-wide orchestration, no heavy ML policies.
+## Blockers / Degradations
 
-## Must-Prove Claims
-- Interference on shared DPU compression engines is severe, asymmetric, and workload-dependent.
-- A low-dimensional interference cartography can predict most harmful co-schedules accurately enough for online use.
-- QoS-aware scheduling using this cartography substantially reduces p99 latency vs FIFO policies.
+- `deepxiv` CLI is not installed, so DeepXiv was recorded as unavailable rather than fabricated.
+- Local shell network cannot resolve arXiv/Semantic Scholar API hosts, so arXiv/S2 adapters degraded; browser/web search was used for current metadata.
+- Zotero/Obsidian MCP resources are not exposed in this Codex environment.
+- `codex exec` nightmare review could not reach `api.openai.com`; fallback Claude review returned a disabled-organization API error.
 
-## First Runs to Launch
-1. Platform bring-up and single-tenant calibration (establish saturation point).
-2. Interference cartography data collection (pairwise matrix over load levels).
-3. Offline scheduler replay and ablations.
+## Next Step
 
-## Main Risks
-- **Risk**: The cartography becomes too hardware/firmware-specific and doesn't generalize well.
-- **Mitigation**: Base features on fundamental properties (compressibility, chunk size, burstiness) and validate across different DPU models or firmware versions if possible.
-
-## Next Action
-- Proceed to `/run-experiment` (needs access to BlueField DPU).
+Start Workflow 1.5 implementation from `refine-logs/EXPERIMENT_PLAN.md`: analytical break-even model, then htsim/standalone flow simulator smoke test, then gem5/htsim window co-simulation.

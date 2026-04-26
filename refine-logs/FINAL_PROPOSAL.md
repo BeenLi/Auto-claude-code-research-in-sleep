@@ -1,22 +1,46 @@
 # Final Method Proposal
 
-## 1. Problem Anchor
-Shared DPU compression engines are fast in isolation but poorly behaved under contention. When flows with different compressibility, chunk sizes, and burst patterns share the same hardware engine, they interfere in highly asymmetric ways, creating head-of-line blocking, tail-latency inflation, and tenant-level QoS violations. Existing systems optimize for raw throughput but fail to provide predictable multi-tenant interference control.
+**Selected idea**: Rx Expansion Budgeting for Compressed RDMA  
+**Generated**: 2026-04-26 10:26 CST  
+**Effort**: beast  
 
-## 2. Final Method Thesis
-We propose to build an **interference cartography** of shared DPU compression engines and use it to drive a lightweight **QoS-aware scheduler** that predicts harmful co-schedules and steers requests to preserve tail latency and fairness with minimal throughput loss.
+## 1. Problem Anchor
+
+NIC/DPU-side lossless compression reduces RDMA wire bytes, but the receiver must still materialize the original uncompressed bytes into host memory, GPU memory, or a staging buffer. With LLM tensors, per-flow compression ratios vary over time and across layers. A 400Gbps NIC receiving data at 2-3x compression ratio can create 800-1200Gbps of decompressed output demand, shifting the bottleneck from the link to Rx decompression engines, PCIe, host-memory writes, and Rx SRAM buffering. Existing NIC compression work largely treats this as an implementation detail rather than a control-plane resource.
+
+## 2. Method Thesis
+
+Build an **Expansion-Aware RDMA Rx Budgeter (EARB)** that accounts for both compressed wire bytes and decompressed output bytes. EARB estimates per-flow expansion ratio, allocates output-byte credits across Rx queues, schedules decompression engines by output pressure, and feeds an expansion-aware signal into RDMA congestion/credit control before hidden Rx stalls turn into tail-latency spikes or retransmissions.
 
 ## 3. Dominant Contribution
-Treating the DPU compression engine as a contention-sensitive shared accelerator and making its interference structure explicit, measurable, and schedulable.
-- A compact interference map predicting how one workload degrades another.
-- A practical scheduler that avoids destructive co-location and bounds unfair slowdowns without hardware changes.
 
-## 4. Explicitly Rejected Complexity
-- **No hardware redesign**: Focus is on software control of existing DPU engines.
-- **No full-cluster scheduling**: This is a per-DPU engine scheduling problem.
-- **No heavy ML/RL**: Simple predictive models or table-driven policies are used for fast online scheduling.
-- **No perfect isolation**: Target is strong improvement in QoS predictability, not absolute strict isolation.
+The contribution is a NIC/RDMA control mechanism for a new bottleneck created by compression:
 
-## 5. Key Claims and Must-Run Ablations
-- **Claims**: Interference is structured/predictable; cartography accurately flags toxic co-runs; QoS scheduling reduces p99 latency significantly vs FIFO.
-- **Ablations**: FIFO vs Map-aware Scheduler; Offline vs Online map; Feature ablations (compressibility vs size vs burstiness).
+- **Dual-byte accounting**: separate compressed ingress bytes, decompressed output bytes, and buffered expansion debt.
+- **Output-byte credit allocator**: per-flow or per-tenant budget that protects PCIe/host-memory write bandwidth.
+- **Rx decompression scheduler**: schedules engines and buffers using predicted output bytes, not only packet arrival order.
+- **Feedback hook**: exposes expansion pressure to sender-side rate/credit control or marks flows before Rx SRAM overflow.
+
+## 4. Scope Boundaries
+
+- No claim that EARB invents a better compression algorithm.
+- No full production RoCE implementation in Workflow 1.5; simulator-first validation is the primary path.
+- No Soft-RoCE as a substitute for RDMA behavior.
+- No application-level speedup claim until closed-loop network + host pressure evidence exists.
+
+## 5. Must-Prove Claims
+
+1. **C1 - Hidden bottleneck**: naive compressed RDMA can increase Rx stalls/tail latency because output-byte demand exceeds receiver-side memory/PCIe budget.
+2. **C2 - Predictability**: short-window expansion estimates predict dangerous output pressure well enough for control.
+3. **C3 - Control benefit**: EARB reduces p99/p999 FCT, Rx queue stalls, drops/retransmissions, or completion latency versus naive compressed RDMA and wire-byte-only controls.
+4. **C4 - Practicality**: bookkeeping SRAM, metadata, and scheduler latency are small enough for NIC/DPU implementation.
+
+## 6. Reviewer-Risk Register
+
+| Risk | Why it matters | Mitigation |
+|---|---|---|
+| "This is just flow control" | Reviewer may view dual-byte accounting as obvious | Show baseline RDMA controls observe the wrong byte domain and fail under variable ratio |
+| "Simulator is too abstract" | Main validation is simulator-first | Use htsim for network, gem5 for host-memory windows, and analytical bounds to triangulate |
+| "Compression ratios are workload-dependent" | LLM tensors may not compress enough | Include synthetic ratio sweeps plus tensor-inspired distributions from NetZIP/Quad/Ecco-style data |
+| "NetZIP already did it" | Direct competitor | Position NetZIP as compression datapath; EARB is Rx expansion/control-plane mechanism |
+

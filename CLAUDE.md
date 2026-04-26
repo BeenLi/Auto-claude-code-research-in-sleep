@@ -37,16 +37,19 @@ Parses external reviews → enforces coverage and grounding → drafts text-only
 **Full pipeline**: `/research-pipeline "topic"` runs Workflow 1 → 1.5 → 2 → 3
 
 ## Pipeline Status
+
+```yaml
 stage: implementation
-idea: "NIC/DPU-side lossless compression in RDMA networks with QoS-aware scheduling"
+idea: "Rx Expansion Budgeting for Compressed RDMA: NIC/DPU-side lossless compression with decompressed output-byte admission, scheduling, and feedback"
 contract: refine-logs/EXPERIMENT_PLAN.md
-current_branch: main
-baseline: "FIFO shared queue, Weighted fair sharing, Static partitioning, Reactive QoS controller"
-training_status: Not started
+current_branch: codex/computer-architecture
+baseline: "Uncompressed RDMA, naive compressed RDMA, static Rx output partitioning, FIFO decompression queue, wire-byte weighted fair sharing, reactive QoS controller, oracle output-byte scheduler"
+validation_status: Not started
 active_tasks: []
 language: zh
-last_updated: "2026-04-25"
-next: "Review completed with score 6.0. Next step is to implement the experiment plan (run platform bring-up and single-tenant calibration)."
+last_updated: "2026-04-26"
+next: "Workflow 1 restarted with beast effort and clean Research Wiki. Implement Workflow 1.5 starting from the analytical break-even model and htsim/standalone smoke test. Nightmare review gate is blocked by sandbox/API connectivity, recorded in review-stage/AUTO_REVIEW.md."
+```
 
 ## State Persistence Rules
 

@@ -39,6 +39,7 @@ import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 _ARXIV_API = "http://export.arxiv.org/api/query?id_list={ids}"
 _ARXIV_NS = {"atom": "http://www.w3.org/2005/Atom",
@@ -184,10 +185,13 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
                     node_id = line.split(":", 1)[1].strip()
                 if line.startswith("title:"):
                     title = line.split(":", 1)[1].strip().strip('"')
-                if line.startswith("# One-line thesis"):
+                if re.match(r"^#+\s+One-line thesis\b", line):
                     idx = content.split("\n").index(line)
-                    next_lines = content.split("\n")[idx+1:idx+3]
-                    thesis = " ".join(l for l in next_lines if l.strip() and not l.startswith("#"))
+                    next_lines = content.split("\n")[idx + 1:idx + 4]
+                    thesis = " ".join(
+                        l.strip() for l in next_lines
+                        if l.strip() and not l.startswith("#")
+                    )
             if title:
                 paper_summaries.append(f"- [{node_id}] {title}: {thesis[:150]}")
 
@@ -377,7 +381,7 @@ def _load_paper_frontmatter(path: Path) -> dict:
     return meta
 
 
-def _find_existing_page_by_arxiv(wiki_root: Path, arxiv_id: str) -> Path | None:
+def _find_existing_page_by_arxiv(wiki_root: Path, arxiv_id: str) -> Optional[Path]:
     papers = wiki_root / "papers"
     if not papers.exists():
         return None
@@ -468,9 +472,9 @@ def _render_paper_page(meta: dict, slug: str, thesis: str, tags: list[str]) -> s
 
 
 def ingest_paper(wiki_root: str, *, arxiv_id: str = "", title: str = "",
-                 authors: list[str] | None = None, year: int = 0,
+                 authors: Optional[list[str]] = None, year: int = 0,
                  venue: str = "", doi: str = "", thesis: str = "",
-                 tags: list[str] | None = None,
+                 tags: Optional[list[str]] = None,
                  update_on_exist: bool = False) -> Path:
     """Canonical paper-ingest entrypoint.
 
@@ -495,7 +499,7 @@ def ingest_paper(wiki_root: str, *, arxiv_id: str = "", title: str = "",
     authors = authors or []
 
     meta: dict = {}
-    existing: Path | None = None  # populated when we find a prior page (by arxiv or slug)
+    existing: Optional[Path] = None  # populated when we find a prior page (by arxiv or slug)
     if arxiv_id:
         aid = _normalize_arxiv_id(arxiv_id)
         existing = _find_existing_page_by_arxiv(root, aid)
