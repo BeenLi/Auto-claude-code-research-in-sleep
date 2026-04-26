@@ -1,6 +1,6 @@
 ---
 name: experiment-bridge
-description: Workflow 1.5 for Computer Architecture research: turn EXPERIMENT_PLAN.md into simulator manifests, scripts, sanity runs, and initial results for gem5, Broadcom/csg-htsim, co-simulation, RTL, synthesis, or micro-benchmark experiments.
+description: "Workflow 1.5 for Computer Architecture research: turn EXPERIMENT_PLAN.md into simulator manifests, scripts, sanity runs, and initial results for gem5, Broadcom/csg-htsim, co-simulation, RTL, synthesis, or micro-benchmark experiments."
 argument-hint: [experiment-plan-path-or-topic]
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
 ---

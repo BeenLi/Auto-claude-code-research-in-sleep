@@ -1,6 +1,6 @@
 ---
 name: run-experiment
-description: Launch a single Computer Architecture experiment: simulator run, micro-benchmark, RTL simulation, synthesis job, gem5 run, Broadcom/csg-htsim run, or co-simulation sanity check.
+description: "Launch a single Computer Architecture experiment: simulator run, micro-benchmark, RTL simulation, synthesis job, gem5 run, Broadcom/csg-htsim run, or co-simulation sanity check."
 argument-hint: [experiment-description-or-command]
 allowed-tools: Bash(*), Read, Grep, Glob, Edit, Write, Agent
 ---
