@@ -10,7 +10,7 @@ This ARIS instance is configured for **Computer Architecture / AI Infrastructure
 
 - **Field**: Computer Architecture / Systems / Networking / AI Infrastructure for LLM
 - **Target venues**: MICRO, ISCA, HPCA, ASPLOS, NSDI, OSDI, SIGCOMM, DAC, EuroSys, FCCM, IEEE TPDS, IEEE TC, IEEE TON, IEEE TVLSI, IEEE TCAD, ACM TACO
-- **AI infrastructure layers**: compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, runtime/serving
+- **AI infrastructure layers**: compute/accelerator, memory/storage/data movement, interconnect/network, runtime/system
 - **Evidence and validation**: Workflow 1 uses lightweight evidence for idea ranking: analytical models, small simulator runs, trace replay, microbenchmarks, RTL/HLS sketches, and gem5/htsim smoke runs. Full experiment execution is handled by Workflow 1.5.
 - **Current simulator-first anchor**: gem5 + Broadcom/csg-htsim + `cosim_gem5_htsim`, with window-level co-simulation for Rx decompression expansion pressure.
 - **Key metrics**: serving/system (tokens/s, requests/s, TTFT, TPOT, tail latency, completion time); data movement (HBM/CXL/PCIe/NIC/storage bandwidth, memory copy amplification, queue/buffer occupancy); network/RDMA (goodput, FCT, retransmitted bytes, drop/stall/congestion signals); compression (compression ratio, decompression expansion ratio, accepted/dropped compressed bytes); hardware cost (area, LUT/BRAM/DSP/SRAM footprint, timing/frequency, power/energy).

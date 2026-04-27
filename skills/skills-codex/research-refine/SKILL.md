@@ -19,7 +19,7 @@ Four principles dominate this skill:
 3. **One paper, one dominant contribution.** Prefer one sharp thesis plus at most one supporting contribution.
 4. **Platform leverage is a prior, not a decoration.** When accelerator, memory hierarchy, CXL/HBM, SmartNIC/DPU, P4, FPGA, storage, or runtime hooks naturally fit the bottleneck, use them concretely. Do not bolt on trendy hardware features as buzzwords.
 
-> **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving. "Frontier primitives" means modern hardware and system substrates (accelerators, HBM/CXL, SmartNIC/DPU, FPGA, storage datapaths, simulators), not ML models. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
+> **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute, memory/storage/data movement, interconnect/network, or runtime/system. "Frontier primitives" means modern hardware and system substrates (accelerators, HBM/CXL, SmartNIC/DPU, FPGA, storage datapaths, simulators), not ML models. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
 
 ```
 User input (PROBLEM + vague APPROACH)
@@ -325,7 +325,7 @@ spawn_agent:
   model: REVIEWER_MODEL
   message: |
     You are a senior computer architecture / systems researcher reviewing for MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM.
-    Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving.
+    Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system.
     This is an early-stage, mechanism-first research proposal.
 
     Your job is NOT to reward more hardware blocks, feature sprawl, or a giant benchmark checklist.

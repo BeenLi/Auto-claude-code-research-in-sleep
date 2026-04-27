@@ -35,7 +35,7 @@ Research topic: $ARGUMENTS
 > - `/research-lit "topic" — sources: all, deepxiv` — use default sources plus DeepXiv
 > - `/research-lit "topic" — arxiv download: true` — download top relevant arXiv PDFs
 > - `/research-lit "topic" — arxiv download: true, max download: 10` — download up to 10 PDFs
-> - `/research-lit "KV cache CXL" — ai-infra layer: memory, neighborhood: same-layer` — expand within the memory/data movement layer
+> - `/research-lit "KV cache CXL" — ai-infra layer: memory, neighborhood: same-layer` — expand within the memory/storage/data movement layer
 > - `/research-lit "nic-lossless-compression" — extended topics: "memory compression", "hardware compression accelerator"` — also search adjacent fields; results appear in Section 1b only
 
 ## AI Infrastructure Scope
@@ -45,12 +45,12 @@ This skill is the evidence entrypoint for **AI infrastructure for LLM** research
 | Layer | Typical topic terms | Same-layer expansion examples | Hardware bottleneck signals |
 |-------|---------------------|-------------------------------|-----------------------------|
 | `compute/accelerator` | tensor cores, sparsity, attention kernels, inference accelerator, near-data compute | systolic array, dataflow, quantization hardware, HLS/RTL accelerator, GPGPU-Sim, Accel-Sim | TOPS/W, utilization, pipeline stalls, on-chip SRAM pressure |
-| `memory/data movement` | KV cache, HBM, CXL, prefetch, memory compression, disaggregation | cache hierarchy, paging, NUMA, CXL.mem, bandwidth amplification, memory controller | GB/s, tail latency, miss rate, write amplification, capacity pressure |
+| `memory/storage/data movement` | KV cache, HBM, CXL, prefetch, memory compression, disaggregation | cache hierarchy, paging, NUMA, CXL.mem, bandwidth amplification, memory controller | GB/s, tail latency, miss rate, write amplification, capacity pressure |
 | `interconnect/network` | RDMA, NIC, DPU, collective, congestion, compression, htsim | RoCE, DCQCN, PFC/ECN, SmartNIC, Broadcom/csg-htsim, gem5+htsim | goodput, FCT, retransmission, PCIe utilization, Rx pressure |
-| `storage/checkpoint/data pipeline` | checkpointing, dataset loading, shuffle, object store, SSD | burst buffer, compression, DMA, GPUDirect Storage, log-structured writes | checkpoint time, IOPS, write endurance, recovery time |
-| `runtime/serving` | scheduler, batching, KV placement, prefill/decode, disaggregated serving | admission control, memory tiering, NIC offload, accelerator partitioning | only include when the idea exposes or controls a concrete hardware bottleneck |
+| `memory/storage/data movement` | checkpointing, dataset loading, shuffle, object store, SSD | burst buffer, compression, DMA, GPUDirect Storage, log-structured writes | checkpoint time, IOPS, write endurance, recovery time |
+| `runtime/system` | scheduler, batching, KV placement, prefill/decode, disaggregated serving | admission control, memory tiering, NIC offload, accelerator partitioning | only include when the idea exposes or controls a concrete hardware bottleneck |
 
-When `AI_INFRA_LAYER = auto`, infer the narrowest layer that matches the topic. If the topic is runtime/serving and no concrete hardware bottleneck is visible, mark it as **software-only / out-of-scope for Workflow 1** unless the user explicitly asks for pure systems software.
+When `AI_INFRA_LAYER = auto`, infer the narrowest layer that matches the topic. If the topic is runtime/system and no concrete hardware bottleneck is visible, mark it as **software-only / out-of-scope for Workflow 1** unless the user explicitly asks for pure systems software.
 
 ### Topic Neighborhood Expansion
 
@@ -62,9 +62,9 @@ Use topic-neighborhood search, not a full five-layer scan by default:
 4. Record the final query set in the output so downstream skills can see what was and was not searched.
 
 Examples:
-- `KV cache CXL` -> `memory/data movement`; expand with `HBM`, `CXL.mem`, `tiered memory`, `prefetch`, `paging`, `bandwidth`, `tail latency`.
+- `KV cache CXL` -> `memory/storage/data movement`; expand with `HBM`, `CXL.mem`, `tiered memory`, `prefetch`, `paging`, `bandwidth`, `tail latency`.
 - `RDMA NIC compression for LLM` -> `interconnect/network`; expand with `RoCE`, `SmartNIC`, `DPU`, `PFC`, `DCQCN`, `PCIe`, `Rx decompression expansion pressure`.
-- `checkpointing for LLM training` -> `storage/checkpoint/data pipeline`; expand with `burst buffer`, `SSD`, `object store`, `compression`, `recovery time`.
+- `checkpointing for LLM training` -> `memory/storage/data movement`; expand with `burst buffer`, `SSD`, `object store`, `compression`, `recovery time`.
 
 ## Data Sources
 
@@ -435,7 +435,7 @@ For each relevant paper (from all sources), extract:
 - **Results**: Key numbers/claims
 - **Relevance**: How does it relate to our work?
 - **Source**: Where we found it (Zotero/Obsidian/local/web) — helps user know what they already have vs what's new
-- **AI infrastructure layer**: compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, runtime/serving, or multi-layer
+- **AI infrastructure layer**: compute/accelerator, memory/storage/data movement, interconnect/network, runtime/system, or multi-layer
 - **Evidence level**: `peer-reviewed`, `preprint`, `local-note`, or `title-abstract-only`
 
 ### Step 3: Synthesize — Landscape Map + Structural Gaps
@@ -511,7 +511,7 @@ The **Landscape Pack** is a fixed Markdown contract consumed by Workflow 1. It i
 
 Rules for **Gap Seeds**:
 - Each seed must be grounded in at least one paper, preprint, local note, or explicit negative evidence from the search.
-- `runtime/serving` seeds are valid only when `hardware_bottleneck` names a concrete resource such as HBM capacity, PCIe bandwidth, NIC queue pressure, memory copy amplification, or accelerator utilization.
+- `runtime/system` seeds are valid only when `hardware_bottleneck` names a concrete resource such as HBM capacity, PCIe bandwidth, NIC queue pressure, memory copy amplification, or accelerator utilization.
 - Preprint-backed seeds are allowed under `EVIDENCE_POLICY = arxiv-ok`, but the `evidence_level` must expose that risk.
 - Include **Rx decompression expansion pressure** as a valid interconnect/network seed when the topic involves NIC/DPU compression: compressed wire bytes can expand into larger PCIe/host-memory writes, creating Rx buffer overflow, stalls, drops, and sender-side retransmission pressure.
 

@@ -12,7 +12,7 @@
 
 ### Candidate 1: [Idea Name]
 - **One-line**: [What it does]
-- **AI infra layer**: [compute/accelerator | memory/data movement | interconnect/network | storage/checkpoint/data pipeline | runtime/serving]
+- **AI infra layer**: [compute/accelerator | memory/storage/data movement | interconnect/network | runtime/system]
 - **Hardware bottleneck**: [Concrete resource pressure or timing path]
 - **Validation backend**: [analytical_model | gem5 | htsim | cosim_gem5_htsim | trace_replay | RTL/HLS | FPGA/DPU_microbench]
 - **Novelty score**: X/10

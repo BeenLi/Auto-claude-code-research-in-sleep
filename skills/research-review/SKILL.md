@@ -41,7 +41,7 @@ mcp__codex__codex:
   prompt: |
     [Full research context + specific questions]
     Please act as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level).
-    Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
+    Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
 
     Identify:
     1. Logical gaps or unjustified claims (e.g., missing area/power analysis, unrealistic throughput assumptions)
@@ -100,7 +100,7 @@ Update project memory/notes with key review conclusions.
 ## Prompt Templates
 
 ### For initial review:
-"I'm going to present a computer architecture research project for your critical review. Please act as a senior MICRO/ISCA/HPCA/ASPLOS reviewer. Domain: AI infrastructure for LLM across compute, memory/data movement, interconnect/network, storage/data pipeline, or runtime/serving..."
+"I'm going to present a computer architecture research project for your critical review. Please act as a senior MICRO/ISCA/HPCA/ASPLOS reviewer. Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system..."
 
 ### For experiment design:
 "Please design the minimal additional experiment package that gives the highest acceptance lift. Focus on: (1) which claims need real hardware measurement vs simulation, (2) what micro-benchmark or trace workloads cover the key cases, (3) what overhead analysis (area/power/latency/bandwidth) a reviewer would require. Be very specific about configurations."

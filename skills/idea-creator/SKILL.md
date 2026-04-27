@@ -24,7 +24,7 @@ For this repository, the default domain is **AI infrastructure for LLM** with a 
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 - **RANKING_PROFILE = `fast-iteration`** — Apply hard gates first, then rank by simulation readiness, implementation risk, LLM bottleneck importance, hardware insight, and novelty.
 
-> 💡 **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, and runtime/serving. Hardware bottlenecks and simulator/prototype readiness are mandatory; pure ML algorithm ideas and pure software schedulers without a hardware bottleneck are out of scope.
+> 💡 **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute/accelerator, memory/storage/data movement, interconnect/network, and runtime/system. Hardware bottlenecks and simulator/prototype readiness are mandatory; pure ML algorithm ideas and pure software schedulers without a hardware bottleneck are out of scope.
 
 > Override via argument, e.g., `/idea-creator "topic" — pilot: analytical only`.
 
@@ -35,10 +35,10 @@ Classify every idea before ranking it:
 | Layer | Examples | Typical validation backends | Key metrics |
 |-------|----------|-----------------------------|-------------|
 | `compute/accelerator` | attention/KV kernels, sparsity datapaths, inference accelerators, near-data compute | analytical model, gem5, GPGPU-Sim/Accel-Sim, RTL/HLS | TOPS/W, utilization, latency, SRAM pressure, area/power |
-| `memory/data movement` | KV cache hierarchy, CXL memory, HBM pressure, compression, prefetch | analytical model, gem5, trace replay, microbench | GB/s, tail latency, cache miss rate, write amplification |
+| `memory/storage/data movement` | KV cache hierarchy, CXL memory, HBM pressure, compression, prefetch | analytical model, gem5, trace replay, microbench | GB/s, tail latency, cache miss rate, write amplification |
 | `interconnect/network` | RDMA, NIC/DPU compression, collectives, congestion, packet/flow scheduling | htsim, gem5+htsim, ns-3, DPU/FPGA microbench | goodput, FCT, retransmitted bytes, PCIe utilization, Rx pressure |
-| `storage/checkpoint/data pipeline` | checkpoint bursts, object store, SSD pipeline, data loading | analytical model, trace replay, storage microbench | checkpoint time, recovery time, IOPS, bandwidth, endurance |
-| `runtime/serving` | batching, admission, prefill/decode split, KV placement | only when tied to hardware model; analytical/gem5/trace replay | HBM capacity, accelerator utilization, PCIe/NIC traffic, tail latency |
+| `memory/storage/data movement` | checkpoint bursts, object store, SSD pipeline, data loading | analytical model, trace replay, storage microbench | checkpoint time, recovery time, IOPS, bandwidth, endurance |
+| `runtime/system` | batching, admission, prefill/decode split, KV placement | only when tied to hardware model; analytical/gem5/trace replay | HBM capacity, accelerator utilization, PCIe/NIC traffic, tail latency |
 
 Hard gates:
 1. The problem must be an LLM infrastructure problem.
@@ -197,7 +197,7 @@ mcp__codex__codex:
     You are a senior computer architecture / systems researcher (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level) brainstorming research ideas.
 
     Research direction: [user's direction]
-    Domain context: AI infrastructure for LLM. Valid layers are compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, and runtime/serving. Runtime/serving ideas are only valid if they expose or control a concrete hardware bottleneck.
+    Domain context: AI infrastructure for LLM. Valid layers are compute/accelerator, memory/storage/data movement, interconnect/network, and runtime/system. Runtime/serving ideas are only valid if they expose or control a concrete hardware bottleneck.
 
     Here is the current landscape (from /research-lit Section 2):
     [paste landscape map — sub-direction clusters]
@@ -214,7 +214,7 @@ mcp__codex__codex:
     Generate 8-12 concrete research ideas. For each idea:
     1. One-sentence summary
     2. Core hypothesis (what you expect to find and why)
-    3. ai_infra_layer: one of compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, runtime/serving, or multi-layer
+    3. ai_infra_layer: one of compute/accelerator, memory/storage/data movement, interconnect/network, runtime/system, or multi-layer
     4. hardware_bottleneck: the concrete resource pressure or timing path
     5. Minimum viable experiment (cheapest validation: analytical model / gem5 / htsim / gem5+htsim / trace replay / RTL simulation / FPGA or DPU micro-benchmark)
     6. Expected contribution type: hardware mechanism / microarchitecture / memory hierarchy / NIC or DPU pipeline integration / protocol co-design / storage datapath / hardware-aware runtime
@@ -248,7 +248,7 @@ For each generated idea, quickly evaluate:
    - Assign `validation_backend`: analytical model, gem5, Broadcom/csg-htsim, cosim_gem5_htsim, trace replay, RTL/HLS, FPGA/DPU microbench, or future platform bring-up.
    - Mark readiness as `ready`, `partial`, or `future`.
    - For RDMA/NIC ideas, keep the real-RDMA baseline rule: do not substitute Soft-RoCE for claims about real RDMA behavior.
-   - For runtime/serving ideas, keep only those tied to a measurable hardware bottleneck such as HBM capacity, PCIe/NIC traffic, accelerator utilization, or host memory copy pressure.
+   - For runtime/system ideas, keep only those tied to a measurable hardware bottleneck such as HBM capacity, PCIe/NIC traffic, accelerator utilization, or host memory copy pressure.
 
 3. **Workload availability**:
    - Prefer public traces, synthetic LLM serving/training traffic, standard compression corpora, microbenchmarks, or simulator-generated workloads.
@@ -280,7 +280,7 @@ For each surviving idea, run a deeper evaluation:
    - How would you rank these for a top venue submission?
    - Which 2-3 would you actually work on?
 
-   For runtime/serving ideas:
+   For runtime/system ideas:
    - Is the hardware bottleneck real and central, or is this a pure software scheduler?
 
    For RDMA/NIC compression ideas:
@@ -300,10 +300,10 @@ Before committing to a full research effort, run or design cheap pilots to get e
    |-----------------|---------------|-------------|---------------|
    | Any / analytical model | Queue, bandwidth, latency, or resource model | First-order script with published baselines and sensitivity sweep | Model shows a decisive bottleneck and plausible gain |
    | compute/accelerator | Kernel or pipeline model | Small simulator run, HLS/RTL sketch, or accelerator utilization trace | Utilization/latency/TOPS/W improves enough to justify mechanism |
-   | memory/data movement | gem5 or trace replay | KV/cache/CXL/HBM traffic model, bandwidth amplification, prefetch or placement sensitivity | Tail latency, bandwidth, miss rate, or capacity pressure changes materially |
+   | memory/storage/data movement | gem5 or trace replay | KV/cache/CXL/HBM traffic model, bandwidth amplification, prefetch or placement sensitivity | Tail latency, bandwidth, miss rate, or capacity pressure changes materially |
    | interconnect/network | htsim or gem5+htsim | 100-1000 flow smoke, 100us window summaries, lossy RDMA/RTO sensitivity if relevant | goodput/FCT/retransmitted bytes/Rx pressure changes in expected direction |
-   | storage/checkpoint/data pipeline | trace replay or storage microbench | checkpoint burst, compression, object-store, or SSD bandwidth replay | checkpoint/recovery time or I/O amplification improves |
-   | runtime/serving | hardware-aware trace analysis | batching/admission/KV placement trace with hardware resource accounting | tail latency or throughput improves because a named hardware bottleneck is controlled |
+   | memory/storage/data movement | trace replay or storage microbench | checkpoint burst, compression, object-store, or SSD bandwidth replay | checkpoint/recovery time or I/O amplification improves |
+   | runtime/system | hardware-aware trace analysis | batching/admission/KV placement trace with hardware resource accounting | tail latency or throughput improves because a named hardware bottleneck is controlled |
    | RTL/HLS/FPGA/DPU | microarchitecture sketch | Minimal datapath or existing IP configuration, no full platform build required | line-rate feasibility, area/power estimate, or platform blocker identified |
 
    - Default budget: `pilot_budget: <=2h mini-run`.
@@ -340,7 +340,7 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 
 ### Idea 1: [title]
 - **Hypothesis**: [one sentence]
-- **ai_infra_layer**: compute/accelerator | memory/data movement | interconnect/network | storage/checkpoint/data pipeline | runtime/serving | multi-layer
+- **ai_infra_layer**: compute/accelerator | memory/storage/data movement | interconnect/network | memory/storage/data movement | runtime/system | multi-layer
 - **hardware_bottleneck**: [concrete resource pressure or timing path]
 - **validation_backend**: analytical_model | gem5 | Broadcom/csg-htsim | cosim_gem5_htsim | trace_replay | RTL/HLS | FPGA/DPU_microbench | future_platform
 - **Minimum experiment**: [concrete description]
@@ -374,8 +374,8 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 | Idea | ai_infra_layer | validation_backend | pilot_status | pilot_budget | pilot_command_or_plan | key_metric | signal | readiness_blocker |
 |------|----------------|--------------------|--------------|--------------|-----------------------|------------|--------|-------------------|
 | Idea 1 | interconnect/network | cosim_gem5_htsim | completed | <=2h mini-run | `python3 run_rx_pressure_smoke.py --flows 100 --window-us 100` | host_memory_write_gbps, retransmitted_bytes | POSITIVE | none |
-| Idea 2 | memory/data movement | gem5 | designed_not_run | <=2h mini-run | cache/KV trace replay with CXL bandwidth sweep | tail latency, bandwidth amplification | NOT_RUN | missing trace |
-| Idea 3 | runtime/serving | trace_replay | killed | <=2h mini-run | N/A | N/A | NEGATIVE | no hardware bottleneck claim |
+| Idea 2 | memory/storage/data movement | gem5 | designed_not_run | <=2h mini-run | cache/KV trace replay with CXL bandwidth sweep | tail latency, bandwidth amplification | NOT_RUN | missing trace |
+| Idea 3 | runtime/system | trace_replay | killed | <=2h mini-run | N/A | N/A | NEGATIVE | no hardware bottleneck claim |
 
 ## Suggested Execution Order
 1. Start with Idea 1 (positive pilot signal, lowest risk)

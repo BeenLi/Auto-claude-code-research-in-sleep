@@ -18,7 +18,7 @@ This skill chains sub-skills into a single automated pipeline for **AI infrastru
   (survey)      (brainstorm)    (verify novel)    (critical feedback)  (refine method + plan experiments)
 ```
 
-Each phase builds on the previous one's output. The final deliverables are a validated `idea-stage/IDEA_REPORT.md` with ranked ideas, plus a refined proposal (`refine-logs/FINAL_PROPOSAL.md`) and experiment plan (`refine-logs/EXPERIMENT_PLAN.md`) for the top idea. The default scope covers compute/accelerator, memory/data movement, interconnect/network, storage/checkpoint/data pipeline, and runtime/serving when runtime has a concrete hardware bottleneck.
+Each phase builds on the previous one's output. The final deliverables are a validated `idea-stage/IDEA_REPORT.md` with ranked ideas, plus a refined proposal (`refine-logs/FINAL_PROPOSAL.md`) and experiment plan (`refine-logs/EXPERIMENT_PLAN.md`) for the top idea. The default scope covers compute/accelerator, memory/storage/data movement, interconnect/network, and runtime/system when runtime has a concrete hardware bottleneck.
 
 ## Constants
 
@@ -277,7 +277,7 @@ If checkpoint `final_report` is enabled, present the final report summary before
 [from Phase 2, updated with Phase 3-4 results]
 
 ### 🏆 Idea 1: [title] — RECOMMENDED
-- AI infra layer: [compute/accelerator | memory/data movement | interconnect/network | storage/checkpoint/data pipeline | runtime/serving]
+- AI infra layer: [compute/accelerator | memory/storage/data movement | interconnect/network | runtime/system]
 - Hardware bottleneck: [concrete bottleneck]
 - Validation backend: [analytical_model | gem5 | Broadcom/csg-htsim | cosim_gem5_htsim | trace_replay | RTL/HLS | FPGA/DPU_microbench]
 - Pilot: [pilot_status], signal: [signal], key metric: [key_metric], blocker: [readiness_blocker]

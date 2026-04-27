@@ -7,7 +7,7 @@
 
 ## Background
 - **Field**: [e.g., Computer Architecture / Systems / Networking]
-- **AI infra layer**: [compute/accelerator | memory/data movement | interconnect/network | storage/checkpoint/data pipeline | runtime/serving]
+- **AI infra layer**: [compute/accelerator | memory/storage/data movement | interconnect/network | runtime/system]
 - **Sub-area**: [e.g., KV cache hierarchy, CXL memory, NIC/DPU compression, LLM checkpointing]
 - **Hardware bottleneck**: [e.g., HBM capacity, PCIe bandwidth, NIC Rx buffer pressure, SSD checkpoint bandwidth]
 - **Key papers I've read**: [3-5 papers]
