@@ -39,16 +39,16 @@ Parses external reviews → enforces coverage and grounding → drafts text-only
 ## Pipeline Status
 
 ```yaml
-stage: implementation
-idea: "Rx Expansion Budgeting for Compressed RDMA: NIC/DPU-side lossless compression with decompressed output-byte admission, scheduling, and feedback"
-contract: refine-logs/EXPERIMENT_PLAN.md
-current_branch: codex/computer-architecture
-baseline: "Uncompressed RDMA, naive compressed RDMA, receiver decompressed-byte token bucket, static Rx output partitioning, FIFO decompression queue, wire-byte weighted fair sharing, reactive QoS controller, oracle output-byte scheduler"
-validation_status: M1 P0-only analytical sensitivity pack complete; 960 rows, 384 output-unsafe, conditional Go for M2 model plumbing only
+stage: idle
+idea: ""
+contract: ""
+current_branch: main
+baseline: ""
+validation_status: ""
 active_tasks: []
 language: zh
-last_updated: "2026-04-26"
-next: "Use experiments/rx-expansion/results/M1_GO_NOGO_REPORT.md for targeted Go/No-Go review or decide whether to implement M2 standalone simulator. P0-only results are analytical sensitivity only."
+last_updated: "2026-04-28"
+next: "Ready to start Workflow 1 (Idea Discovery). Run `/research-pipeline \"topic\"` to begin."
 ```
 
 ## State Persistence Rules
@@ -68,12 +68,12 @@ On new session or post-compaction recovery:
 ## Skill Invocation
 
 ```bash
-/research-lit "nic-lossless-compression" — sources: local, zotero, web — extended topics: "memory compression", "compression accelerator", "in-network compression"
-/idea-discovery "nic-lossless-compression"
-/research-pipeline "nic-lossless-compression" — AUTO_PROCEED: false
+/research-lit "AI infrastructure for LLM" — sources: local, zotero, web — extended topics: "KV cache CXL", "NIC compression", "LLM checkpointing"
+/idea-discovery "AI infrastructure for LLM — hardware bottlenecks"
+/research-pipeline "NIC/DPU compression for LLM serving" — checkpoint mode: standard
 ```
 
-Key overridable parameters: `AUTO_PROCEED` (true), `human_checkpoint` (false), `sources` (all), `code_review` (true), `illustration` (gemini/mermaid/false).
+Key overridable parameters: `CHECKPOINT_MODE` (standard), `CHECKPOINTS` (literature_scope, idea_selection), `AUTO_PROCEED` (compatibility), `human_checkpoint` (false), `sources` (all), `code_review` (true), `illustration` (gemini/mermaid/false).
 
 ## MCP Servers
 
