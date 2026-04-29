@@ -27,33 +27,22 @@ Current overrides:
 
 ## Install
 
-1. Install the base Codex-native skills first:
-
 ```bash
-mkdir -p ~/.codex/skills
-cp -a skills/skills-codex/* ~/.codex/skills/
+# Clone ARIS once, then run this from each Codex project.
+git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
+cd /path/to/your/project
+bash ~/aris_repo/tools/install_codex_skills.sh --reviewer claude
 ```
 
-2. Install the Claude-review overrides second:
-
-```bash
-cp -a skills/skills-codex-claude-review/* ~/.codex/skills/
-```
-
-3. Register the local reviewer bridge:
-
-```bash
-mkdir -p ~/.codex/mcp-servers/claude-review
-cp mcp-servers/claude-review/server.py ~/.codex/mcp-servers/claude-review/server.py
-codex mcp add claude-review -- python3 ~/.codex/mcp-servers/claude-review/server.py
-```
+The installer links base skills from `skills/skills-codex/`, points the
+review-heavy overrides at this package, writes `.aris/codex-installed-skills.txt`,
+and registers `claude-review` MCP.
 
 If your Claude setup depends on a shell helper such as `claude-aws`, use the wrapper instead:
 
 ```bash
-cp mcp-servers/claude-review/run_with_claude_aws.sh ~/.codex/mcp-servers/claude-review/run_with_claude_aws.sh
-chmod +x ~/.codex/mcp-servers/claude-review/run_with_claude_aws.sh
-codex mcp add claude-review -- ~/.codex/mcp-servers/claude-review/run_with_claude_aws.sh
+codex mcp remove claude-review
+codex mcp add claude-review -- ~/aris_repo/mcp-servers/claude-review/run_with_claude_aws.sh
 ```
 
 ## Why this exists

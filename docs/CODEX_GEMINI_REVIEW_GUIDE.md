@@ -24,18 +24,19 @@ The install order matters:
 ## Install
 
 ```bash
-git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git
-cd Auto-claude-code-research-in-sleep
+# Clone ARIS once to a stable location.
+git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
 
-mkdir -p ~/.codex/skills
-cp -a skills/skills-codex/* ~/.codex/skills/
-cp -a skills/skills-codex-gemini-review/* ~/.codex/skills/
-
-mkdir -p ~/.codex/mcp-servers/gemini-review
-cp mcp-servers/gemini-review/server.py ~/.codex/mcp-servers/gemini-review/server.py
-cp mcp-servers/gemini-review/README.md ~/.codex/mcp-servers/gemini-review/README.md
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api -- python3 ~/.codex/mcp-servers/gemini-review/server.py
+# In each Codex project, install base skills plus the Gemini-review overlay.
+cd /path/to/your/project
+bash ~/aris_repo/tools/install_codex_skills.sh --reviewer gemini
 ```
+
+The installer creates flat project-local symlinks under `.agents/skills/`, writes
+`.aris/codex-installed-skills.txt`, and registers the `gemini-review` MCP bridge
+with `GEMINI_REVIEW_BACKEND=api`. To update skill content later, run `git pull`
+in `~/aris_repo`; re-run the installer only for newly added/removed skills or
+reviewer switching.
 
 Recommended credential file:
 
@@ -70,7 +71,7 @@ The intended path is direct API. If you explicitly need Gemini CLI instead:
 
 ```bash
 codex mcp remove gemini-review
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=cli -- python3 ~/.codex/mcp-servers/gemini-review/server.py
+codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=cli -- python3 ~/aris_repo/mcp-servers/gemini-review/server.py
 ```
 
 That fallback is available, but it is not the primary path for this guide.
@@ -101,7 +102,7 @@ If the default API model returns temporary free-tier `429` responses in your cur
 
 ```bash
 codex mcp remove gemini-review
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api --env GEMINI_REVIEW_MODEL=gemini-flash-latest -- python3 ~/.codex/mcp-servers/gemini-review/server.py
+codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api --env GEMINI_REVIEW_MODEL=gemini-flash-latest -- python3 ~/aris_repo/mcp-servers/gemini-review/server.py
 ```
 
 This does not change the ARIS reviewer contract or skill overlay shape. It only changes the Gemini API model used behind the same local `gemini-review` bridge.

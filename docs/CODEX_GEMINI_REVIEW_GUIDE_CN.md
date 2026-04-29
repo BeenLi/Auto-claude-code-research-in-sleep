@@ -24,18 +24,18 @@
 ## 安装
 
 ```bash
-git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git
-cd Auto-claude-code-research-in-sleep
+# 只需把 ARIS 克隆到一个稳定位置。
+git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
 
-mkdir -p ~/.codex/skills
-cp -a skills/skills-codex/* ~/.codex/skills/
-cp -a skills/skills-codex-gemini-review/* ~/.codex/skills/
-
-mkdir -p ~/.codex/mcp-servers/gemini-review
-cp mcp-servers/gemini-review/server.py ~/.codex/mcp-servers/gemini-review/server.py
-cp mcp-servers/gemini-review/README.md ~/.codex/mcp-servers/gemini-review/README.md
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api -- python3 ~/.codex/mcp-servers/gemini-review/server.py
+# 在每个 Codex 项目中安装 base skills + Gemini-review overlay。
+cd /path/to/your/project
+bash ~/aris_repo/tools/install_codex_skills.sh --reviewer gemini
 ```
+
+安装器会在 `.agents/skills/` 下创建扁平项目级 symlink，写入
+`.aris/codex-installed-skills.txt`，并用 `GEMINI_REVIEW_BACKEND=api` 注册
+`gemini-review` MCP bridge。之后更新 skill 内容只需要在 `~/aris_repo` 里
+`git pull`；只有新增/删除 skill 或切换 reviewer 时才需要重跑安装器。
 
 推荐凭证文件：
 
@@ -71,7 +71,7 @@ chmod 600 ~/.gemini/.env
 
 ```bash
 codex mcp remove gemini-review
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=cli -- python3 ~/.codex/mcp-servers/gemini-review/server.py
+codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=cli -- python3 ~/aris_repo/mcp-servers/gemini-review/server.py
 ```
 
 但这不是本指南的主路径。
@@ -102,7 +102,7 @@ codex -C /path/to/your/project
 
 ```bash
 codex mcp remove gemini-review
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api --env GEMINI_REVIEW_MODEL=gemini-flash-latest -- python3 ~/.codex/mcp-servers/gemini-review/server.py
+codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api --env GEMINI_REVIEW_MODEL=gemini-flash-latest -- python3 ~/aris_repo/mcp-servers/gemini-review/server.py
 ```
 
 这不会改变 ARIS 的 reviewer 契约，也不会改变 skill overlay 的组织方式，只是让同一个本地 `gemini-review` bridge 在底层改用另一个 Gemini API 模型。

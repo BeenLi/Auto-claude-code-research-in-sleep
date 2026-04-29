@@ -26,15 +26,32 @@ These skills cover the experiment follow-up chain:
 # 1. Clone ARIS once to a stable location
 git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
 
-# 2. Attach to a Codex project (auto-detects platform from AGENTS.md):
+# 2. Attach Codex skills to a project as flat symlinks:
 cd ~/your-paper-project
-bash ~/aris_repo/tools/install_aris.sh
-# → creates .agents/skills/aris symlink → <aris-repo>/skills/skills-codex/
-# → adds managed block to AGENTS.md telling agent to use only project-local skills
+bash ~/aris_repo/tools/install_codex_skills.sh
+# -> creates .agents/skills/<skill> symlinks to ~/aris_repo/skills/skills-codex/<skill>
+# -> writes .aris/codex-installed-skills.txt
+# -> re-runnable: reconcile new/removed skills and switch reviewer overlays
 
-# Windows (PowerShell, junctions need admin or developer mode):
-.\tools\install_aris.ps1 C:\path\to\your-paper-project
+# 3. Update existing skill content:
+cd ~/aris_repo && git pull
+
 ```
+
+Reviewer overlay modes:
+
+```bash
+# Codex executes, Claude Code reviews through claude-review MCP
+bash ~/aris_repo/tools/install_codex_skills.sh --project ~/your-paper-project --reviewer claude
+
+# Codex executes, Gemini reviews through gemini-review MCP
+bash ~/aris_repo/tools/install_codex_skills.sh --project ~/your-paper-project --reviewer gemini
+
+# Switch back to Codex-as-reviewer skills
+bash ~/aris_repo/tools/install_codex_skills.sh --project ~/your-paper-project --reviewer codex
+```
+
+Use `bash ~/aris_repo/tools/install_codex_skills.sh --help` for all options, including `--dry-run` and `--no-mcp`.
 
 <details>
 <summary><b>Alternative: legacy global install (`~/.codex/skills/`)</b></summary>
@@ -52,11 +69,9 @@ Global install increases the risk of skill name collisions when other community 
 
 ```bash
 mkdir -p ~/your-project/.agents/skills
-bash ~/aris_repo/tools/smart_update.sh \
-    --project ~/your-project \
-    --target-subdir .agents/skills/aris \
-    --apply
-# Update with the same command (smart_update detects personal customizations)
+cp -a ~/aris_repo/skills/skills-codex/* ~/your-project/.agents/skills/
+# Overlay manually if needed:
+# cp -a ~/aris_repo/skills/skills-codex-gemini-review/* ~/your-project/.agents/skills/
 ```
 
 </details>
@@ -67,4 +82,4 @@ Optional companion dependency for the `deepxiv` skill:
 pip install deepxiv-sdk
 ```
 
-If you also use reviewer overlay packages, install this base package first, then apply the overlay on top.
+If you also use reviewer overlay packages, prefer `tools/install_codex_skills.sh`; it chooses the final symlink target for each overridden skill.

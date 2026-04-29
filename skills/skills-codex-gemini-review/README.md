@@ -94,34 +94,23 @@ Optional fallback only:
 
 - **Gemini CLI**: install `gemini` and complete login/auth if you explicitly want `GEMINI_REVIEW_BACKEND=cli`
 
-1. Install the base Codex-native skills first:
-
 ```bash
-mkdir -p ~/.codex/skills
-cp -a skills/skills-codex/* ~/.codex/skills/
+# Clone ARIS once, then run this from each Codex project.
+git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
+cd /path/to/your/project
+bash ~/aris_repo/tools/install_codex_skills.sh --reviewer gemini
 ```
 
-2. Install the Gemini-review overrides second:
-
-```bash
-cp -a skills/skills-codex-gemini-review/* ~/.codex/skills/
-```
-
-3. Register the local reviewer bridge:
-
-```bash
-mkdir -p ~/.codex/mcp-servers/gemini-review
-cp mcp-servers/gemini-review/server.py ~/.codex/mcp-servers/gemini-review/server.py
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api -- python3 ~/.codex/mcp-servers/gemini-review/server.py
-```
-
-The bridge defaults to the direct Gemini API path. This is the intended reviewer backend for this overlay.
+The installer links base skills from `skills/skills-codex/`, points the
+reviewer-aware overrides at this package, writes `.aris/codex-installed-skills.txt`,
+and registers `gemini-review` MCP with `GEMINI_REVIEW_BACKEND=api`. This is the
+intended reviewer backend for this overlay.
 
 If the default API model is temporarily rate-limited on your current free-tier window, keep the same overlay and bridge, and override only the reviewer model:
 
 ```bash
 codex mcp remove gemini-review
-codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api --env GEMINI_REVIEW_MODEL=gemini-flash-latest -- python3 ~/.codex/mcp-servers/gemini-review/server.py
+codex mcp add gemini-review --env GEMINI_REVIEW_BACKEND=api --env GEMINI_REVIEW_MODEL=gemini-flash-latest -- python3 ~/aris_repo/mcp-servers/gemini-review/server.py
 ```
 
 ## Why this exists

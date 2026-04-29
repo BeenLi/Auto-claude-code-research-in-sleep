@@ -23,31 +23,31 @@ The install order matters:
 ## Install
 
 ```bash
-git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git
-cd Auto-claude-code-research-in-sleep
+# Clone ARIS once to a stable location.
+git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
 
-mkdir -p ~/.codex/skills
-cp -a skills/skills-codex/* ~/.codex/skills/
-cp -a skills/skills-codex-claude-review/* ~/.codex/skills/
-
-mkdir -p ~/.codex/mcp-servers/claude-review
-cp mcp-servers/claude-review/server.py ~/.codex/mcp-servers/claude-review/server.py
-codex mcp add claude-review -- python3 ~/.codex/mcp-servers/claude-review/server.py
+# In each Codex project, install base skills plus the Claude-review overlay.
+cd /path/to/your/project
+bash ~/aris_repo/tools/install_codex_skills.sh --reviewer claude
 ```
+
+The installer creates flat project-local symlinks under `.agents/skills/`, writes
+`.aris/codex-installed-skills.txt`, and registers the `claude-review` MCP bridge.
+To update skill content later, run `git pull` in `~/aris_repo`; re-run the
+installer only for newly added/removed skills or reviewer switching.
 
 If your Claude login depends on a shell helper such as `claude-aws`, use the wrapper:
 
 ```bash
-cp mcp-servers/claude-review/run_with_claude_aws.sh ~/.codex/mcp-servers/claude-review/run_with_claude_aws.sh
-chmod +x ~/.codex/mcp-servers/claude-review/run_with_claude_aws.sh
-codex mcp add claude-review -- ~/.codex/mcp-servers/claude-review/run_with_claude_aws.sh
+codex mcp remove claude-review
+codex mcp add claude-review -- ~/aris_repo/mcp-servers/claude-review/run_with_claude_aws.sh
 ```
 
 Optional reviewer model override:
 
 ```bash
 codex mcp remove claude-review
-codex mcp add claude-review --env CLAUDE_REVIEW_MODEL=claude-opus-4-1 -- python3 ~/.codex/mcp-servers/claude-review/server.py
+codex mcp add claude-review --env CLAUDE_REVIEW_MODEL=claude-opus-4-1 -- python3 ~/aris_repo/mcp-servers/claude-review/server.py
 ```
 
 ## Verify
