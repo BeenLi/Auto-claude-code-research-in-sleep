@@ -2,7 +2,7 @@
 name: patent-review
 description: "Get an external patent examiner review of a patent application. Use when user says \"专利审查\", \"patent review\", \"审查意见\", \"examiner review\", or wants critical feedback on patent claims and specification."
 argument-hint: [patent-directory-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, spawn_agent, send_input
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
 # Patent Examiner Review via Codex MCP (xhigh reasoning)
@@ -13,9 +13,9 @@ Adapted from `/research-review`. The reviewer persona is a patent examiner, not 
 
 ## Constants
 
-- `REVIEWER_MODEL = gpt-5.5` — Model used via Codex MCP
+- `REVIEWER_MODEL = gpt-5.4` — Model used via Codex MCP
 - `REVIEW_ROUNDS = 2` — Number of review rounds
-- `EXAMINER_PERSONA = "patent-examiner"` — GPT-5.5 persona
+- `EXAMINER_PERSONA = "patent-examiner"` — GPT-5.4 persona
 
 ## Prerequisites
 
@@ -44,12 +44,12 @@ Before calling the external reviewer, compile a comprehensive briefing:
 
 ### Step 2: Round 1 — Full Examiner Review
 
-Send to `REVIEWER_MODEL` via `spawn_agent` with xhigh reasoning:
+Send to `REVIEWER_MODEL` via `mcp__codex__codex` with xhigh reasoning:
 
 ```
-spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+mcp__codex__codex:
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are a senior patent examiner at the [USPTO/CNIPA/EPO].
     Examine this patent application and issue a detailed office action.
 
@@ -128,12 +128,12 @@ For each fix:
 
 ### Step 4: Round 2 — Follow-Up Review
 
-Use `spawn_agent` with the threadId from Round 1:
+Use `mcp__codex__codex` with the threadId from Round 1:
 
 ```
-spawn_agent:
+mcp__codex__codex:
   threadId: [from Round 1]
-  message: |
+  prompt: |
     Here is the revised patent application after addressing your office action.
 
     CHANGES MADE:
