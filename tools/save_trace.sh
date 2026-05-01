@@ -23,7 +23,7 @@
 set -euo pipefail
 
 # --- Parse arguments ---
-SKILL="" PURPOSE="" MODEL="" THREAD_ID="" PROMPT="" RESPONSE=""
+SKILL="" PURPOSE="" MODEL="" THREAD_ID="" TOOL="mcp__codex__codex" PROMPT="" RESPONSE=""
 PROMPT_FILE="" RESPONSE_FILE="" TRACE_MODE="${ARIS_TRACE_MODE:-full}"
 
 while [[ $# -gt 0 ]]; do
@@ -32,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --purpose)     PURPOSE="$2";       shift 2 ;;
     --model)       MODEL="$2";         shift 2 ;;
     --thread-id)   THREAD_ID="$2";     shift 2 ;;
+    --tool)        TOOL="$2";          shift 2 ;;
     --prompt)      PROMPT="$2";        shift 2 ;;
     --response)    RESPONSE="$2";      shift 2 ;;
     --prompt-file) PROMPT_FILE="$2";   shift 2 ;;
@@ -60,7 +61,7 @@ if [[ -n "$RESPONSE_FILE" && -f "$RESPONSE_FILE" ]]; then
 fi
 
 # --- Determine run directory ---
-TODAY=$(date +%Y-%m-%d)
+TODAY=$(date -u +%Y-%m-%d)
 TRACES_DIR=".aris/traces/${SKILL}"
 mkdir -p "$TRACES_DIR"
 
@@ -93,7 +94,7 @@ METAEOF
 fi
 
 # --- Determine call number ---
-CALL_NUM=$(ls "${RUN_DIR}/"*.request.json 2>/dev/null | wc -l | tr -d ' ')
+CALL_NUM=$(find "${RUN_DIR}" -maxdepth 1 -name "*.request.json" -type f | wc -l | tr -d ' ')
 CALL_NUM=$((CALL_NUM + 1))
 CALL_PREFIX=$(printf '%03d' $CALL_NUM)
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -107,7 +108,7 @@ data = {
     'call_number': ${CALL_NUM},
     'purpose': '${PURPOSE}',
     'timestamp': '${TIMESTAMP}',
-    'tool': 'mcp__codex__codex',
+    'tool': '${TOOL}',
     'model': '${MODEL}',
     'prompt': sys.stdin.read()
 }
@@ -124,7 +125,7 @@ data = {
     'call_number': ${CALL_NUM},
     'purpose': '${PURPOSE}',
     'timestamp': '${TIMESTAMP}',
-    'tool': 'mcp__codex__codex',
+    'tool': '${TOOL}',
     'model': '${MODEL}',
     'prompt_length': ${#PROMPT},
     'response_length': ${#RESPONSE}

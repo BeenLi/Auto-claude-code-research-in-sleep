@@ -578,7 +578,7 @@ Rules:
 
 - **`topic-slug`**: Derived from the user's topic argument — lowercase, hyphens instead of spaces, simplified but recognizable. E.g., `"NIC-side lossless compression"` → `nic-lossless-compression`.
 - **`research-lit`**: Fixed — matches this skill's directory name, so the user knows which skill produced the file.
-- **`{date}.md`**: Date the skill was run, in `YYYY-MM-DD` format.
+- **`{date}.md`**: UTC date the skill was run, in `YYYY-MM-DD` format.
 
 Example: `/my-project/nic-lossless-compression/research-lit/2026-03-21.md`
 
@@ -650,4 +650,3 @@ python3 tools/research_wiki.py ingest_paper research-wiki/ \
 - Note if a paper directly competes with or supports our approach
 - **Never fail because a MCP server is not configured** — always fall back gracefully to the next data source
 - Zotero/Obsidian tools may have different names depending on how the user configured the MCP server (e.g., `mcp__zotero__search` or `mcp__zotero-mcp__search_items`). Try the most common patterns and adapt.
-

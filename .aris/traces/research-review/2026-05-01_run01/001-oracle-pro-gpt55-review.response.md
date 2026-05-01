@@ -1,30 +1,3 @@
-# Oracle-Pro API Review
-
-**Date**: 2026-05-01
-**Reviewer backend**: oracle-pro API mode via local gproxy
-**Requested model**: `gpt-5-5-pro`
-**Oracle session**: `rx-expansion-m1-gpt55-pro-2`
-**Trace**: `.aris/traces/research-review/2026-05-01_run01/001-oracle-pro-gpt55-review.*`
-**Note**: The first MCP call failed because the already-running Oracle MCP server did not inherit `OPENAI_API_KEY`; the successful call used Oracle CLI with the same local gproxy API path.
-
-## Attached Context
-
-- `AGENTS.md`
-- `refine-logs/EXPERIMENT_PLAN.md`
-- `experiments/rx-expansion/README.md`
-- `experiments/rx-expansion/contracts/TRACE_PAYLOAD_CONTRACT.md`
-- `experiments/rx-expansion/contracts/CLAIM_BOUNDARY.md`
-- `experiments/rx-expansion/contracts/DDP_BUCKET_CAPTURE.md`
-- `experiments/rx-expansion/configs/m1_break_even.json`
-- `experiments/rx-expansion/data/p0_literature_profiles.json`
-- `experiments/rx-expansion/results/M1_GO_NOGO_REPORT.md`
-- `experiments/rx-expansion/rx_expansion/analytical_model.py`
-- `experiments/rx-expansion/run_m1_break_even.py`
-- `experiments/rx-expansion/rx_expansion/trace_payload.py`
-- `experiments/rx-expansion/rx_expansion/schedule_adapters.py`
-
-## Review
-
 ### A. Verdict
 
 **Conditional Go for M2 model plumbing only.**

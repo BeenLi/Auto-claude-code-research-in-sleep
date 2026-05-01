@@ -46,6 +46,10 @@ _ARXIV_NS = {"atom": "http://www.w3.org/2005/Atom",
              "arxiv": "http://arxiv.org/schemas/atom"}
 
 
+def utc_iso_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def slugify(title: str, author_last: str = "", year: int = 0) -> str:
     """Generate a canonical slug: author_last + year + keyword."""
     # Extract first meaningful word from title
@@ -120,7 +124,7 @@ def add_edge(wiki_root: str, from_id: str, to_id: str, edge_type: str, evidence:
         "to": to_id,
         "type": edge_type,
         "evidence": evidence,
-        "added": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "added": utc_iso_now(),
     }
 
     with open(edges_path, "a") as f:
@@ -424,7 +428,7 @@ def _render_paper_page(meta: dict, slug: str, thesis: str, tags: list[str]) -> s
         value_str = _yaml_quote(v) if v else "null"
         lines.append(f"  {k}: {value_str}")
     lines.append("tags: [" + ", ".join(_yaml_quote(t) for t in tags) + "]")
-    lines.append(f"added: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}")
+    lines.append(f"added: {utc_iso_now()}")
     lines.append("---")
     lines.append("")
     lines.append(f"# {fm['title']}")
@@ -623,7 +627,7 @@ def rebuild_index(wiki_root: str) -> None:
 def append_log(wiki_root: str, message: str):
     """Append a timestamped entry to log.md."""
     log_path = Path(wiki_root) / "log.md"
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts = utc_iso_now()
     entry = f"- `{ts}` {message}\n"
 
     if log_path.exists():

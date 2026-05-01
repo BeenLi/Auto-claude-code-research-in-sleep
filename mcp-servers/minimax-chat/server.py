@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+from datetime import datetime, timezone
 import httpx
 
 # Force unbuffered stdout/stdin
@@ -14,12 +15,14 @@ sys.stdin = os.fdopen(sys.stdin.fileno(), 'rb', buffering=0)
 # Debug logging
 DEBUG_LOG = os.path.join(tempfile.gettempdir(), "minimax-mcp-debug.log")
 
+def utc_timestamp():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 def debug_log(msg):
     """Write debug message to log file"""
     try:
         with open(DEBUG_LOG, "a") as f:
-            import datetime
-            f.write(f"{datetime.datetime.now()}: {msg}\n")
+            f.write(f"{utc_timestamp()}: {msg}\n")
             f.flush()
     except:
         pass
@@ -48,8 +51,7 @@ def clamp_temperature(temp):
 def log_error(msg):
     try:
         with open(DEBUG_LOG, "a") as f:
-            import datetime
-            f.write(f"{datetime.datetime.now()}: ERROR: {msg}\n")
+            f.write(f"{utc_timestamp()}: ERROR: {msg}\n")
     except:
         pass
 

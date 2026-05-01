@@ -46,7 +46,7 @@ import shlex
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -100,8 +100,21 @@ def resolve_conda_hook(manifest_hook=None):
     return 'eval "$(conda shell.bash hook)"'
 
 
+def now_dt():
+    return datetime.now(timezone.utc)
+
+
 def now():
-    return datetime.utcnow().isoformat() + "Z"
+    return now_dt().replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_timestamp(value):
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 def run(cmd, check=False, capture=True):
@@ -417,8 +430,8 @@ def step(manifest, state, state_file, log_dir):
             continue
         # Wait oom_delay after failure before retry
         if job["completed"]:
-            last = datetime.fromisoformat(job["completed"].rstrip("Z"))
-            elapsed = (datetime.utcnow() - last).total_seconds()
+            last = parse_timestamp(job["completed"])
+            elapsed = (now_dt() - last).total_seconds()
             if elapsed >= oom_delay:
                 job["status"] = "pending"  # Requeue
 

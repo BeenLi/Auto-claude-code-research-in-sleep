@@ -44,11 +44,11 @@ idea: "Rx Expansion Budgeting for Compressed RDMA: NIC/DPU-side lossless compres
 contract: refine-logs/EXPERIMENT_PLAN.md
 current_branch: codex/computer-architecture
 baseline: "Uncompressed RDMA, naive compressed RDMA, receiver decompressed-byte token bucket, static Rx output partitioning, FIFO decompression queue, wire-byte weighted fair sharing, reactive QoS controller, oracle output-byte scheduler"
-validation_status: M1 P0-only analytical sensitivity pack complete; 960 rows, 384 output-unsafe, conditional Go for M2 model plumbing only
+validation_status: M1 P0-only analytical sensitivity pack complete; 960 rows, 384 output-unsafe; targeted oracle-pro API review on 2026-05-01 with gpt-5-5-pro confirmed conditional Go for M2 model plumbing only, score 4/6, confidence high
 active_tasks: []
 language: zh
-last_updated: "2026-04-26"
-next: "Use experiments/rx-expansion/results/M1_GO_NOGO_REPORT.md for targeted Go/No-Go review or decide whether to implement M2 standalone simulator. P0-only results are analytical sensitivity only."
+last_updated: "2026-05-01"
+next: "Proceed only with M2 model plumbing. Include receiver decompressed-byte token bucket, static per-QP decompressed-byte cap, exact-original-byte receiver credits, FIFO/static partitioning, queueing/control, Rx SRAM, decompressor/output-DMA service, and hardware-cost ablations. Do not claim real compressed communication payload behavior until P2/P3 evidence exists."
 ```
 
 ## State Persistence Rules

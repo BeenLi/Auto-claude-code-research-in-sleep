@@ -40,3 +40,7 @@
 | 2026-04-26 15:25 | /experiment-bridge | tests/test_rx_expansion_m1_analytical.py | implementation | M1 analytical model tests for monotonicity, provenance, and no-overclaim |
 | 2026-04-26 15:25 | /experiment-plan | refine-logs/EXPERIMENT_PLAN_20260426_152500.md | implementation | experiment plan updated after M1 P0-only evidence pack |
 | 2026-04-26 15:25 | /research-pipeline | refine-logs/PIPELINE_SUMMARY_20260426_152500.md | implementation | pipeline summary updated with M1 P0-only Go/No-Go result |
+| 2026-05-01 15:20 | /research-review | review-stage/AUTO_REVIEW_ORACLE_GPT55_20260501.md | review | oracle-pro API review via local gproxy completed with gpt-5-5-pro; conditional Go for M2, score 4/6 |
+| 2026-05-01 15:20 | /research-review | review-stage/AUTO_REVIEW.md | review | latest oracle-pro GPT-5.5 Pro review copy |
+| 2026-05-01 15:20 | /research-review | review-stage/REVIEW_STATE_ORACLE_GPT55_20260501.json | review | completed oracle-pro GPT-5.5 Pro review state |
+| 2026-05-01 15:20 | /research-review | review-stage/REVIEW_STATE.json | review | latest review state |

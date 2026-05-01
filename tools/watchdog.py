@@ -38,12 +38,17 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_BASE = "/tmp/aris-watchdog"
 DEFAULT_INTERVAL = 60
 SLOW_SPEED_THRESHOLD = 1 * 1024 * 1024  # 1 MB/s
 GPU_IDLE_THRESHOLD = 5  # percent
+
+
+def utc_timestamp():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def get_paths(base_dir):
@@ -89,7 +94,7 @@ def register_task(base_dir, task_json):
 
     # Deduplicate: replace existing task with same name
     tasks = [t for t in tasks if t["name"] != task["name"]]
-    task["registered_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    task["registered_at"] = utc_timestamp()
     tasks.append(task)
 
     paths["tasks"].write_text(json.dumps(tasks, indent=2))
@@ -169,7 +174,7 @@ def check_download(task, status_dir, interval):
     session_type = task.get("session_type", "screen")
     target = task.get("target_path", "")
     status_file = status_dir / f"{name}.json"
-    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+    now = utc_timestamp()
 
     if not session_alive(session, session_type):
         return write_status(status_file, {
@@ -221,7 +226,7 @@ def check_training(task, status_dir):
     session = task["session"]
     session_type = task.get("session_type", "screen")
     status_file = status_dir / f"{name}.json"
-    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+    now = utc_timestamp()
 
     if not session_alive(session, session_type):
         return write_status(status_file, {
@@ -258,7 +263,7 @@ def write_status(path, data):
     status = data.get("status", "OK")
     if status in ("DEAD", "STALLED", "IDLE", "ERROR"):
         alert_file = path.parent.parent / "alerts.log"
-        ts = data.get("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
+        ts = data.get("ts", utc_timestamp())
         task = data.get("task", "?")
         msg = data.get("msg", "")
         alert_line = f"[{ts}] {task}: {status} — {msg}\n"
@@ -334,7 +339,7 @@ def run_watchdog(base_dir, interval):
                 write_status(
                     paths["status"] / f"{task['name']}.json",
                     {"status": "ERROR", "task": task["name"], "msg": str(e),
-                     "ts": time.strftime("%Y-%m-%dT%H:%M:%S")},
+                     "ts": utc_timestamp()},
                 )
 
         write_summary(paths["status"])

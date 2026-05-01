@@ -26,7 +26,7 @@ Do NOT trace: purely informational LLM calls (e.g., `codex exec` for code genera
 ```
 
 - `<skill-name>`: the ARIS skill that triggered this call (e.g., `auto-review-loop`)
-- `<YYYY-MM-DD>_run<NN>`: date + sequential run number (start from `01`)
+- `<YYYY-MM-DD>_run<NN>`: UTC date + sequential run number (start from `01`)
 - `<purpose>`: short kebab-case label (e.g., `round-1-review`, `critique`, `ideation`, `audit`, `patch-gate`)
 
 ## How to Trace
@@ -54,7 +54,7 @@ If the `tools/save_trace.sh` script is not available (e.g., on Codex CLI), write
 {
   "skill": "auto-review-loop",
   "run_id": "2026-04-15_run01",
-  "started_at": "2026-04-15T14:30:00+08:00",
+  "started_at": "2026-04-15T06:30:00Z",
   "executor": "claude-code",
   "project_dir": "/path/to/project"
 }
@@ -65,7 +65,7 @@ If the `tools/save_trace.sh` script is not available (e.g., on Codex CLI), write
 {
   "call_number": 1,
   "purpose": "round-1-review",
-  "timestamp": "2026-04-15T14:31:00+08:00",
+  "timestamp": "2026-04-15T06:31:00Z",
   "tool": "mcp__codex__codex",
   "model": "gpt-5.5",
   "config": {"model_reasoning_effort": "xhigh"},
@@ -82,7 +82,7 @@ The reviewer's full response, verbatim. No truncation, no summarization.
 {
   "call_number": 1,
   "purpose": "round-1-review",
-  "timestamp": "2026-04-15T14:33:00+08:00",
+  "timestamp": "2026-04-15T06:33:00Z",
   "thread_id": "019d8fe0-b25d-...",
   "model": "gpt-5.5",
   "duration_ms": 142000,

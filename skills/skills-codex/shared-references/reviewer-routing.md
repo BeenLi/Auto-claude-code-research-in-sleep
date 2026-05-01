@@ -23,7 +23,7 @@ If `— reviewer: oracle-pro`:
     → Check if mcp__oracle__consult tool is available
     → If available:
         Use mcp__oracle__consult with:
-          model: "gpt-5.4-pro"
+          model: "gpt-5-5-pro"
           prompt: [same prompt you would send to Codex]
           files: [file paths for reviewer to read directly]
         Note: Oracle may use API mode (fast, needs OPENAI_API_KEY)
@@ -48,7 +48,7 @@ mcp__oracle__consult:
   prompt: |
     [role + task + output schema]
     Read all listed files directly.
-  model: "gpt-5.4-pro"
+  model: "gpt-5-5-pro"
   files:
     - /absolute/path/to/file1
     - /absolute/path/to/file2

@@ -6,7 +6,7 @@ WRAPPER_DEBUG_LOG="${CLAUDE_REVIEW_WRAPPER_DEBUG_LOG:-/tmp/claude-review-wrapper
 
 log_wrapper() {
   {
-    print -r -- "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    print -r -- "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"
   } >>"$WRAPPER_DEBUG_LOG" 2>/dev/null || true
 }
 

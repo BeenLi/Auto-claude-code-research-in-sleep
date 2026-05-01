@@ -269,7 +269,7 @@ class TestWriteStatus(unittest.TestCase):
 
     def test_writes_json_status_file(self):
         status_file = self.status_dir / "exp01.json"
-        data = {"status": "OK", "task": "exp01", "type": "training", "ts": "2026-01-01T00:00:00"}
+        data = {"status": "OK", "task": "exp01", "type": "training", "ts": "2026-01-01T00:00:00Z"}
         watchdog.write_status(status_file, data)
         saved = json.loads(status_file.read_text())
         self.assertEqual(saved["status"], "OK")
@@ -282,7 +282,7 @@ class TestWriteStatus(unittest.TestCase):
                 "status": bad_status,
                 "task": f"task_{bad_status}",
                 "msg": "something went wrong",
-                "ts": "2026-01-01T00:00:00",
+                "ts": "2026-01-01T00:00:00Z",
             }
             watchdog.write_status(status_file, data)
 
