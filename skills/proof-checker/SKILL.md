@@ -1,7 +1,7 @@
 ---
 name: proof-checker
 description: Rigorous mathematical proof verification and fixing workflow. Reads a LaTeX proof, identifies gaps via cross-model review (Codex GPT-5.4 xhigh), fixes each gap with full derivations, re-reviews, and generates an audit report. Use when user says "检查证明", "verify proof", "proof check", "审证明", "check this proof", or wants rigorous mathematical verification of a theory paper.
-argument-hint: [path-to-tex-file or proof-description] [--deep-fix]
+argument-hint: [path-to-tex-file or proof-description] [--deep-fix] [--restatement-check]
 allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
@@ -385,6 +385,52 @@ After fixes, re-run:
 - Counterexample suite on all DOWNSTREAM lemmas of modified results
 - Assumption-delta report: what became stronger/weaker due to fixes?
 
+### Phase 3.6: Theorem Restatement Regression (opt-in)
+
+**Default**: skipped. Existing callers see no change.
+
+**Opt-in**: pass `--restatement-check` on invocation. The skill then runs a cross-location consistency pass after Phase 3.5 (Global Closure) and before Phase 3.9 (Unrecoverable Protocol).
+
+This phase catches a specific class of bugs that Phase 3.5's "Statement-conclusion match" check does NOT catch: **drift between the canonical theorem statement and its restatements elsewhere in the paper** (summary tables, "Key Contributions" / "Summary" sections, abstract, discussion, captions). Common drift patterns observed in practice:
+
+- Main theorem says "width-1 unconditional, width-w conditional" but a later summary cites it as "unconditional DSM excess-risk oracle bound".
+- Main theorem κ exponent is `O(d²K²)` but a constants table writes `O(K²)`.
+- Main theorem regime condition is squared envelope, but a remark elsewhere still shows the first-order envelope.
+- Restatement quietly drops a quantifier ("for $n \ge n_0$") that the proof relied on.
+
+#### Algorithm
+
+1. **Build canonical statement table.** Scan all `*.tex` files in the paper for `\begin{theorem}` / `\begin{lemma}` / `\begin{proposition}` / `\begin{corollary}` blocks with a `\label{...}`. For each: record `(label, full_statement_text, file:line_range)`.
+
+2. **Collect restatement candidates.** For each canonical label `thm:foo`:
+   - Every `\Cref{thm:foo}` / `\ref{thm:foo}` / `\cref{thm:foo}` invocation, with the surrounding 2 sentences as candidate restatement context.
+   - Rows in tables (`\begin{tabular}` … `\end{tabular}`) that mention the label, the theorem's informal name, or its constants.
+   - Bullets in "Key Contributions" / "Summary" / "Main Results" lists.
+   - Sentences in the abstract and introduction that paraphrase the theorem.
+
+3. **Normalized diff.** For each (canonical_statement, restatement_context) pair:
+   - Strip `\,` `\;` `\!` `~`, normalize whitespace, normalize math-mode delimiters (`$..$`, `\(..\)`, display vs inline).
+   - Detect drift signatures (one or more):
+     - **conditional_loss** — canonical says "under \Cref{ass:X}" or "for w=1"; restatement omits the conditional.
+     - **scope_change** — big-O exponent or rate differs (`O(K^2)` vs `O(d^2K^2)`; `√n` vs `n`).
+     - **quantifier_loss** — quantifier present canonically (e.g. "for $n \ge n_0$", "for sufficiently small $\gamma$") absent in restatement.
+     - **regime_envelope_change** — first-order leakage `Cγ/(1-Δγ)` vs squared envelope `(Cγ/(1-Δγ))²` (or analogous).
+     - **constant_change** — different numeric constant or different parameter dependence stated.
+     - **variable_rename** — same role in argument played by differently-named symbol with no explicit alias.
+
+4. **Emit findings.** Each detected drift becomes an entry in `details.restatement_drift` (see "Submission Artifact Emission" below). Severity defaults to **MAJOR** (UNDERSTATED/OVERSTATED + GLOBAL); reviewer may downgrade to MINOR if drift is purely cosmetic (e.g. `\,` placement) and upgrade to CRITICAL only if the restatement is used downstream as if it were the canonical (e.g. another proof cites the restated version).
+
+#### What this phase does NOT do
+- It does **not** fix drift automatically. The output is advisory; the executor or a follow-up `--deep-fix` run handles the rewrite.
+- It does **not** alter `details.issues`; restatement drift is reported as a sibling field, so existing consumers reading `issues[]` see no schema change.
+- It does **not** alter the top-level `verdict` decision rule. A paper with non-empty `restatement_drift` may still emit `PASS` if all proof obligations are otherwise discharged; the drift is independent of proof correctness. (The reviewer may at its discretion mirror a **CRITICAL**-severity drift into the `issues` list as a regular issue — typically when the restated version is used downstream as if it were canonical — but that is a per-issue judgment, never an automatic rule. MAJOR or MINOR drift never mirrors into `issues`.)
+
+#### Failure mode
+If `--restatement-check` is set but the cross-location scan cannot complete, emit `details.restatement_drift: []` plus `details.restatement_check_status: "unavailable"` with a one-line note explaining why. Verifier gates and downstream skills MUST treat `"unavailable"` identically to the field being absent: not blocking. Phases 1 / 1.5 / 2 / 3 / 3.5 / 3.9 / 4 / 5 still run normally. Cases that trigger this fallback include:
+- Unreadable `.tex` (parser / encoding error on a file that contains a theorem block).
+- Ambiguous label resolution (e.g., the same `\label{thm:foo}` appears more than once with no clear canonical pick).
+- **No labeled canonical theorem-like block found** (the algorithm only inspects `\begin{theorem|lemma|proposition|corollary}` blocks with an explicit `\label{...}`; if there is no such block, there is nothing to compare restatements against).
+
 ### Phase 3.9: Unrecoverable Proof Protocol
 
 If acceptance gate is not met after MAX_REVIEW_ROUNDS, output a **Proof Unrecoverable Report**:
@@ -491,7 +537,9 @@ If the augmented Phase 1 call fails so badly that the normal proof review cannot
 ### Opt-in flag discipline
 - **Deep-fix is opt-in only**: never auto-enable; never block on `deep_fix_plans` content; existing callers must observe identical reviewer output and identical JSON schema if they do not pass `--deep-fix`.
 - **Reviewer prompt augmentation is additive**: the deep-fix block is appended to the Phase 1 prompt, not substituted for any part of it. The original mandatory checklist (A-H) and original per-issue OUTPUT FORMAT remain in place verbatim.
-- **No verdict crosstalk**: deep-fix output never alters top-level `verdict` or `reason_code`. A FAIL stays FAIL whether or not a `deep_fix_plan` was requested.
+- **Restatement check is opt-in only**: Phase 3.6 runs only when `--restatement-check` is set; existing callers must observe identical reviewer output and identical JSON schema if they do not pass the flag.
+- **No Phase reordering**: enabling Phase 3.6 inserts it strictly between 3.5 and 3.9; it does not skip any other phase or change their semantics.
+- **No verdict crosstalk**: neither deep-fix output nor `restatement_drift` ever alters top-level `verdict` or `reason_code`. A paper with non-empty drift or with deep-fix plans may still pass; a paper with FAIL verdict stays FAIL whether or not either flag was set.
 
 ## Output Files
 
@@ -502,6 +550,8 @@ If the augmented Phase 1 call fails so badly that the normal proof review cannot
 | `PROOF_AUDIT.json` | Machine-readable submission verdict (see below) | Always emitted |
 | `proof_audit_report.tex/.pdf` | Formal before/after report | Phase 4 |
 | `PROOF_CHECK_STATE.json` | State for recovery | Phase 5 |
+
+When `--restatement-check` is set, `PROOF_AUDIT.json` additionally carries `details.restatement_drift` and `details.restatement_check_status`; both fields are omitted when the flag is unset. See "Submission Artifact Emission" below.
 
 ## Submission Artifact Emission
 
@@ -582,6 +632,35 @@ Field semantics:
 - Downstream consumers MUST treat absence of either field as the only valid default state and MUST NOT raise on missing.
 - `deep_fix_plans` is advisory tooling for the executor; `tools/verify_paper_audits.sh` and `paper-writing` Phase 6 do not block on its content or shape.
 
+### Optional: `details.restatement_drift` (only when `--restatement-check` is set)
+
+```json
+"details": {
+  ...
+  "restatement_drift": [
+    {
+      "label": "thm:dsm-oracle",
+      "canonical_location": "sections/2.setup.tex:117",
+      "restatement_location": "sections/appendix.tex:1614",
+      "drift_type": "conditional_loss" | "scope_change" | "quantifier_loss" |
+                    "regime_envelope_change" | "constant_change" | "variable_rename",
+      "canonical_excerpt": "<short LaTeX>",
+      "restatement_excerpt": "<short LaTeX>",
+      "severity": "MAJOR" | "MINOR" | "CRITICAL",
+      "note": "..."
+    }
+  ],
+  "restatement_check_status": "ok" | "unavailable"
+}
+```
+
+Field semantics:
+- Both `restatement_drift` and `restatement_check_status` are **omitted entirely** when the flag is not set. The default schema does not include either key.
+- When the flag is set and the cross-location scan completes, `restatement_check_status` is `"ok"` and `restatement_drift` lists detected pairs (possibly empty if none found).
+- When the scan fails (per "Failure mode" in Phase 3.6), `restatement_check_status` is `"unavailable"` and `restatement_drift` is `[]`.
+- Downstream consumers MUST treat absence or `"unavailable"` identically as the default state and MUST NOT raise on missing.
+- `restatement_drift` does **not** alter `details.issues` and does **not** change the top-level `verdict` decision rule. The reviewer may at its discretion mirror a CRITICAL-severity drift into `details.issues` as a regular issue, but that is a per-issue judgment, not an automatic schema-driven rule.
+
 ### `audited_input_hashes` scope
 
 Hash the **declared input set** actually reviewed — the theorem-bearing
@@ -627,5 +706,7 @@ verifier decide whether the verdict blocks finalization based on the
 /proof-checker "neurips_2025.tex"
 /proof-checker "check the GMM generalization proof, focus on dimension dependence"
 /proof-checker "verify proof in paper.tex — difficulty: nightmare"
-/proof-checker "paper/main.tex --deep-fix"      # opt-in: ask reviewer to also emit repair-grade deep_fix_plans
+/proof-checker "paper/main.tex --deep-fix"            # opt-in: ask reviewer to also emit repair-grade deep_fix_plans
+/proof-checker "paper/main.tex --restatement-check"   # opt-in: run Phase 3.6 to detect cross-location theorem-statement drift
+/proof-checker "paper/main.tex --deep-fix --restatement-check"   # both opt-ins, independent
 ```
