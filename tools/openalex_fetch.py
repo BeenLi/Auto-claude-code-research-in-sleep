@@ -4,12 +4,23 @@ OpenAlex API client for academic paper search.
 Documentation: https://developers.openalex.org/
 """
 
-import requests
 import argparse
 import json
 import sys
 import os
 from typing import List, Dict, Optional
+
+try:
+    import requests
+except ImportError:
+    print(
+        "OpenAlex requires the 'requests' package. "
+        "Install with: pip install requests",
+        file=sys.stderr,
+    )
+    # Exit code 2 signals "skip this source" to the calling skill,
+    # distinct from exit 1 used for runtime errors below.
+    sys.exit(2)
 
 
 class OpenAlexClient:
