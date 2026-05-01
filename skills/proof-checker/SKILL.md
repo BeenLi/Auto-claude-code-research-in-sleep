@@ -1,7 +1,7 @@
 ---
 name: proof-checker
 description: Rigorous mathematical proof verification and fixing workflow. Reads a LaTeX proof, identifies gaps via cross-model review (Codex GPT-5.4 xhigh), fixes each gap with full derivations, re-reviews, and generates an audit report. Use when user says "检查证明", "verify proof", "proof check", "审证明", "check this proof", or wants rigorous mathematical verification of a theory paper.
-argument-hint: [path-to-tex-file or proof-description]
+argument-hint: [path-to-tex-file or proof-description] [--deep-fix]
 allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
@@ -221,6 +221,60 @@ mcp__codex__codex:
     [FULL PROOF CONTENT HERE]
 ```
 
+#### Phase 1 addendum — `--deep-fix` opt-in
+
+If the user passed `--deep-fix` on invocation, append the following block to the reviewer prompt **after** the OUTPUT FORMAT block above (do **not** modify the original block; the new fields are additive). Default invocations skip this block entirely and emit the original output schema unchanged.
+
+```
+    ## DEEP-FIX OUTPUT (opt-in, only when --deep-fix is set)
+
+    For EACH issue listed above, additionally provide a `deep_fix_plan`
+    that is repair-grade — sufficient for an executor to apply the fix
+    in one Edit pass without spawning a follow-up review thread:
+
+    - issue_id: same as the issue id above
+    - corrected_statement: the theorem/lemma statement as it should
+      read after the fix, with explicit quantifiers, regime conditions,
+      and uniformity scope (LaTeX, paste-ready)
+    - changed_equations: list of {before: <LaTeX>, after: <LaTeX>}
+      pairs for each equation that needs replacement
+    - downstream_labels: list of \label{...} keys whose statements or
+      proofs depend on this fix and must be re-checked or rewritten
+    - minimal_tex_patch_plan: ordered list of concrete edits, each as
+      {file: <path>, anchor_old: <unique LaTeX snippet to find>,
+       replacement_new: <LaTeX to insert>}; the executor will pass
+      these directly to its file-editing tool
+    - closure_tests: 2-5 sanity checks the executor must run after
+      applying the fix (e.g., "verify constant_dependence_diff matches
+      computed value", "limit case γ→0 reduces to identity",
+      "dimension count matches before/after")
+
+    ## ALGEBRA / TYPE SANITY PASS (opt-in, only when --deep-fix is set)
+
+    If any issue invokes Schur test, Young's inequality, Cauchy-Schwarz,
+    Hölder, quadratic form, operator norm, or power counting, the
+    deep_fix_plan for that issue MUST also include an `algebra_sanity`
+    object:
+
+    - dimension_table: map of {symbol: type_signature}, e.g.
+      {"K(i,α)": "scalar ≥ 0",
+       "‖K‖_{2→2}": "scalar ≥ 0",
+       "Σ_i V_i^rem": "scalar quadratic in w"}
+    - power_count: number of times each operator-norm or Schur factor
+      appears on each side; flag mismatch as INVALID
+    - zero_coupling_check: evaluate the expression at γ=0 (or the
+      analogous degenerate point); confirm it reduces to the expected
+      identity / vanishing case
+    - constant_dependence_diff: list of constants whose dependence on
+      (d, K, n, ...) changes between BEFORE and AFTER, with the new
+      explicit dependence written out
+
+    Be precise. The executor will apply this plan literally; vague
+    prose ("strengthen the bound", "redo the Schur step") is not
+    acceptable in deep-fix mode and should be flagged as
+    UNCLEAR_DEEP_FIX rather than emitted.
+```
+
 **Save the threadId.** Parse into structured issue list. Write to `PROOF_AUDIT.md`.
 
 ### Phase 1.5: Counterexample Red Team
@@ -370,6 +424,30 @@ Write `PROOF_CHECK_STATE.json`:
 }
 ```
 
+## Deep-Fix Mode (opt-in)
+
+**Default**: disabled. The Phase 1 reviewer emits issues with `minimal_fix` (a 1-2 sentence pointer); existing callers see no change.
+
+**Opt-in**: pass `--deep-fix` on invocation. The Phase 1 reviewer prompt is **augmented** (not replaced) with the "DEEP-FIX OUTPUT" and "ALGEBRA / TYPE SANITY PASS" blocks above, so the reviewer also returns a `deep_fix_plan` per issue: corrected statement, changed equations, downstream label list, minimal LaTeX patch plan, and closure tests. Issues invoking Schur / Young / Cauchy-Schwarz / Hölder / quadratic forms / operator norms / power counting additionally carry an `algebra_sanity` block (dimension table + power count + zero-coupling check + constant-dependence diff).
+
+### Why opt-in
+The default `minimal_fix` prose is intentionally short — it suits the common case where the executor wants high-level pointers and will derive the patch separately. Forcing `deep_fix_plan` on every run would (a) inflate every reviewer call by 2-5×, (b) trigger re-review thrash for issues the executor has already decided to weaken or defer, and (c) change the shape of `details.issues` for every existing caller. The flag preserves zero behavior change for default invocations while letting the executor request repair-grade output when the fix is going to be applied immediately.
+
+### Effect when enabled
+- The Phase 1 reviewer prompt is augmented with the deep-fix and algebra-sanity blocks; nothing in the original mandatory checklist or output format is removed.
+- `PROOF_AUDIT.json` `details` gains a sibling field `deep_fix_plans` (parallel to `details.issues`); see "Submission Artifact Emission" below.
+- The top-level `verdict`, `reason_code`, and `summary` are **unchanged in shape and decision rule**: deep-fix output is advisory tooling for the executor, not a verdict-altering signal.
+- Verifier gates and downstream skills (`paper-writing` Phase 6, `tools/verify_paper_audits.sh`) MUST treat absence of `deep_fix_plans` as the only valid default state and MUST NOT block on its presence or content.
+
+### When opt-in is appropriate
+- The executor intends to apply the fix in the same session and wants to skip a follow-up "give me a concrete patch" thread.
+- A previous default-mode run identified a CRITICAL or MAJOR issue whose `minimal_fix` was too vague to act on (e.g., "redo the Schur step" without specifying the corrected operator-norm bound).
+- Algebra-heavy proofs with Schur / quadratic-form / operator-norm steps where the reviewer's first pass has consistently produced under-specified fixes.
+
+### Failure modes
+- If the reviewer cannot produce a repair-grade plan (e.g., the fix requires choices the reviewer is unwilling to make), it MUST emit an issue with `category: UNCLEAR_DEEP_FIX` rather than fabricate a plan. The skill treats this as advisory; it does not flip the top-level verdict.
+- If `--deep-fix` is set but the Phase 1 reviewer call fails to return well-formed deep-fix output (truncation, malformed JSON), emit `details.deep_fix_plans: []` plus `details.deep_fix_status: "unavailable"` with a one-line note. Verifier gates MUST treat `unavailable` identically to the field being absent: not blocking. The cited-entry audit and the standard issue list still proceed normally.
+
 ## Key Rules
 
 ### Mathematical rigor
@@ -398,6 +476,11 @@ Write `PROOF_CHECK_STATE.json`:
 - **Don't overclaim**: If a fix makes a result conditional, say so.
 - **Separate "proven" from "assumed"**: The audit report has an explicit section for this.
 - **Log open problems**: Issues requiring future work are listed, not hidden.
+
+### Opt-in flag discipline
+- **Deep-fix is opt-in only**: never auto-enable; never block on `deep_fix_plans` content; existing callers must observe identical reviewer output and identical JSON schema if they do not pass `--deep-fix`.
+- **Reviewer prompt augmentation is additive**: the deep-fix block is appended to the Phase 1 prompt, not substituted for any part of it. The original mandatory checklist (A-H) and original per-issue OUTPUT FORMAT remain in place verbatim.
+- **No verdict crosstalk**: deep-fix output never alters top-level `verdict` or `reason_code`. A FAIL stays FAIL whether or not a `deep_fix_plan` was requested.
 
 ## Output Files
 
@@ -447,6 +530,47 @@ The artifact conforms to the schema in `shared-references/assurance-contract.md`
 }
 ```
 
+### Optional: `details.deep_fix_plans` (only when `--deep-fix` is set)
+
+```json
+"details": {
+  ...
+  "deep_fix_plans": [
+    {
+      "issue_id": "T1-H3",
+      "corrected_statement": "<LaTeX, paste-ready>",
+      "changed_equations": [{"before": "<LaTeX>", "after": "<LaTeX>"}, ...],
+      "downstream_labels": ["thm:convergence", "cor:minimax", ...],
+      "minimal_tex_patch_plan": [
+        {"file": "sections/4.theory.tex",
+         "anchor_old": "<unique LaTeX snippet>",
+         "replacement_new": "<LaTeX to insert>"},
+        ...
+      ],
+      "closure_tests": [
+        "verify constant_dependence_diff matches computed value",
+        "limit case γ→0 reduces to identity",
+        ...
+      ],
+      "algebra_sanity": {
+        "dimension_table": {"<symbol>": "<type_signature>", ...},
+        "power_count": "<one-line check>",
+        "zero_coupling_check": "<one-line check>",
+        "constant_dependence_diff": "<before vs after>"
+      }
+    }
+  ],
+  "deep_fix_status": "ok" | "unavailable"
+}
+```
+
+Field semantics:
+- Both `deep_fix_plans` and `deep_fix_status` are **omitted entirely** when the flag is not set. The default schema does not include either key.
+- When the flag is set and reviewer returns well-formed plans, `deep_fix_status` is `"ok"` and `deep_fix_plans` mirrors `details.issues` one-to-one (each plan referenced by `issue_id`); `algebra_sanity` is present only for issues invoking Schur / Young / Cauchy-Schwarz / Hölder / quadratic-form / operator-norm / power-counting steps.
+- When the flag is set but reviewer output is malformed or truncated, `deep_fix_status` is `"unavailable"` and `deep_fix_plans` is `[]`. Downstream consumers MUST treat `"unavailable"` identically to the field being absent: not blocking.
+- Downstream consumers MUST treat absence of either field as the only valid default state and MUST NOT raise on missing.
+- `deep_fix_plans` is advisory tooling for the executor; `tools/verify_paper_audits.sh` and `paper-writing` Phase 6 do not block on its content or shape.
+
 ### `audited_input_hashes` scope
 
 Hash the **declared input set** actually reviewed — the theorem-bearing
@@ -492,4 +616,5 @@ verifier decide whether the verdict blocks finalization based on the
 /proof-checker "neurips_2025.tex"
 /proof-checker "check the GMM generalization proof, focus on dimension dependence"
 /proof-checker "verify proof in paper.tex — difficulty: nightmare"
+/proof-checker "paper/main.tex --deep-fix"      # opt-in: ask reviewer to also emit repair-grade deep_fix_plans
 ```
