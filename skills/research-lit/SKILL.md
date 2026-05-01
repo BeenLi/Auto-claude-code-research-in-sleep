@@ -40,7 +40,7 @@ This skill checks multiple sources **in priority order**. All are optional — i
 
 Parse `$ARGUMENTS` for a `— sources:` directive:
 - **If `— sources:` is specified**: Only search the listed sources (comma-separated). Valid values: `zotero`, `obsidian`, `local`, `web`, `semantic-scholar`, `deepxiv`, `exa`, `gemini`, `openalex`, `all`.
-- **If not specified**: Default to `all` — search every available source in priority order (`semantic-scholar`, `deepxiv`, and `exa` are **excluded** from `all`; they must be explicitly listed).
+- **If not specified**: Default to `all` — search every available source in priority order (`semantic-scholar`, `deepxiv`, `exa`, `gemini`, and `openalex` are **excluded** from `all`; they must be explicitly listed).
 
 Examples:
 ```
@@ -284,11 +284,19 @@ When the user explicitly requests `— sources: openalex` (or includes `openalex
 ```bash
 OA_SCRIPT=$(find tools/ -name "openalex_fetch.py" 2>/dev/null | head -1)
 
-# Search for papers with comprehensive metadata
-python3 "$OA_SCRIPT" search "QUERY" --max 10 \
-  --year "2022-" \
-  --type article \
-  --sort relevance
+# Preflight: skip OpenAlex silently if either openalex_fetch.py or the
+# `requests` Python package is unavailable. Both checks must pass before
+# the script is invoked, so users without `requests` installed never see
+# a stack trace from a default `/research-lit` run.
+if [ -z "$OA_SCRIPT" ] || ! python3 -c "import requests" >/dev/null 2>&1; then
+  echo "OpenAlex source not available (missing tools/openalex_fetch.py or 'requests' module); skipping." >&2
+else
+  # Search for papers with comprehensive metadata
+  python3 "$OA_SCRIPT" search "QUERY" --max 10 \
+    --year "2022-" \
+    --type article \
+    --sort relevance
+fi
 ```
 
 If `openalex_fetch.py` is not found or `requests` module is missing, skip this source gracefully and continue with the remaining requested sources.
