@@ -43,7 +43,7 @@ Use Gemini when you want AI-driven discovery that goes beyond keyword matching �
 1. **Node.js** v16.0.0+
 2. **Google Gemini CLI** — installed and authenticated
    ```bash
-   npm install -g @anthropic-ai/gemini-cli
+   npm install -g @google/gemini-cli
    gemini auth
    ```
 3. **gemini-mcp-tool** — MCP bridge for Claude Code ([jamubc/gemini-mcp-tool](https://github.com/jamubc/gemini-mcp-tool))
