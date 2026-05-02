@@ -22,8 +22,9 @@ The skill expects one or more of these in the project directory:
 1. **NARRATIVE_REPORT.md** or **STORY.md** — research narrative with claims and evidence
 2. **review-stage/AUTO_REVIEW.md** — auto-review loop conclusions *(fall back to `./AUTO_REVIEW.md` if not found)*
 3. **Experiment results** — JSON files in `figures/`, screen logs, tables
-4. **idea-stage/IDEA_REPORT.md** — from idea-discovery pipeline (if applicable) *(fall back to `./IDEA_REPORT.md` if not found)*
-5. **Compact files** (if available): `idea-stage/IDEA_CANDIDATES.md` *(fall back to `./IDEA_CANDIDATES.md` if not found)*, `findings.md`, `EXPERIMENT_LOG.md` — preferred over full files when present, saves context window
+4. **idea-stage/docs/research_contract.md** — active idea claim boundary and intended claims; if no complete narrative exists, prefer this over the full `IDEA_REPORT.md`
+5. **idea-stage/IDEA_REPORT.md** — from idea-discovery pipeline (if applicable) *(fall back to `./IDEA_REPORT.md` if not found; use only when switching ideas or the contract is absent)*
+6. **Compact files** (if available): `idea-stage/IDEA_CANDIDATES.md` *(fall back to `./IDEA_CANDIDATES.md` if not found)*, `findings.md`, `EXPERIMENT_LOG.md` — preferred over full files when present, saves context window
 
 If none exist, ask the user to describe the paper's contribution in 3-5 sentences.
 
@@ -43,7 +44,7 @@ Keep the existing `insleep` workflow and outputs, but use the shared references 
 
 If `CLAIMS_FROM_RESULTS.md` does not exist, extract claims from scratch:
 
-Read all available narrative documents and extract:
+Read all available narrative documents and extract. Treat `idea-stage/docs/research_contract.md` as the claim boundary: do not promote unsupported or explicitly out-of-scope claims into the paper outline.
 
 1. **Core claims** (3-5 main contributions)
 2. **One-sentence contribution** (the single sentence that best states what the paper contributes)

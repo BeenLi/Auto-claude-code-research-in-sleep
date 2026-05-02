@@ -27,7 +27,8 @@ Gather experiment data from whatever sources are available in the project:
 2. **EXPERIMENT_LOG.md**: full results table with baselines and verdicts
 3. **EXPERIMENT_TRACKER.md**: check which experiments are DONE vs still running
 4. **Log files**: `ssh server "tail -100 /path/to/training.log"` if no other source
-5. **docs/research_contract.md**: intended claims and experiment design
+5. **idea-stage/docs/research_contract.md**: intended claims and active idea context
+6. **refine-logs/EXPERIMENT_PLAN.md**: experiment design and success criteria
 
 Assemble the key information:
 - What experiments were run (method, dataset, config)
@@ -135,6 +136,11 @@ See `shared-references/experiment-integrity.md` for the full integrity protocol.
 1. Record confirmed claim in project notes
 2. If ablation studies are incomplete → trigger `/ablation-planner`
 3. If all evidence is in → ready for paper writing
+
+### Step 4.5: Research Contract Postcondition
+
+At this workflow exit, apply `shared-references/research-contract-maintenance.md` to refresh `idea-stage/docs/research_contract.md` because claim support may have changed.
+This is only a workflow-exit gate; record the verdict without inflating evidence or copying result logs.
 
 ### Step 5: Update Research Wiki (if active)
 

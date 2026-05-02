@@ -20,7 +20,7 @@ Research topic: $ARGUMENTS
 - **MAX_LOCAL_PAPERS = 20** — Maximum number of local PDFs to scan (read first 3 pages each). If more are found, prioritize by filename relevance to the topic.
 - **ARXIV_DOWNLOAD = false** — When `true`, download top 3-5 most relevant arXiv PDFs to PAPER_LIBRARY after search. When `false` (default), only fetch metadata (title, abstract, authors) via arXiv API — no files are downloaded.
 - **ARXIV_MAX_DOWNLOAD = 5** — Maximum number of PDFs to download when `ARXIV_DOWNLOAD = true`.
-- **EXTENDED_TOPICS = []** — Optional list of related-but-broader topics to search in addition to the primary topic. Papers found via extended topics are tagged `[cross-domain]` and reported in a separate Section 1b table. They inform the "Cross-domain transfer" gap but do NOT affect the primary paper table or the topic-slug used for saving.
+- **EXTENDED_TOPICS = []** — Optional list of related-but-broader topics to search in addition to the primary topic. Papers found via extended topics are tagged `[cross-domain]` and reported in a separate Section 1b table. They inform the "Cross-domain transfer" gap but do NOT affect the primary paper table.
 - **AI_INFRA_LAYER = `auto`** — Inferred AI infrastructure for LLM layer unless overridden: `compute`, `memory`, `interconnect`, `storage`, `runtime`, or `multi`.
 - **NEIGHBORHOOD = `same-layer`** — Expand the user's topic with same-layer aliases, platform names, and metrics. Use `explicit` to search only the original topic plus `EXTENDED_TOPICS`.
 - **EVIDENCE_POLICY = `arxiv-ok`** — Preprints may anchor frontier gaps, but every claim must carry an `evidence_level` (`peer-reviewed`, `preprint`, `local-note`, or `title-abstract-only`).
@@ -112,22 +112,19 @@ Examples:
 
 Before doing any search, check whether a prior literature review was already generated for this topic.
 
-1. **Derive topic slug** from the query argument (lowercase, hyphens, simplified). E.g. `"NIC-side lossless compression"` → `nic-lossless-compression`.
-
-2. **Scan for prior reviews**:
+1. **Check the fixed latest copy**:
    ```
-   Glob: {project-root}/{topic-slug}/research-lit/*.md
+   Read: idea-stage/LITERATURE_REVIEW.md
    ```
 
-3. **If one or more files exist**:
-   - Read the most recent file (latest date in filename)
+2. **If the file exists**:
    - Extract the existing paper table and narrative summary
    - Use this as the **baseline** — treat all papers already listed as known
-   - Announce to the user: _"Found prior review from {date}, building on it."_
-   - In subsequent steps, **only search for papers newer than the prior review date**, or papers not already in the table
+   - Announce to the user: _"Found prior literature review in `idea-stage/LITERATURE_REVIEW.md`, building on it."_
+   - In subsequent steps, **only search for papers newer than the review date recorded in the file header**, or papers not already in the table
    - In Step 4 output, clearly mark newly added papers (e.g. `🆕`) vs papers carried over from the prior review
 
-4. **If no prior review exists**: proceed normally from scratch.
+3. **If no prior review exists**: proceed normally from scratch.
 
 > This ensures incremental refinement rather than redundant re-research. Each run adds new findings on top of existing ones.
 
@@ -143,9 +140,9 @@ Do NOT rely solely on keyword search — Zotero collections are organized as a u
 
 1. **Get full collection tree**: Call `zotero_get_collections` to retrieve all collections with their keys and nesting.
 
-2. **Match by keyword fragments**: Decompose the topic slug into meaningful keywords. For example, `nic-lossless-compression` → `["compression", "lossless", "nic", "rdma"]`. Match any collection whose name contains **any** of these keywords (case-insensitive). Collect all matching collections at any depth level.
-   - Example: topic `nic-lossless-compression` → matches `compression` collection even if nested under `IOAcc → RDMA → compression`.
-   - Do NOT require the full slug to match — fragment matching is sufficient.
+2. **Match by keyword fragments**: Decompose the original topic text and expanded search terms into meaningful keywords. For example, `"NIC-side lossless compression for RDMA"` → `["compression", "lossless", "nic", "rdma"]`. Match any collection whose name contains **any** of these keywords (case-insensitive). Collect all matching collections at any depth level.
+   - Example: a topic mentioning NIC lossless compression matches a `compression` collection even if nested under `IOAcc → RDMA → compression`.
+   - Do NOT require the full topic phrase to match — fragment matching is sufficient.
 
 3. **Retrieve items from matched collections**: For each matched collection, call `zotero_get_collection_items(collection_key)`. De-duplicate across collections.
 
@@ -163,7 +160,7 @@ If `EXTENDED_TOPICS` is non-empty, search each extended topic separately:
 
 3. **Filter by venue quality**: Keep only papers from top-tier venues (MICRO, ISCA, HPCA, ASPLOS, NSDI, SIGCOMM, OSDI, USENIX ATC, EuroSys, FCCM, DAC, IEEE TPDS, IEEE Micro, etc.). Discard workshop papers and preprints from unknown venues at this stage.
 
-4. **Tag as cross-domain**: Mark these papers with `[cross-domain]` in your working set. They will be reported in Section 1b — NOT mixed into the primary paper table. The topic-slug used for saving is always derived from the **primary topic**, not extended topics.
+4. **Tag as cross-domain**: Mark these papers with `[cross-domain]` in your working set. They will be reported in Section 1b — NOT mixed into the primary paper table.
 
 #### Phase C: Annotation and Metadata Extraction
 
@@ -178,7 +175,7 @@ For papers found in Phase A (primary) and Phase B (cross-domain):
    - Tags the user assigned
    - `[cross-domain]` marker if applicable
 
-> 📚 Phase A collection traversal ensures you find papers even when the collection name doesn't match the topic slug. Phase B cross-domain broadening ensures top-venue adjacent work is not silently dropped.
+> 📚 Phase A collection traversal ensures you find papers even when the collection name doesn't match the full topic text. Phase B cross-domain broadening ensures top-venue adjacent work is not silently dropped.
 
 ### Step 0b: Search Obsidian Vault (if available)
 
@@ -305,7 +302,7 @@ After the primary search, run a second pass for each entry in EXTENDED_TOPICS:
 - Filter to top-tier venues only (same list as Step 0a Phase B)
 - De-duplicate against all papers already found in the primary pass
 - Tag all results as `[cross-domain]` — they go into Section 1b, not the primary paper table
-- Topic-slug for saving is still derived from the **primary topic** only
+- Cross-domain papers stay in Section 1b and do not change the fixed output path
 
 **arXiv API search** (always runs, no download by default):
 
@@ -553,18 +550,21 @@ If Zotero BibTeX was exported, append a `references.bib` snippet for direct use 
 
 **Always save the output automatically** — do not wait for the user to request it.
 
-#### Output directory structure
+#### Output files
 
 ```
-{project-root}/{topic-slug}/research-lit/{date}.md
+idea-stage/LITERATURE_REVIEW_{YYYYMMDD_HHmmssZ}.md
+idea-stage/LITERATURE_REVIEW.md
 ```
 
 Rules:
-- **`topic-slug`**: Derived from the user's topic argument — lowercase, hyphens instead of spaces, simplified but recognizable. E.g., `"NIC-side lossless compression"` → `nic-lossless-compression`.
-- **`research-lit`**: Fixed — matches this skill's directory name, so the user knows which skill produced the file.
-- **`{date}.md`**: UTC date the skill was run, in `YYYY-MM-DD` format.
+- Use UTC timestamps for history files: `date -u +%Y%m%d_%H%M%SZ`.
+- Write the timestamped history file first: `idea-stage/LITERATURE_REVIEW_{YYYYMMDD_HHmmssZ}.md`.
+- Copy the same content to the fixed latest copy: `idea-stage/LITERATURE_REVIEW.md`.
+- Downstream skills always read `idea-stage/LITERATURE_REVIEW.md`.
+- Append both output rows to `MANIFEST.md` using stage `idea-discovery`.
 
-Example: `/my-project/nic-lossless-compression/research-lit/2026-03-21.md`
+Example: `idea-stage/LITERATURE_REVIEW_20260502_041530Z.md`
 
 #### File content
 
@@ -580,7 +580,7 @@ The saved file must include:
 > Section 5 (Landscape Pack) is the primary input consumed by `/idea-creator`. Section 3 remains useful for human reading, but downstream idea generation should prioritize `Gap Seeds`.
 
 #### Additional saves (optional)
-- If `ARXIV_DOWNLOAD = true`, save downloaded PDFs to `{topic-slug}/papers/`
+- If `ARXIV_DOWNLOAD = true`, save downloaded PDFs to the resolved `PAPER_LIBRARY`
 - If Obsidian is available, optionally create a literature review note in the vault
 
 ### Step 6: Update Research Wiki

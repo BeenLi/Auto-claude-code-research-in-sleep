@@ -16,10 +16,12 @@ Prefer:
 1. `refine-logs/EXPERIMENT_PLAN.md`
 2. `refine-logs/EXPERIMENT_TRACKER.md`
 3. `refine-logs/FINAL_PROPOSAL.md`
+4. `idea-stage/docs/research_contract.md`
 
 Extract:
 
 - claims and success criteria
+- claim boundary and unsupported claims that must not be implied by results
 - simulator/backend choice
 - run order and milestones
 - baselines and ablations
@@ -89,3 +91,8 @@ Initial results must separate:
 - missing artifacts,
 - claim impact,
 - next runs to launch.
+
+## Research Contract Postcondition
+
+At this workflow exit, apply `shared-references/research-contract-maintenance.md` to refresh `idea-stage/docs/research_contract.md` if evidence changed.
+This is only a workflow-exit gate; execution details stay in `refine-logs/EXPERIMENT_PLAN.md` and results stay in `refine-logs/EXPERIMENT_LOG.md`.

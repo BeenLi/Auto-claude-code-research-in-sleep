@@ -21,6 +21,8 @@ project/
 ├── MANIFEST.md                            # Output tracking manifest (root)
 │
 ├── idea-stage/                            # W1: Idea Discovery
+│   ├── LITERATURE_REVIEW.md               # Latest copy from /research-lit
+│   ├── LITERATURE_REVIEW_20250615_143022Z.md
 │   ├── IDEA_REPORT.md                     # Latest copy
 │   ├── IDEA_REPORT_20250615_143022.md     # Timestamped version
 │   ├── IDEA_CANDIDATES.md
@@ -53,6 +55,7 @@ project/
 ## What to Timestamp
 
 Files that get overwritten on re-runs:
+- `LITERATURE_REVIEW.md`
 - `IDEA_REPORT.md`, `IDEA_CANDIDATES.md`, `REF_PAPER_SUMMARY.md`
 - `EXPERIMENT_PLAN.md`, `EXPERIMENT_TRACKER.md`, `EXPERIMENT_RESULTS.md`
 - `FINAL_PROPOSAL.md`, `PIPELINE_SUMMARY.md`

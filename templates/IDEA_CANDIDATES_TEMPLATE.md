@@ -6,7 +6,7 @@
 
 ## Active Idea
 
-**Current**: [Idea name] → see `docs/research_contract.md` for full context
+**Current**: [Idea name] → see `idea-stage/docs/research_contract.md` for full context
 
 ## Candidates
 

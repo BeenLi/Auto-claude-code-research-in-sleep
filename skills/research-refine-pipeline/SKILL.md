@@ -137,6 +137,11 @@ Write `refine-logs/PIPELINE_SUMMARY.md`:
 - Proceed to `/run-experiment`
 ```
 
+### Phase 4.5: Research Contract Postcondition
+
+At this workflow exit, apply `shared-references/research-contract-maintenance.md` to create or refresh `idea-stage/docs/research_contract.md`.
+This is only a workflow-exit gate; experiment-plan is the semantic owner of `refine-logs/EXPERIMENT_PLAN.md`.
+
 ### Phase 5: Present a Brief Summary to the User
 
 ```

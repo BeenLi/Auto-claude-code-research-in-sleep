@@ -68,10 +68,10 @@ LLM 应在以下情况发生时**立即更新**：
 
 工作流 1（`/idea-discovery`）完成后，`idea-stage/IDEA_REPORT.md` 包含 8-12 个候选 idea。一旦选定一个进入实现阶段，把所有候选都留在上下文中会浪费 LLM 的工作记忆、降低输出质量。
 
-**`idea-stage/docs/research_contract.md`** 解决这个问题：只提取*当前正在做的那一个 idea* 到一份聚焦的工作文档——claim、实验设计、baseline、结果。新 session 读这个，而不是读整个 IDEA_REPORT.md。模板见 [`templates/RESEARCH_CONTRACT_TEMPLATE.md`](../templates/RESEARCH_CONTRACT_TEMPLATE.md)。
+**`idea-stage/docs/research_contract.md`** 解决这个问题：只提取*当前正在做的那一个 idea* 到一份聚焦的 claim-boundary 文档——选中 idea、核心 claim、证据状态、关键决策、Immediate Research Gate。新 session 读这个，而不是读整个 IDEA_REPORT.md。模板见 [`templates/RESEARCH_CONTRACT_TEMPLATE.md`](../templates/RESEARCH_CONTRACT_TEMPLATE.md)。
 
 - **创建时机**：选定 idea 时（工作流 1 → 工作流 1.5）
-- **更新时机**：baseline 复现后、实验完成后、做出关键决策后
+- **更新时机**：proposal/plan 文件变化、baseline 复现、重大结果或 Mx Go/No-Go 完成、`/result-to-claim` 判定 claim 支持度，或当前 idea 失败后从 `IDEA_CANDIDATES.md` 选择下一个时
 - **读取时机**：每次会话恢复 — 这是主要的上下文文档
 
 ### 恢复流程
@@ -168,11 +168,9 @@ if [ -n "$STATUS" ]; then
   OUTPUT="[session-restore] Research project detected. Current state:\n$STATUS"
 fi
 
-# 2. Check for research_contract.md (new path first, legacy fallback)
+# 2. Check for research_contract.md
 if [ -f "$PROJECT_DIR/idea-stage/docs/research_contract.md" ]; then
   OUTPUT="$OUTPUT\n\n[session-restore] idea-stage/docs/research_contract.md exists — read it to restore full idea context."
-elif [ -f "$PROJECT_DIR/docs/research_contract.md" ]; then
-  OUTPUT="$OUTPUT\n\n[session-restore] docs/research_contract.md exists (legacy path) — read it to restore full idea context."
 fi
 
 # 3. Check for active training

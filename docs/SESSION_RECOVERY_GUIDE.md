@@ -68,10 +68,10 @@ The LLM should update Pipeline Status **immediately** when any of these happen:
 
 After Workflow 1 (`/idea-discovery`), `idea-stage/IDEA_REPORT.md` contains 8-12 candidate ideas. Once you pick one and move to implementation, keeping all candidates in context wastes the LLM's working memory and degrades its output quality.
 
-**`idea-stage/docs/research_contract.md`** solves this by extracting *only the active idea* into a focused working document — claims, experiment design, baselines, and results. New sessions read this instead of the full IDEA_REPORT.md. See [`templates/RESEARCH_CONTRACT_TEMPLATE.md`](../templates/RESEARCH_CONTRACT_TEMPLATE.md) for the template.
+**`idea-stage/docs/research_contract.md`** solves this by extracting *only the active idea* into a focused claim-boundary document — selected idea, core claims, evidence status, key decisions, and immediate research gate. New sessions read this instead of the full IDEA_REPORT.md. See [`templates/RESEARCH_CONTRACT_TEMPLATE.md`](../templates/RESEARCH_CONTRACT_TEMPLATE.md) for the template.
 
 - **Created**: when an idea is selected (Workflow 1 → Workflow 1.5)
-- **Updated**: as baselines are reproduced, experiments complete, decisions are made
+- **Updated**: when proposal/plan files change, baselines are reproduced, major results or Mx Go/No-Go reviews complete, `/result-to-claim` resolves claim support, or the active idea fails and the next `IDEA_CANDIDATES.md` entry is selected
 - **Read**: on every session recovery — this is the primary context document
 
 ### How Recovery Works
@@ -171,11 +171,9 @@ if [ -n "$STATUS" ]; then
   OUTPUT="[session-restore] Research project detected. Current state:\n$STATUS"
 fi
 
-# 2. Check for research_contract.md (new path first, legacy fallback)
+# 2. Check for research_contract.md
 if [ -f "$PROJECT_DIR/idea-stage/docs/research_contract.md" ]; then
   OUTPUT="$OUTPUT\n\n[session-restore] idea-stage/docs/research_contract.md exists — read it to restore full idea context."
-elif [ -f "$PROJECT_DIR/docs/research_contract.md" ]; then
-  OUTPUT="$OUTPUT\n\n[session-restore] docs/research_contract.md exists (legacy path) — read it to restore full idea context."
 fi
 
 # 3. Check for active training

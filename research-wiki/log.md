@@ -15,3 +15,10 @@ _Append-only timeline._
 - `2026-04-26T02:26:35Z` ingest_paper: ingested paper:xia2025_kelle_codesign_caching (arxiv:)
 - `2026-04-26T02:26:35Z` ingest_paper: ingested paper:preeti2026_toasty_speeding_network (arxiv:)
 - `2026-04-26T02:30:33Z` idea-discovery selected idea: Rx Expansion Budgeting for Compressed RDMA
+- `2026-05-02T08:02:06Z` ingest_paper: ingested paper:lin2026_zipccl_efficient_lossless (arxiv:2604.27844)
+- `2026-05-02T08:02:24Z` ingest_paper: ingested paper:al2026_quad_length_codes (arxiv:)
+- `2026-05-02T08:02:24Z` ingest_paper: ingested paper:al2025_optinic_resilient_tailoptimal (arxiv:)
+- `2026-05-02T08:02:24Z` ingest_paper: ingested paper:al2026_zipserv_fast_memoryefficient (arxiv:)
+- `2026-05-02T08:02:24Z` ingest_paper: ingested paper:al2024_accelerating_lossy_lossless (arxiv:)
+- `2026-05-02T08:14:04Z` ingest_paper: ingested paper:al2026_ucclzip_lossless_compression (arxiv:)
+- `2026-05-02T08:14:04Z` ingest_paper: ingested paper:unknown2025_reimagining_rdma_through (arxiv:)

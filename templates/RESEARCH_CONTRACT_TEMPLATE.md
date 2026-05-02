@@ -1,8 +1,8 @@
 # Research Contract: [Idea Name]
 
-> **A focused working document for the currently selected idea.** Created when an idea is chosen from `IDEA_REPORT.md`, updated throughout implementation and training. This is what the LLM reads on session recovery — not the full IDEA_REPORT with all 8-12 candidates.
+> **A focused working document for the currently selected idea.** Created when an idea is chosen from `IDEA_REPORT.md` or `IDEA_CANDIDATES.md`, updated at research milestones, and read on session recovery — not the full IDEA_REPORT with all 8-12 candidates.
 >
-> **Why this file exists:** After brainstorming, `IDEA_REPORT.md` contains many candidate ideas. Keeping all of them in context pollutes the LLM's working memory and degrades output quality. This contract extracts *only the active idea* into a standalone document, so new sessions and post-compaction recovery load focused context instead of the entire idea pool.
+> **Why this file exists:** After brainstorming, `IDEA_REPORT.md` contains many candidate ideas. Keeping all of them in context pollutes the LLM's working memory and degrades output quality. This contract extracts *only the active idea* into a standalone claim boundary, so new sessions and post-compaction recovery load focused context instead of the entire idea pool.
 
 ## Selected Idea
 
@@ -20,28 +20,24 @@
 
 [2-3 paragraphs: How the method works. Enough detail that a new session can understand the approach without reading the full codebase.]
 
-## Experiment Design
+## Experiment Design Pointer
 
-- **Datasets**: [Which datasets, which splits]
+- **Plan**: `refine-logs/EXPERIMENT_PLAN.md`
 - **Baselines**: [What you compare against]
 - **Metrics**: [Primary and secondary metrics]
-- **Key hyperparameters**: [The ones that matter most]
-- **Compute budget**: [GPU hours, hardware]
+- **Execution note**: The detailed run order and experiment blocks live in the plan; do not copy them here.
 
-## Baselines
+## Claim Boundary
 
-| Method | Dataset | Metric | Score | Source |
-|--------|---------|--------|-------|--------|
-| [Baseline A] | [Dataset] | [Metric] | [Number] | [Paper / reproduced] |
-| [Baseline B] | [Dataset] | [Metric] | [Number] | [Paper / reproduced] |
+[What the current evidence allows you to claim, what it does not yet support, and what evidence would be required to strengthen the claim.]
 
-## Current Results
+## Current Evidence Status
 
-> Updated as experiments complete. Start empty, fill in as you go.
+> Updated after baselines, major results, Mx Go/No-Go reviews, or `/result-to-claim`. Keep this short; link to logs and reports.
 
-| Method | Dataset | Metric | Score | Notes |
-|--------|---------|--------|-------|-------|
-| [Your method] | [Dataset] | [Metric] | [Number] | [e.g., "3 seeds, mean±std"] |
+- [Current evidence milestone]
+- [Supported / partial / unsupported claim state]
+- [Largest remaining evidence gap]
 
 ## Key Decisions
 
@@ -49,12 +45,6 @@
 - [Decision 2: Why this hyperparameter / architecture choice]
 - [Known limitations / risks and how you plan to handle them]
 
-## Status
+## Immediate Research Gate
 
-- [ ] Idea selected
-- [ ] Baseline reproduced
-- [ ] Main method implemented
-- [ ] Representative dataset results
-- [ ] Full dataset results
-- [ ] Ablation studies
-- [ ] Paper draft
+[One sentence: the next research gate, and what must not be claimed until that gate passes.]

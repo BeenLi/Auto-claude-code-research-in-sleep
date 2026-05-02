@@ -23,7 +23,7 @@ This ARIS instance is configured for **Computer Architecture / AI Infrastructure
 `research-lit` → `idea-creator` → `novelty-check` → `research-review` → `research-refine` → `experiment-plan`
 
 **Workflow 1.5 — Experiment Bridge** (`/experiment-bridge`):
-Reads `EXPERIMENT_PLAN.md` → implements code → deploys experiments → collects initial results in `EXPERIMENT_LOG.md`
+Reads `refine-logs/EXPERIMENT_PLAN.md` → implements code → deploys experiments → collects initial results in `EXPERIMENT_LOG.md`
 
 **Workflow 2 — Auto Review Loop** (`/auto-review-loop "scope"`):
 Up to 4 rounds: external LLM review → identify weaknesses → Claude implements fixes → re-review until score ≥ 6/10
@@ -41,7 +41,7 @@ Parses external reviews → enforces coverage and grounding → drafts text-only
 ```yaml
 stage: implementation
 idea: "Rx Expansion Budgeting for Compressed RDMA: NIC/DPU-side lossless compression with decompressed output-byte admission, scheduling, and feedback"
-contract: refine-logs/EXPERIMENT_PLAN.md
+contract: idea-stage/docs/research_contract.md
 current_branch: codex/computer-architecture
 baseline: "Uncompressed RDMA, naive compressed RDMA, receiver decompressed-byte token bucket, static Rx output partitioning, FIFO decompression queue, wire-byte weighted fair sharing, reactive QoS controller, oracle output-byte scheduler"
 validation_status: M1 P0-only analytical sensitivity pack complete; 960 rows, 384 output-unsafe, conditional Go for M2 model plumbing only
@@ -58,9 +58,14 @@ Pipeline Status update triggers:
 - User says "save" / "record" / "new session" / "wrap up"
 - Before any long pause or handoff
 
+Research Contract update triggers:
+- Idea selected or changed; if the idea fails, select the next candidate from `idea-stage/IDEA_CANDIDATES.md` and overwrite the contract
+- `refine-logs/FINAL_PROPOSAL.md` or `refine-logs/EXPERIMENT_PLAN.md` generated/updated
+- Baseline reproduced, major result obtained, Mx Go/No-Go completed, or `/result-to-claim` resolves claim support
+
 On new session or post-compaction recovery:
 1. Read ## Pipeline Status
-2. Read refine-logs/EXPERIMENT_PLAN.md (the active idea's focused context)
+2. Read idea-stage/docs/research_contract.md (the active idea's focused context)
 3. Read project notes if any (e.g., experiment logs, decision rationale)
 4. If active_tasks is non-empty → check remote status, rebuild monitoring
 5. Resume work without asking the user

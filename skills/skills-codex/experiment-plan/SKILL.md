@@ -197,7 +197,12 @@ Use this structure:
 
 Keep the tracker compact and execution-oriented.
 
-#### Step 5.3: Present a Brief Summary to the User
+#### Step 5.3: Research Contract Postcondition
+
+At this workflow exit, apply `shared-references/research-contract-maintenance.md` to refresh `idea-stage/docs/research_contract.md` if the plan changed.
+This is only a workflow-exit gate; experiment-plan is the semantic owner of `refine-logs/EXPERIMENT_PLAN.md`.
+
+#### Step 5.4: Present a Brief Summary to the User
 
 ```
 Experiment plan ready.

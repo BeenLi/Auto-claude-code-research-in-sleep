@@ -51,3 +51,5 @@
 | 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-reviewer-interaction.mmd | documentation | reviewer interaction sequence Mermaid source |
 | 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-reviewer-interaction.md | documentation | reviewer interaction sequence Mermaid preview |
 | 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-reviewer-interaction.png | documentation | rendered reviewer interaction sequence |
+idea-stage/LITERATURE_REVIEW_20260502_080052Z.md
+idea-stage/LITERATURE_REVIEW.md

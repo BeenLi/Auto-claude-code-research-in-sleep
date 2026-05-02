@@ -239,7 +239,12 @@ After review, refine the top idea into a concrete proposal and plan experiments.
 - Generate a claim-driven experiment roadmap with ablations, budgets, and run order
 - Output: `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md`, `refine-logs/EXPERIMENT_TRACKER.md`
 
-**🚦 Checkpoint:** Present the refined proposal summary:
+#### Research Contract Postcondition
+
+After the selected idea has proposal and plan outputs, apply `shared-references/research-contract-maintenance.md` to create or refresh `idea-stage/docs/research_contract.md`.
+This is only a workflow-exit gate; experiment-plan is the semantic owner of `refine-logs/EXPERIMENT_PLAN.md`.
+
+#### Checkpoint: Present the refined proposal summary
 
 ```
 🔬 Method refined and experiment plan ready:

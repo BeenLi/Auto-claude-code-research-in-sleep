@@ -19,6 +19,7 @@ project/
 ├── MANIFEST.md                            # Output tracking manifest (auto-maintained)
 │
 ├── idea-stage/                            # W1: Idea Discovery outputs
+│   ├── LITERATURE_REVIEW.md               # Latest literature landscape (from /research-lit)
 │   ├── IDEA_REPORT.md                     # Raw brainstorm output (from /idea-creator)
 │   ├── IDEA_CANDIDATES.md                 # Curated pool of viable ideas (post-review)
 │   ├── REF_PAPER_SUMMARY.md              # Reference paper summary (when REF_PAPER is set)
@@ -52,6 +53,7 @@ project/
 
 | File | Created by | Purpose |
 |------|-----------|---------|
+| `idea-stage/LITERATURE_REVIEW.md` | `/research-lit` | Latest literature landscape: paper table, structural gaps, Landscape Pack |
 | `idea-stage/IDEA_REPORT.md` | `/idea-creator` | Raw brainstorm output: all 8-12 ideas + pilot results + eliminated ideas |
 | `refine-logs/EXPERIMENT_PLAN.md` | `/experiment-plan` | Experiment design: claim map, blocks, run order, compute budget |
 | `refine-logs/EXPERIMENT_TRACKER.md` | `/experiment-plan` | Execution checklist: run ID, status (TODO→DONE), one-line notes |
@@ -101,10 +103,11 @@ findings.md                       (one-line entry — anomaly, root cause, decis
 
 | File | Write when... | Update frequency |
 |------|--------------|-----------------|
+| `LITERATURE_REVIEW.md` | After `/research-lit` completes; before `/idea-creator` consumes Landscape Pack | Per literature survey |
 | `IDEA_CANDIDATES.md` | After `/idea-discovery` completes (initial creation); after idea kill/selection (update status) | Per idea transition |
 | `findings.md` | Discover something non-obvious during experiments, debugging, or analysis | As discoveries happen (append) |
 | `EXPERIMENT_LOG.md` | An experiment finishes (any experiment, successful or not) | After every experiment |
-| `idea-stage/docs/research_contract.md` | Select an idea to work on; baseline reproduced; major results obtained | Per stage milestone |
+| `idea-stage/docs/research_contract.md` | Select/change an idea; proposal/plan changes; baseline reproduced; major result or Mx Go/No-Go; `/result-to-claim`; idea failure → next `IDEA_CANDIDATES.md` entry | Per research gate |
 
 ### Session Recovery Priority
 
@@ -122,7 +125,7 @@ Do NOT read `IDEA_REPORT.md` or `IDEA_CANDIDATES.md` unless switching ideas.
 | Question | Answer |
 |----------|--------|
 | Where does a brainstorm idea go? | `IDEA_REPORT.md` (raw) → `IDEA_CANDIDATES.md` (curated) |
-| Where does the current idea's full context go? | `idea-stage/docs/research_contract.md` |
+| Where does the current idea's claim boundary go? | `idea-stage/docs/research_contract.md` |
 | Where does "experiment X is running" go? | `EXPERIMENT_TRACKER.md` |
 | Where does "experiment X got accuracy 95.2" go? | `EXPERIMENT_LOG.md` |
 | Where does "lr=1e-4 diverges on dataset-X" go? | `findings.md` |
@@ -134,11 +137,13 @@ Do NOT read `IDEA_REPORT.md` or `IDEA_CANDIDATES.md` unless switching ideas.
 
 ARIS skills use timestamped filenames to preserve history. Each output is written twice:
 
-1. **Timestamped file**: `{FILENAME}_{YYYYMMDD_HHmmss}.md` — permanent history
+1. **Timestamped file**: `{FILENAME}_{YYYYMMDD_HHmmssZ}.md` — permanent history, UTC
 2. **Fixed-name file**: `{FILENAME}.md` — latest copy, read by downstream skills
 
 ```
 idea-stage/
+├── LITERATURE_REVIEW_20250615_143022Z.md  ← /research-lit run
+├── LITERATURE_REVIEW.md                   ← latest literature copy
 ├── IDEA_REPORT_20250615_143022.md    ← first run
 ├── IDEA_REPORT_20250616_090015.md    ← second run
 ├── IDEA_REPORT.md                    ← latest copy (= 20250616 version)

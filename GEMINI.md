@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working in this repository.
+This file provides guidance to Gemini (Gemini.ai/code) when working in this repository.
 
 ## Research Domain
 
@@ -26,7 +26,7 @@ This ARIS instance is configured for **Computer Architecture / AI Infrastructure
 Reads `refine-logs/EXPERIMENT_PLAN.md` → implements code → deploys experiments → collects initial results in `EXPERIMENT_LOG.md`
 
 **Workflow 2 — Auto Review Loop** (`/auto-review-loop "scope"`):
-Up to 4 rounds: external LLM review → identify weaknesses → Codex implements fixes → re-review until score ≥ 6/10
+Up to 4 rounds: external LLM review → identify weaknesses → Gemini implements fixes → re-review until score ≥ 6/10
 
 **Workflow 3 — Paper Writing** (`/paper-writing "NARRATIVE_REPORT.md"`):
 `paper-plan` → `paper-figure` → `paper-write` → `paper-compile` → `auto-paper-improvement-loop`
@@ -39,16 +39,16 @@ Parses external reviews → enforces coverage and grounding → drafts text-only
 ## Pipeline Status
 
 ```yaml
-stage: implementation
-idea: "Rx Expansion Budgeting for Compressed RDMA: NIC/DPU-side lossless compression with decompressed output-byte admission, scheduling, and feedback"
-contract: idea-stage/docs/research_contract.md
+stage: idea-discovery
+idea: ""
+contract: ""
 current_branch: codex/computer-architecture
-baseline: "Uncompressed RDMA, naive compressed RDMA, receiver decompressed-byte token bucket, static Rx output partitioning, FIFO decompression queue, wire-byte weighted fair sharing, reactive QoS controller, oracle output-byte scheduler"
-validation_status: M1 P0-only analytical sensitivity pack complete; 960 rows, 384 output-unsafe; targeted oracle-pro API review on 2026-05-01 with gpt-5-5-pro confirmed conditional Go for M2 model plumbing only, score 4/6, confidence high
+baseline: ""
+validation_status:
 active_tasks: []
 language: zh
-last_updated: "2026-05-01"
-next: "Proceed only with M2 model plumbing. Include receiver decompressed-byte token bucket, static per-QP decompressed-byte cap, exact-original-byte receiver credits, FIFO/static partitioning, queueing/control, Rx SRAM, decompressor/output-DMA service, and hardware-cost ablations. Do not claim real compressed communication payload behavior until P2/P3 evidence exists."
+last_updated: ""
+next: ""
 ```
 
 ## State Persistence Rules

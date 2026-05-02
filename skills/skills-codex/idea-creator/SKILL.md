@@ -163,23 +163,23 @@ The landscape survey (paper collection, landscape map, structural gaps) is owned
 
 #### Step 0: Load research-lit output (required)
 
-Derive the topic slug from `$ARGUMENTS` (lowercase, hyphens). Then:
+Read the fixed latest literature review:
 
 ```
-Glob: {project-root}/{topic-slug}/research-lit/*.md
+Read: idea-stage/LITERATURE_REVIEW.md
 ```
 
-**If found**: Read the most recent file. Extract all four sections:
+**If found**: Extract all five sections:
 - **Section 1** (paper table) → known-papers set for deduplication
 - **Section 2** (landscape map) → sub-direction clusters, what's been tried
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
 - **Section 4** (competitive landscape) → top competing papers and positioning
 - **Section 5** (Landscape Pack) → topic scope, bottleneck evidence, simulator/prototype readiness, and `Gap Seeds`
 
-Announce: _"Loaded research-lit from {date}: {N} papers, {M} structural gaps, {K} Gap Seeds identified."_
+Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {M} structural gaps, {K} Gap Seeds identified."_
 
 **If not found**: Warn the user:
-> ⚠️ No research-lit output found for topic `{topic-slug}`. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
+> ⚠️ No `idea-stage/LITERATURE_REVIEW.md` found. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
 
 Then run a condensed version: WebSearch across MICRO/ISCA/HPCA/NSDI/SIGCOMM for top 10 papers, build a basic landscape map, and identify gaps as best as possible.
 
