@@ -109,15 +109,23 @@ Phase 1 and Phase 2 will use `idea-stage/REF_PAPER_SUMMARY.md` as additional con
 
 ### Phase 1: Literature Survey
 
-Invoke `/research-lit` to map the research landscape:
+Invoke `/research-lit` to map the research landscape. Idea discovery is exactly the place where Gemini's AI-driven broad coverage adds value, so include `gemini` as a source by default unless the user already specified an explicit `— sources:` directive in their idea-discovery invocation:
 
 ```
+# If $ARGUMENTS already contains "— sources:", pass through unchanged
+# (the user is in control of source selection):
 /research-lit "$ARGUMENTS"
+
+# Otherwise (the common case), include gemini explicitly for broader discovery:
+/research-lit "$ARGUMENTS" — sources: all, gemini
 ```
+
+If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracefully with a warning — no break to the pipeline. Users who want to force-disable Gemini in idea-discovery can pass `/idea-discovery "topic" — sources: all` explicitly (which becomes the literal source list, no auto-injection).
 
 **What this does:**
 - Search local/Zotero/Obsidian/web/arXiv sources for recent papers and preprints
 - Infer the AI infrastructure layer and expand the topic within the same layer
+- Plus Gemini-driven broad discovery (sub-problem decomposition, naming variants, alias coverage) when `gemini-cli` is available
 - Build a landscape map: sub-directions, approaches, open problems
 - Identify structural gaps, bottleneck evidence, and `Gap Seeds`
 - Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon` and `Core Baseline Candidates`
