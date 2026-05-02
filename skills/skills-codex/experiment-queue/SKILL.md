@@ -109,9 +109,120 @@ Use persistent workers plus file-based JSON handshakes. Exchange flow/QP summari
 
 Retry transient failures such as timeouts and license checkout failures. Mark missing required outputs as failed/stuck. For lossy RDMA experiments, packet/drop behavior belongs in the simulator output and result JSON, not in the queue state machine.
 
+## Run Directory and Launch
+
+Bind the run identifiers once so every later step (manifest save, scp, launch, monitor, resume) refers to the same paths. Set these as local shell variables before generating the manifest:
+
+```bash
+# REPLACE the placeholder path before running, or pre-export PROJECT_DIR:
+PROJECT_DIR="${PROJECT_DIR:?set PROJECT_DIR to the local project root}"
+RUN_TS=$(date -u +%Y%m%dT%H%M%SZ)
+LOCAL_RUN_DIR="$PROJECT_DIR/experiment_queue/$RUN_TS"
+mkdir -p "$LOCAL_RUN_DIR"
+```
+
+Save the built manifest to `$LOCAL_RUN_DIR/manifest.json` for reproducibility.
+
+### Preflight
+
+Before launch:
+
+- Check SSH connection works if running on a remote host.
+- Check `cwd` exists on the execution host.
+- Check project-specific preconditions such as checkpoints, input traces, simulator binaries, licenses, and environment setup.
+- Check required resource slots are available. Do not assume GPUs unless the manifest requests a legacy GPU slot.
+
+If any precondition fails, show the user which jobs are blocked and why.
+
+### Launch Scheduler
+
+The scheduler implementation lives in `tools/experiment_queue/queue_manager.py`. Resolve helpers through the same project-local tools path used by installed ARIS skills:
+
+```bash
+QUEUE_TOOLS=".aris/tools/experiment_queue"
+[ -f "$QUEUE_TOOLS/queue_manager.py" ] || QUEUE_TOOLS="tools/experiment_queue"
+[ -f "$QUEUE_TOOLS/queue_manager.py" ] || QUEUE_TOOLS="${ARIS_REPO:-}/tools/experiment_queue"
+[ -f "$QUEUE_TOOLS/queue_manager.py" ] || { echo "ERROR: experiment_queue helpers not found; rerun install_aris.sh or set ARIS_REPO" >&2; exit 1; }
+```
+
+The `.aris/tools` symlink is set up by `install_aris.sh` (#174). Older installs without that symlink fall through to `tools/experiment_queue` when invoked inside the ARIS repo, or `$ARIS_REPO/tools/experiment_queue`.
+
+For remote runs, use both a remote-relative path for `scp` and a `$HOME`-prefixed path for `ssh` command strings. Modern `scp` uses SFTP mode and does not reliably expand `$HOME` in destination paths.
+
+```bash
+REMOTE_RUN_REL=".aris_queue/runs/$RUN_TS"
+REMOTE_RUN_DIR="\$HOME/$REMOTE_RUN_REL"
+```
+
+Bootstrap the remote run directory and copy helpers plus manifest:
+
+```bash
+ssh <server> "mkdir -p \"$REMOTE_RUN_DIR/logs\" \"\$HOME/.aris_queue\""
+scp "$QUEUE_TOOLS/queue_manager.py" "$QUEUE_TOOLS/build_manifest.py" <server>:.aris_queue/
+scp "$LOCAL_RUN_DIR/manifest.json" <server>:"$REMOTE_RUN_REL/manifest.json"
+```
+
+Launch the detached scheduler:
+
+```bash
+ssh <server> "nohup python3 \"\$HOME/.aris_queue/queue_manager.py\" \\
+  --manifest \"$REMOTE_RUN_DIR/manifest.json\" \\
+  --state    \"$REMOTE_RUN_DIR/queue_state.json\" \\
+  --log-dir  \"$REMOTE_RUN_DIR/logs\" \\
+  > \"$REMOTE_RUN_DIR/queue_mgr.log\" 2>&1 &"
+```
+
+Use `--log-dir`, not `--log`. `queue_manager.py` reads per-job logs from `--log-dir` for failure detection; a single combined log breaks those checks.
+
+Persist run metadata so monitoring and resume do not regenerate paths:
+
+```bash
+{
+  printf 'PROJECT_DIR=%q\n'    "$PROJECT_DIR"
+  printf 'RUN_TS=%q\n'         "$RUN_TS"
+  printf 'LOCAL_RUN_DIR=%q\n'  "$LOCAL_RUN_DIR"
+  printf 'REMOTE_RUN_REL=%q\n' "$REMOTE_RUN_REL"
+  printf 'REMOTE_RUN_DIR=%q\n' "$REMOTE_RUN_DIR"
+} > "$LOCAL_RUN_DIR/run_meta.txt"
+```
+
+To resume an existing queue, reload the recorded values and re-run only the launch command:
+
+```bash
+LOCAL_RUN_DIR="/abs/path/to/project/experiment_queue/<existing-run-ts>"
+. "$LOCAL_RUN_DIR/run_meta.txt"
+# Re-run the launch command. Do not re-run bootstrap if it would overwrite manifest.json or queue_state.json.
+```
+
+### Monitoring
+
+Check queue state using the recorded remote run directory:
+
+```bash
+ssh <server> "cat \"$REMOTE_RUN_DIR/queue_state.json\"" \
+  | jq '.jobs | group_by(.status) | map({(.[0].status): length}) | add'
+```
+
+### Post-completion
+
+When all jobs in `manifest.json` are `completed` or `stuck`:
+
+- The remote scheduler exits cleanly with `All jobs done` in `$REMOTE_RUN_DIR/queue_mgr.log`.
+- The local skill agent aggregates `$REMOTE_RUN_DIR/queue_state.json` into `$LOCAL_RUN_DIR/summary.md`.
+- The local skill agent invokes `/analyze-results` if `analyze_on_complete: true`.
+
 ## Invariants
 
 - Expected outputs are the source of completion truth.
 - Queue state is written atomically.
 - Scheduler does not inject retransmissions for co-simulation.
 - New architecture manifests should not rely on `nvidia-smi` or `CUDA_VISIBLE_DEVICES`.
+
+## See Also
+
+- `/run-experiment` — single experiment deployment
+- `/monitor-experiment` — check experiment progress
+- `/analyze-results` — post-hoc analysis
+- `tools/experiment_queue/queue_manager.py` — scheduler implementation, resolved via the helper chain above
+- `tools/experiment_queue/build_manifest.py` — manifest builder, resolved via the same helper chain
+- `tools/experiment_queue/cosim_protocol.py` — window-level gem5 + Broadcom/csg-htsim exchange contract
