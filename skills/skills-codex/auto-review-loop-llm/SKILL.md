@@ -93,7 +93,7 @@ Persist state to `review-stage/REVIEW_STATE.json` after each round:
   "last_score": 5.0,
   "last_verdict": "not ready",
   "pending_experiments": [],
-  "timestamp": "2026-03-15T10:00:00"
+  "timestamp": "2026-03-15T02:00:00Z"
 }
 ```
 

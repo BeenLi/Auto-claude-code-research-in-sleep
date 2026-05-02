@@ -436,7 +436,7 @@ The artifact conforms to the schema in `shared-references/assurance-contract.md`
   "thread_id":        "<codex mcp thread id>",
   "reviewer_model":   "gpt-5.5",
   "reviewer_reasoning": "xhigh",
-  "generated_at":     "<UTC ISO-8601>",
+  "generated_at":     "<UTC ISO-8601 timestamp ending in Z>",
   "details": {
     "theorems_audited": <int>,
     "issues": [ { "id": "T1-H3", "severity": "FATAL|CRITICAL|MAJOR|MINOR",

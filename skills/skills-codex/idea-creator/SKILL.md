@@ -330,7 +330,7 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 # Research Idea Report
 
 **Direction**: [user's research direction]
-**Generated**: [date]
+**Generated**: [UTC ISO-8601 timestamp ending in Z, e.g. 2026-04-26T02:26:45Z]
 **Ideas evaluated**: X generated → Y survived filtering → Z piloted → W recommended
 
 ## Landscape Summary

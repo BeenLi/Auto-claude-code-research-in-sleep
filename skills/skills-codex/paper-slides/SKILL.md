@@ -64,7 +64,7 @@ Persist state to `slides/SLIDES_STATE.json` after each phase:
   "slide_count": 10,
   "codex_thread_id": "019cfcf4-...",
   "status": "in_progress",
-  "timestamp": "2026-03-18T15:00:00"
+  "timestamp": "2026-03-18T07:00:00Z"
 }
 ```
 

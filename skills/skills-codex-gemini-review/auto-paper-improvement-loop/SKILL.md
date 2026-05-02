@@ -39,7 +39,7 @@ If the context window fills up mid-loop, Codex auto-compacts. To recover, this s
   "thread_id": "019ce736-...",
   "last_score": 6,
   "status": "in_progress",
-  "timestamp": "2026-03-13T21:00:00"
+  "timestamp": "2026-03-13T13:00:00Z"
 }
 ```
 

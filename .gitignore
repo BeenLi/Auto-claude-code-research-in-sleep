@@ -29,6 +29,7 @@ CLAUDE.md
 # Agent local logs & state
 .aris/meta/events.jsonl
 .aris/codex-installed-skills.txt
+.aris/traces
 
 # Patent output — contains confidential invention details, do not commit
 patent/

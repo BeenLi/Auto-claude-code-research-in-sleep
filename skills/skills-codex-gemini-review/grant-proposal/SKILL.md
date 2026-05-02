@@ -139,7 +139,7 @@ Grant proposal drafting is a long task that may trigger context compaction. Pers
   "gap_statement": "...",
   "aims_count": 3,
   "status": "in_progress",
-  "timestamp": "2026-03-18T15:00:00"
+  "timestamp": "2026-03-18T07:00:00Z"
 }
 ```
 

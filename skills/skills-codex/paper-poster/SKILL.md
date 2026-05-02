@@ -62,7 +62,7 @@ Poster generation can be long. Persist state to `poster/POSTER_STATE.json` after
   "figures_selected": ["architecture.pdf", "results.pdf"],
   "codex_thread_id": "019cfcf4-...",
   "status": "in_progress",
-  "timestamp": "2026-03-18T15:00:00"
+  "timestamp": "2026-03-18T07:00:00Z"
 }
 ```
 

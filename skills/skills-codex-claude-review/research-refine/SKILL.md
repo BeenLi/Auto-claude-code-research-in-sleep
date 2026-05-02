@@ -59,7 +59,7 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
   "last_score": 6.5,
   "last_verdict": "REVISE",
   "status": "in_progress",
-  "timestamp": "2026-03-22T20:00:00"
+  "timestamp": "2026-03-22T12:00:00Z"
 }
 ```
 

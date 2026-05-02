@@ -127,7 +127,7 @@ Field semantics:
 - **`thread_id`** — Codex MCP thread ID, for forensic traceability.
 - **`reviewer_model`** + **`reviewer_reasoning`** — proves cross-family review
   invariant was honored.
-- **`generated_at`** — UTC ISO-8601 timestamp.
+- **`generated_at`** — UTC ISO-8601 timestamp ending in `Z`.
 
 ## Verifier Contract
 

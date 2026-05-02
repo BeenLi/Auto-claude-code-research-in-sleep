@@ -1,0 +1,26 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#FFFFFF", "actorBkg": "#E8F1FF", "actorBorder": "#2563EB", "actorTextColor": "#0F172A", "actorLineColor": "#2563EB", "activationBkgColor": "#DBEAFE", "activationBorderColor": "#1D4ED8", "sequenceNumberColor": "#FFFFFF", "sequenceNumberBackground": "#2563EB", "signalColor": "#334155", "signalTextColor": "#111827", "labelBoxBkgColor": "#FFF7ED", "labelBoxBorderColor": "#EA580C", "labelTextColor": "#1F2937", "loopTextColor": "#7C2D12", "noteBkgColor": "#ECFDF5", "noteBorderColor": "#059669"}}}%%
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant E as ARIS executor
+    participant R as Reviewer backend
+    participant T as Trace store
+    participant A as Artifacts
+
+    U->>E: invoke skill with topic and optional reviewer override
+    E->>A: read primary files and prior state
+    E->>E: build reviewer prompt from role, task, file paths, schema
+    alt default reviewer
+        E->>R: mcp__codex__codex, reasoning xhigh
+    else reviewer: oracle-pro
+        E->>R: mcp__oracle__consult, model gpt-5-5-pro, files attached
+    end
+    R-->>E: score, concerns, minimum fixes, verdict
+    E->>T: save request, raw response, metadata, thread id
+    E->>A: update AUTO_REVIEW or audit artifact
+    alt loop continues
+        E->>A: implement fixes, run experiments, recompile, or reframe claims
+        E->>R: reply or fresh review depending on skill rules
+    else terminal
+        E->>A: mark state completed and write handoff artifact
+    end

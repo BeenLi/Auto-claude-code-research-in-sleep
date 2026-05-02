@@ -4,6 +4,7 @@ When writing any output file that would overwrite an existing file, use timestam
 
 1. Write output to timestamped file: `{FILENAME}_{YYYYMMDD_HHmmssZ}.md` (or `.json`, `.tex` as appropriate)
    - Use UTC for filename timestamps (for example, `date -u +%Y%m%d_%H%M%SZ`).
+   - Use UTC ISO-8601 with a trailing `Z` for in-file metadata fields such as `Generated`, `timestamp`, `generated_at`, `started_at`, and `start_time` (for example, `date -u +%Y-%m-%dT%H:%M:%SZ`).
    - Timestamp precision to seconds to reduce collisions. In the rare case of sub-second conflicts, append `_2`, `_3` etc.
    - Place the timestamped file in the same directory as the fixed-name file
 2. Copy the same content to the fixed-name file: `{FILENAME}.md` (overwrites the previous latest copy)

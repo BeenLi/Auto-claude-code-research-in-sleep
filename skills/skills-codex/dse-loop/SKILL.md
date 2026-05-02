@@ -171,7 +171,7 @@ For each iteration:
      "best_metric": 1.23,
      "best_params": {"cache_size": 32768, "assoc": 4, "pipeline_width": 2},
      "total_iterations": 15,
-     "start_time": "2026-03-13T10:00:00",
+     "start_time": "2026-03-13T02:00:00Z",
      "timeout": "2h",
      "patience_counter": 3
    }

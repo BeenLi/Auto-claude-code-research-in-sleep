@@ -41,7 +41,7 @@ Long-running loops may hit the context window limit, triggering automatic compac
   "last_score": 5.0,
   "last_verdict": "not ready",
   "pending_experiments": ["screen_name_1"],
-  "timestamp": "2026-03-13T21:00:00"
+  "timestamp": "2026-03-13T13:00:00Z"
 }
 ```
 

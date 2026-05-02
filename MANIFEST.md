@@ -44,3 +44,10 @@
 | 2026-05-01 15:20 | /research-review | review-stage/AUTO_REVIEW.md | review | latest oracle-pro GPT-5.5 Pro review copy |
 | 2026-05-01 15:20 | /research-review | review-stage/REVIEW_STATE_ORACLE_GPT55_20260501.json | review | completed oracle-pro GPT-5.5 Pro review state |
 | 2026-05-01 15:20 | /research-review | review-stage/REVIEW_STATE.json | review | latest review state |
+| 2026-05-01T13:47Z | /mermaid-diagram | docs/WORKFLOW_WANLI.md | documentation | expanded ARIS workflow map with skill inputs/outputs, reviewer routing, traces, and artifacts |
+| 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-workflow-wanli-overview.mmd | documentation | end-to-end workflow overview Mermaid source |
+| 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-workflow-wanli-overview.md | documentation | end-to-end workflow overview Mermaid preview |
+| 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-workflow-wanli-overview.png | documentation | rendered end-to-end workflow overview |
+| 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-reviewer-interaction.mmd | documentation | reviewer interaction sequence Mermaid source |
+| 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-reviewer-interaction.md | documentation | reviewer interaction sequence Mermaid preview |
+| 2026-05-01T13:47Z | /mermaid-diagram | figures/aris-reviewer-interaction.png | documentation | rendered reviewer interaction sequence |

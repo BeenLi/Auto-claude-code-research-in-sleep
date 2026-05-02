@@ -58,7 +58,7 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
   "last_score": 6.5,
   "last_verdict": "REVISE",
   "status": "in_progress",
-  "timestamp": "2026-03-22T20:00:00"
+  "timestamp": "2026-03-22T12:00:00Z"
 }
 ```
 
@@ -72,7 +72,7 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
 | `last_score` | number or null | Most recent overall score from reviewer |
 | `last_verdict` | string or null | Most recent verdict (READY / REVISE / RETHINK) |
 | `status` | `"in_progress"` / `"completed"` | Loop status |
-| `timestamp` | UTC ISO 8601 | When state was last written |
+| `timestamp` | UTC ISO-8601 timestamp ending in Z | When state was last written |
 
 **Write rules:**
 - **Write after each phase completes** (not before). Overwrite each time — only the latest state matters.
@@ -139,7 +139,7 @@ Write:
 
 If later reviewer feedback would change the problem being solved, mark that as **drift** and push back or adapt carefully.
 
-**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "threadId": null, "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<UTC ISO-8601>"}`.
+**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "threadId": null, "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<UTC ISO-8601 timestamp ending in Z>"}`.
 
 ### Phase 1: Build the Initial Proposal
 
