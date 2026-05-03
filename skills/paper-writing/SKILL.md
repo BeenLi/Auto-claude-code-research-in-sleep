@@ -1,7 +1,7 @@
 ---
 name: paper-writing
 description: "Workflow 3: Full paper writing pipeline. Orchestrates paper-plan → paper-figure → figure-spec/paper-illustration/mermaid-diagram → paper-write → paper-compile → auto-paper-improvement-loop to go from a narrative report to a polished PDF. At `— effort: max | beast` (or explicit `— assurance: submission`), Phase 6 gates the Final Report on `tools/verify_paper_audits.sh`; the PDF is labelled `submission-ready` only when the external verifier is green. Use when user says \"写论文全流程\", \"write paper pipeline\", \"从报告到PDF\", \"paper writing\", or wants the complete paper generation workflow."
-argument-hint: [narrative-report-path-or-topic]
+argument-hint: "[narrative-report-path-or-topic] [— style-ref: <source>]"
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
@@ -43,6 +43,39 @@ This pipeline accepts one of:
 3. **Existing `PAPER_PLAN.md`** — skip Phase 1, start from Phase 2
 
 The more detailed the input (especially figure descriptions and quantitative results), the better the output.
+
+## Optional: Style reference (`— style-ref: <source>`, opt-in)
+
+Lets the user steer **structural** style (section ordering, theorem density, sentence cadence, figure density, bibliography style) of the generated paper toward a reference paper they admire. **Default OFF — when the user does not pass `— style-ref`, do nothing differently from before.**
+
+When `— style-ref: <source>` is in `$ARGUMENTS`, run the helper FIRST, before Phase 1 (paper-plan):
+
+```bash
+if [ ! -f tools/extract_paper_style.py ]; then
+  echo "error: tools/extract_paper_style.py not found — re-run 'bash tools/install_aris.sh' to refresh the '.aris/tools' symlink (added in #174), or copy the helper manually from the ARIS repo" >&2
+  exit 1
+fi
+CACHE=$(python3 tools/extract_paper_style.py --source "<source>")
+case $? in
+  0) ;;                                       # share $CACHE/style_profile.md with downstream WRITER phases only
+  2) echo "warning: style-ref skipped (missing optional dep)" >&2 ;;
+  3) echo "error: --style-ref source failed; aborting pipeline" >&2 ; exit 1 ;;
+  *) echo "error: helper failed unexpectedly; aborting pipeline" >&2 ; exit 1 ;;
+esac
+```
+
+Then forward `— style-ref: <source>` only to the **writer-side** sub-skills:
+- `/paper-plan` (Phase 1) — outline structure
+- `/paper-write` (Phase 3) — section-by-section prose
+- `/paper-illustration` (Phase 2b) — figure structural matching, optional
+
+Sources accepted: local TeX dir / file, local PDF, arXiv id, http(s) URL. Overleaf URLs/IDs are rejected — clone via `/overleaf-sync setup <id>` first and pass the local clone path.
+
+**Strict rules** (full contract in `tools/extract_paper_style.py` docstring):
+
+- Use `style_profile.md` as **structural** guidance only. Match section-count tendency, theorem density, caption-length distribution, sentence cadence, math display ratio, citation style.
+- **Never copy prose, claims, examples, or terminology** from anything reachable through the cache.
+- **Never pass `— style-ref` (or the cache contents) to reviewer / auditor sub-skills** — Phase 4.5 (`/proof-checker`), Phase 4.7 / 5.5 (`/paper-claim-audit`), Phase 5 (`/auto-paper-improvement-loop` reviewer), Phase 5.8 (`/citation-audit`) MUST run on the artifact alone. Cross-model review independence (`../shared-references/reviewer-independence.md`).
 
 ## Pipeline
 
@@ -97,6 +130,8 @@ Invoke `/paper-plan` to create the structural outline:
 /paper-plan "$ARGUMENTS"
 ```
 
+If `— style-ref: <source>` was passed in `$ARGUMENTS` and the helper succeeded above, append `— style-ref: <source>` to the invocation: `/paper-plan "<topic> — style-ref: <source>"`. (Writer-side phase — forwarding is allowed; reviewer/auditor phases below must not see the style ref.)
+
 **What this does:**
 - Parse NARRATIVE_REPORT.md for claims, evidence, and figure descriptions
 - Build a **Claims-Evidence Matrix** — every claim maps to evidence, every experiment supports a claim
@@ -123,6 +158,8 @@ Shall I proceed with figure generation?
 - **User requests changes** → adjust plan and re-present.
 
 ### Phase 2: Figure Generation
+
+If `— style-ref: <source>` was passed in `$ARGUMENTS` and the helper succeeded above, append `— style-ref: <source>` to every writer-side sub-skill invocation in this pipeline (Phases 1, 2b, 3, 5). Do **not** append it to reviewer/auditor invocations (Phases 4.5, 4.7, 5.5, 5.8).
 
 Invoke `/paper-figure` to generate data-driven plots and tables:
 
@@ -155,6 +192,8 @@ If the paper plan includes architecture diagrams, pipeline figures, audit cascad
 - Best for: system architecture, workflow pipelines, audit cascades, layered topology
 - Output: `figures/*.svg` + `figures/*.pdf` (via rsvg-convert) + `figures/specs/*.json`
 - No external API, runs fully local
+
+If `— style-ref: <source>` was passed and the helper succeeded above, append `— style-ref: <source>` to the invocation below as well.
 
 **When `illustration: gemini`** — invoke `/paper-illustration`:
 ```
@@ -215,6 +254,8 @@ Invoke `/paper-write` to generate section-by-section LaTeX:
 ```
 /paper-write "PAPER_PLAN.md"
 ```
+
+If `— style-ref: <source>` was passed in `$ARGUMENTS` and the helper succeeded above, append `— style-ref: <source>` to the invocation: `/paper-write "PAPER_PLAN.md — style-ref: <source>"`.
 
 **What this does:**
 - Write each section following the plan, with proper LaTeX formatting
@@ -316,6 +357,8 @@ Invoke `/auto-paper-improvement-loop` to polish the paper:
 ```
 /auto-paper-improvement-loop "paper/"
 ```
+
+If `— style-ref: <source>` was passed in `$ARGUMENTS` and the helper succeeded above, append `— style-ref: <source>` to the invocation: `/auto-paper-improvement-loop "paper/ — style-ref: <source>"`. The improvement loop's reviewer sub-agent will still NOT see the style ref (the loop's own SKILL forbids it); only the fix-implementation phase consumes it.
 
 **What this does (2 rounds):**
 
