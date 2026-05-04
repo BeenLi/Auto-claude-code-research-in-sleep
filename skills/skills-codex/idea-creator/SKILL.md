@@ -83,6 +83,19 @@ Use the canon in filtering and reviewer prompts as provenance for platform/workl
 
 **Skip this phase entirely if `research-wiki/` does not exist.**
 
+Resolve the wiki helper using the Codex-side canonical chain (see
+`../shared-references/wiki-helper-resolution.md`):
+
+```bash
+ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null)}"
+WIKI_SCRIPT=".aris/tools/research_wiki.py"
+[ -f "$WIKI_SCRIPT" ] || WIKI_SCRIPT="tools/research_wiki.py"
+[ -f "$WIKI_SCRIPT" ] || { [ -n "${ARIS_REPO:-}" ] && WIKI_SCRIPT="$ARIS_REPO/tools/research_wiki.py"; }
+[ -f "$WIKI_SCRIPT" ] || WIKI_SCRIPT="$HOME/.codex/skills/research-wiki/research_wiki.py"
+[ -f "$WIKI_SCRIPT" ] || {
+  echo "WARN: research_wiki.py not found; idea generation will continue without wiki context." >&2
+  WIKI_SCRIPT=""
+}
 ```
 if research-wiki/query_pack.md exists AND is less than 7 days old:
     Read query_pack.md and use it as initial landscape context:
@@ -91,7 +104,7 @@ if research-wiki/query_pack.md exists AND is less than 7 days old:
     - Treat top papers as known prior work (do not re-search them)
     Still run Phase 1 below for papers from the last 3-6 months (wiki may be stale)
 else if research-wiki/ exists but query_pack.md is stale or missing:
-    python3 tools/research_wiki.py rebuild_query_pack research-wiki/
+    python3 "$WIKI_SCRIPT" rebuild_query_pack research-wiki/
     Then read query_pack.md as above
 ```
 
