@@ -46,7 +46,7 @@ This skill is the evidence entrypoint for **AI infrastructure for LLM** research
 |-------|---------------------|-------------------------------|-----------------------------|
 | `compute/accelerator` | tensor cores, sparsity, attention kernels, inference accelerator, near-data compute | systolic array, dataflow, quantization hardware, HLS/RTL accelerator, GPGPU-Sim, Accel-Sim | TOPS/W, utilization, pipeline stalls, on-chip SRAM pressure |
 | `memory/storage/data movement` | KV cache, HBM, CXL, prefetch, memory compression, disaggregation | cache hierarchy, paging, NUMA, CXL.mem, bandwidth amplification, memory controller | GB/s, tail latency, miss rate, write amplification, capacity pressure |
-| `interconnect/network` | RDMA, NIC, DPU, collective, congestion, compression, htsim | RoCE, DCQCN, PFC/ECN, SmartNIC, Broadcom/csg-htsim, gem5+htsim | goodput, FCT, retransmission, PCIe utilization, Rx pressure |
+| `interconnect/network` | collectives, intra-node/inter-node interconnects, RDMA, NIC/DPU, congestion, compression | NVLink/NVSwitch, InfiniBand/RoCE, SmartNIC, network simulation, trace replay, in-network computing | goodput, FCT, retransmission, PCIe/NVLink utilization, congestion, tail latency |
 | `memory/storage/data movement` | checkpointing, dataset loading, shuffle, object store, SSD | burst buffer, compression, DMA, GPUDirect Storage, log-structured writes | checkpoint time, IOPS, write endurance, recovery time |
 | `runtime/system` | scheduler, batching, KV placement, prefill/decode, disaggregated serving | admission control, memory tiering, NIC offload, accelerator partitioning | only include when the idea exposes or controls a concrete hardware bottleneck |
 
@@ -492,14 +492,20 @@ The **Landscape Pack** is a fixed Markdown contract consumed by Workflow 1. It i
 | cluster | layer | mechanism_family | representative_papers | plateau_or_missing_piece |
 |---------|-------|------------------|-----------------------|--------------------------|
 
+### Evaluation Canon
+| field | extracted_items | supporting_papers | evidence_level | notes |
+|-------|-----------------|-------------------|----------------|-------|
+| evaluation_platforms |  |  |  | simulators, prototypes, real systems, analytical models, trace frameworks, or hardware platforms commonly used for this topic |
+| benchmarks_workloads |  |  |  | public benchmarks, traces, synthetic workloads, microbenchmarks, or application workloads used in this area |
+| baselines |  |  |  | systems, algorithms, hardware mechanisms, policies, or published results that papers compare against |
+| metrics |  |  |  | throughput, latency, tail behavior, bandwidth, utilization, energy, area, reliability, recovery time, or other topic-standard metrics |
+| validation_style |  |  |  | analytical sensitivity, trace replay, cycle simulation, RTL/HLS synthesis, hardware measurement, end-to-end system experiments, or other evidence norms |
+| known_limitations |  |  |  | missing traces, simulator abstraction gaps, platform bring-up cost, scale limits, unrealistic assumptions, or unavailable hardware |
+
 ### Simulator / Prototype Readiness
-| backend | readiness | fits_layers | what_it_can_validate | blocker |
-|---------|-----------|-------------|-----------------------|---------|
-| analytical_model | ready | all | first-order throughput/latency/resource pressure | none |
-| gem5 | ready/partial | compute, memory, interconnect-host | CPU/memory/PCIe/cache effects | model integration |
-| Broadcom/csg-htsim | ready/partial | interconnect/network | flow-level congestion and retransmission sensitivity | adapter availability |
-| cosim_gem5_htsim | ready/partial | memory + interconnect | window-level closed-loop host/network pressure | persistent-worker setup |
-| RTL/HLS/FPGA | partial | compute, NIC, storage datapath | area, timing, line-rate pipeline feasibility | platform bring-up |
+| backend | readiness | fits_layers | what_it_can_validate | supporting_papers | blocker |
+|---------|-----------|-------------|-----------------------|-------------------|---------|
+|  | ready/partial/future |  |  |  |  |
 
 ### Gap Seeds
 | gap_id | gap_type | layer | hardware_bottleneck | supporting_papers | evidence_level | possible_mechanism_hint | minimum validation backend | decisive_metric | main_risk_or_kill_reason |
@@ -511,6 +517,12 @@ Rules for **Gap Seeds**:
 - `runtime/system` seeds are valid only when `hardware_bottleneck` names a concrete resource such as HBM capacity, PCIe bandwidth, NIC queue pressure, memory copy amplification, or accelerator utilization.
 - Preprint-backed seeds are allowed under `EVIDENCE_POLICY = arxiv-ok`, but the `evidence_level` must expose that risk.
 - Include **Rx decompression expansion pressure** as a valid interconnect/network seed when the topic involves NIC/DPU compression: compressed wire bytes can expand into larger PCIe/host-memory writes, creating Rx buffer overflow, stalls, drops, and sender-side retransmission pressure.
+
+Rules for **Evaluation Canon** and **Simulator / Prototype Readiness**:
+- Fill these rows from the papers actually found for the current topic. Do not carry over platforms, benchmarks, baselines, or metrics from a previous topic unless the current literature uses them.
+- Prefer paper-standard platforms and benchmarks over locally convenient tools when judging credibility.
+- If a field is weak or missing, write `none_found` or `weak` and explain the evidence gap in `known_limitations`.
+- The readiness table should list both literature-standard backends and locally plausible backends, but `supporting_papers` must show which are common in the field.
 
 ### Step 4: Output
 
@@ -542,7 +554,7 @@ Bulleted list from Step 3c. These are the direct inputs for `/idea-creator` Phas
 Top 3 competing papers with positioning notes (from Step 3d).
 
 **Section 5 — Landscape Pack**
-The fixed `Landscape Pack` block from Step 3e. This is the primary machine-readable handoff for `/idea-creator`; include `Gap Seeds` even if only 2-3 high-quality seeds exist.
+The fixed `Landscape Pack` block from Step 3e. This is the primary machine-readable handoff for `/idea-creator`; include `Evaluation Canon` and `Gap Seeds` even if only 2-3 high-quality seeds exist.
 
 If Zotero BibTeX was exported, append a `references.bib` snippet for direct use in paper writing.
 
@@ -574,10 +586,10 @@ The saved file must include:
 3. **Section 2**: Landscape map by sub-direction (3–5 paragraphs)
 4. **Section 3**: Structural gaps — the 5-lens analysis (cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions)
 5. **Section 4**: Competitive landscape — top 3 competing papers with positioning
-6. **Section 5**: Landscape Pack — topic scope, bottleneck evidence, mechanism clusters, simulator/prototype readiness, and Gap Seeds
+6. **Section 5**: Landscape Pack — topic scope, bottleneck evidence, mechanism clusters, evaluation canon, simulator/prototype readiness, and Gap Seeds
 7. All reference links
 
-> Section 5 (Landscape Pack) is the primary input consumed by `/idea-creator`. Section 3 remains useful for human reading, but downstream idea generation should prioritize `Gap Seeds`.
+> Section 5 (Landscape Pack) is the primary input consumed by `/idea-creator`. Section 3 remains useful for human reading, but downstream idea generation should prioritize `Evaluation Canon` and `Gap Seeds`.
 
 #### Additional saves (optional)
 - If `ARXIV_DOWNLOAD = true`, save downloaded PDFs to the resolved `PAPER_LIBRARY`

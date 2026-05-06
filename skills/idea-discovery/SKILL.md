@@ -1,6 +1,6 @@
 ---
 name: idea-discovery
-description: "Workflow 1: Full idea discovery pipeline. Orchestrates research-lit → idea-creator → novelty-check → research-review to go from a broad research direction to validated, pilot-tested ideas. Use when user says \"找idea全流程\", \"idea discovery pipeline\", \"从零开始找方向\", or wants the complete idea exploration workflow."
+description: "Workflow 1: Full idea discovery pipeline. Orchestrates research-lit → idea-creator → novelty-check → research-review to go from a broad research direction to validated ideas with evaluation handoff plans. Use when user says \"找idea全流程\", \"idea discovery pipeline\", \"从零开始找方向\", or wants the complete idea exploration workflow."
 argument-hint: [research-direction]
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
 ---
@@ -22,10 +22,8 @@ Each phase builds on the previous one's output. The final deliverables are a val
 
 ## Constants
 
-- **PILOT_MAX_HOURS = 2** — Skip any lightweight architecture pilot estimated to take > 2 wall-clock hours. Flag as `pilot_status: designed_not_run` and record the readiness blocker.
-- **PILOT_TIMEOUT_HOURS = 3** — Hard timeout: kill any running pilot that exceeds 3 hours. Collect partial results if available.
-- **MAX_PILOT_IDEAS = 3** — Run or design pilots for at most 3 top ideas. Additional ideas are validated on paper only.
-- **MAX_TOTAL_PILOT_HOURS = 8** — Total wall-clock pilot budget across all ideas. If exceeded, skip remaining pilots and note the blocker in the report.
+- **MAX_HANDOFF_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not run pilots.
+- **MAX_READY_FOR_WORKFLOW_1_5 = 3** — Mark at most 3 ideas as immediate Workflow 1.5 candidates.
 - **AUTO_PROCEED = true** — If user doesn't respond at a checkpoint, automatically proceed with the best option after presenting results. Set to `false` to always wait for explicit user confirmation.
 - **CHECKPOINT_MODE = `standard`** — Controls human-in-the-loop stops. Values: `standard`, `auto`, `strict`, `custom`.
 - **CHECKPOINTS = `literature_scope, idea_selection`** — Used only when `CHECKPOINT_MODE = custom`. Valid checkpoint names: `literature_scope`, `idea_selection`, `pre_refine`, `final_report`.
@@ -50,7 +48,7 @@ Each phase builds on the previous one's output. The final deliverables are a val
 
 Checkpoint definitions:
 - `literature_scope`: after `/research-lit` produces the Landscape Pack and Gap Seeds.
-- `idea_selection`: after `/idea-creator` produces ranked ideas and lightweight pilot signals.
+- `idea_selection`: after `/idea-creator` produces ranked ideas with `overall_merit_score`, `evaluation_target_feasibility`, `core_baseline`, `canon_mapping`, metrics, `target_validation_style`, and Workflow 1.5 handoff status.
 - `pre_refine`: before `/research-refine-pipeline` turns the selected idea into a final proposal and experiment plan.
 - `final_report`: before finalizing `idea-stage/IDEA_REPORT.md`.
 
@@ -141,7 +139,7 @@ Invoke `/research-lit` to map the research landscape:
 - Infer the AI infrastructure layer and expand the topic within the same layer
 - Build a landscape map: sub-directions, approaches, open problems
 - Identify structural gaps, bottleneck evidence, and `Gap Seeds`
-- Output a structured `Landscape Pack` for downstream idea generation
+- Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon` and `Core Baseline Candidates`
 - Output a literature summary (saved to working notes)
 
 **Checkpoint `literature_scope`:** If enabled by `CHECKPOINT_MODE`, present the landscape summary to the user. Ask:
@@ -150,6 +148,8 @@ Invoke `/research-lit` to map the research landscape:
 📚 Literature survey complete. Here's what I found:
 - Inferred AI infra layer: [layer]
 - Key bottlenecks: [2-3 bullets]
+- Evaluation Canon: platforms=[EC-P* summary], workloads=[EC-W* summary]
+- Core Baseline Candidates: [CB* summary]
 - Gap Seeds: [top 3]
 
 Does this match your understanding? Should I adjust the scope before generating ideas?
@@ -159,7 +159,7 @@ Does this match your understanding? Should I adjust the scope before generating 
 - **User approves** (or checkpoint disabled / auto behavior) → proceed to Phase 2 with best direction.
 - **User requests changes** (e.g., "focus more on X", "ignore Y", "too broad") → refine the search with updated queries, re-run `/research-lit` with adjusted scope, and present again. Repeat until the user is satisfied.
 
-### Phase 2: Idea Generation + Filtering + Pilots
+### Phase 2: Idea Generation + Filtering + Evaluation Handoff
 
 Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUMMARY.md` if available):
 
@@ -169,21 +169,21 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 
 **What this does:**
 - If `idea-stage/REF_PAPER_SUMMARY.md` exists, include it as context — ideas should build on, improve, or extend the reference paper
-- Brainstorm 8-12 concrete Idea Cards from `Landscape Pack` / `Gap Seeds`
-- Filter by hard gates: LLM infrastructure problem, hardware bottleneck claim, and minimum validation path
-- Run quick novelty checks and fast-iteration scoring
-- Run or design lightweight architecture pilots for top 2-3 ideas
-- Rank by simulation readiness, implementation risk, LLM bottleneck importance, hardware insight, novelty, and pilot signal
+- Brainstorm 8-12 concrete idea candidates from `Landscape Pack` / `Gap Seeds`
+- Filter by the `idea-creator` scoring rubric: topic fit and concrete architecture/systems/measurement/benchmark question
+- Run quick novelty checks, overall merit scoring, and evaluation target feasibility assessment
+- Write evaluation handoff plans for the top 4-6 ideas
+- Rank by overall merit and evaluation target feasibility
 - Output `idea-stage/IDEA_REPORT.md`
 
 **Checkpoint `idea_selection`:** If enabled by `CHECKPOINT_MODE`, present `idea-stage/IDEA_REPORT.md` ranked ideas to the user. Ask:
 
 ```
-💡 Generated X ideas, filtered to Y, piloted Z. Top results:
+💡 Generated X ideas, filtered to Y, wrote Z evaluation handoff plans. Top results:
 
-1. [Idea 1] — layer: [layer], backend: [backend], pilot: POSITIVE, metric: [key_metric]
-2. [Idea 2] — layer: [layer], backend: [backend], pilot: DESIGNED_NOT_RUN, blocker: [blocker]
-3. [Idea 3] — layer: [layer], pilot: NEGATIVE, eliminated
+1. [Idea 1] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [CB*], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: [clear], handoff: ready
+2. [Idea 2] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [CB* or new_baseline_with_rationale], canon_mapping: [mapping], target_validation_style: [style], clarity: [partial], handoff: needs_canon_clarification
+3. [Idea 3] — merit: [1-4], feasibility: [low], handoff: designed_not_run, blocker: [main_blocker]
 
 Which ideas should I validate further? Or should I regenerate with different constraints?
 (If no response, I'll proceed with the top-ranked ideas.)
@@ -195,7 +195,7 @@ Which ideas should I validate further? Or should I regenerate with different con
 
 ### Phase 3: Deep Novelty Verification
 
-For each top idea (positive pilot signal), run a thorough novelty check:
+For each selected top idea with strong overall merit and a credible evaluation handoff, run a thorough novelty check:
 
 ```
 /novelty-check "[top idea 1 description]"
@@ -215,7 +215,7 @@ For each top idea (positive pilot signal), run a thorough novelty check:
 For the surviving top idea(s), get brutal feedback:
 
 ```
-/research-review "[top idea with hypothesis + pilot results]"
+/research-review "[top idea with idea_shape + overall_merit_score + evaluation_target_feasibility + core_baseline + canon_mapping + metrics + evaluation handoff plan]"
 ```
 
 **What this does:**
@@ -227,10 +227,10 @@ For the surviving top idea(s), get brutal feedback:
 
 ### Phase 4.5: Method Refinement + Experiment Planning
 
-After review, refine the top idea into a concrete proposal and plan experiments. If checkpoint `pre_refine` is enabled, pause here with the selected idea, novelty result, review summary, pilot signal, and known blockers before invoking the refinement pipeline:
+After review, refine the top idea into a concrete proposal and plan experiments. If checkpoint `pre_refine` is enabled, pause here with the selected idea, novelty result, review summary, evaluation handoff summary, and known blockers before invoking the refinement pipeline:
 
 ```
-/research-refine-pipeline "[top idea description + pilot results + reviewer feedback]"
+/research-refine-pipeline "[top idea description + evaluation handoff plan + reviewer feedback]"
 ```
 
 **What this does:**
@@ -259,7 +259,7 @@ Proceed to implementation? Or adjust the proposal?
 
 - **User approves** (or checkpoint disabled / auto behavior) → proceed to Final Report.
 - **User requests changes** → pass feedback to `/research-refine` for another round.
-- **Lite mode:** If reviewer score < 6 or pilot was weak, run `/research-refine` only (skip `/experiment-plan`) and note remaining risks in the report.
+- **Lite mode:** If reviewer score < 6 or the evaluation handoff is unclear, run `/research-refine` only (skip `/experiment-plan`) and note remaining risks in the report.
 
 ### Phase 5: Final Report
 
@@ -282,13 +282,22 @@ If checkpoint `final_report` is enabled, present the final report summary before
 [from Phase 2, updated with Phase 3-4 results]
 
 ### 🏆 Idea 1: [title] — RECOMMENDED
-- AI infra layer: [compute/accelerator | memory/storage/data movement | interconnect/network | runtime/system]
-- Hardware bottleneck: [concrete bottleneck]
-- Validation backend: [analytical_model | gem5 | Broadcom/csg-htsim | cosim_gem5_htsim | trace_replay | RTL/HLS | FPGA/DPU_microbench]
-- Pilot: [pilot_status], signal: [signal], key metric: [key_metric], blocker: [readiness_blocker]
-- Novelty: CONFIRMED (closest: [paper], differentiation: [what's different])
+- Idea shape: [compact summary of the idea, target gap, proposed mechanism/study, and why the answer matters]
+- Overall merit: [1-4] — [rationale]
+- evaluation_target_feasibility: high | medium | low | unknown
+- baseline_reproducibility: official_artifact | open_source_system | config_reproducible | paper_only | proprietary_or_unavailable | unknown
+- evaluation_environment_access: ready | small_adapter_needed | major_bringup_needed | unavailable | unknown
+- idea_adapter_cost: parameter_or_config_only | small_local_patch | moderate_adapter | major_system_change | new_platform_or_prototype
+- pilot_runtime_cost: minutes_to_hours | one_to_two_days | multi_day_to_two_weeks | long_running_or_large_scale | unknown
+- core_baseline: [CB* candidate or new baseline with rationale]
+- canon_mapping: platform=[EC-P*]; workload=[EC-W*]
+- metrics: [decisive metric first, secondary metrics if needed]
+- target_validation_style: analytical_model | simulator_evaluation | prototype_measurement
+- evaluation_target_clarity: clear | partial | missing
+- handoff_to_workflow_1_5: ready | needs_canon_clarification | designed_not_run
+- Novelty check: CONFIRMED (closest: [paper], differentiation: [what's different]; use this to update overall merit)
 - Reviewer score: X/10
-- Next step: implement full experiment → /auto-review-loop
+- Next step: /experiment-bridge → implement full experiment → /auto-review-loop
 
 ### Idea 2: [title] — BACKUP
 ...
@@ -302,7 +311,8 @@ If checkpoint `final_report` is enabled, present the final report summary before
 - Tracker: `refine-logs/EXPERIMENT_TRACKER.md`
 
 ## Next Steps
-- [ ] /run-experiment to deploy experiments from the plan
+- [ ] /experiment-bridge to create `refine-logs/EVALUATION_CONTRACT.md`
+- [ ] /run-experiment to deploy experiments selected by Workflow 1.5
 - [ ] /auto-review-loop to iterate until submission-ready
 - [ ] Or invoke /research-pipeline for the complete end-to-end flow
 ```
@@ -316,18 +326,24 @@ Write `idea-stage/IDEA_CANDIDATES.md` — a lean summary of the top 3-5 survivin
 ```markdown
 # Idea Candidates
 
-| # | Idea | Pilot Signal | Novelty | Reviewer Score | Status |
-|---|------|-------------|---------|---------------|--------|
-| 1 | [title] | +X% | Confirmed | X/10 | RECOMMENDED |
-| 2 | [title] | +Y% | Confirmed | X/10 | BACKUP |
-| 3 | [title] | Negative | — | — | ELIMINATED |
+| # | Idea | Overall Merit | Feasibility | Core Baseline | Handoff | Reviewer Score | Status |
+|---|------|---------------|-------------|---------------|---------|----------------|--------|
+| 1 | [title] | 1 | high | CB1 | ready | X/10 | RECOMMENDED |
+| 2 | [title] | 2 | medium | CB2 | needs_canon_clarification | X/10 | BACKUP |
+| 3 | [title] | 1 | low | new_baseline_with_rationale | designed_not_run | — | DEFERRED |
 
 ## Active Idea: #1 — [title]
-- Hypothesis: [one sentence]
-- AI infra layer:
-- Hardware bottleneck:
-- Validation backend:
-- Key evidence: [pilot result]
+- Idea shape:
+- core_baseline:
+- canon_mapping:
+- metrics:
+- target_validation_style:
+- evaluation_target_clarity:
+- evaluation_target_feasibility:
+- baseline_reproducibility:
+- evaluation_environment_access:
+- idea_adapter_cost:
+- pilot_runtime_cost:
 - Next step: /experiment-bridge or /research-refine
 ```
 
@@ -347,9 +363,9 @@ This file is intentionally small (~30 lines) so downstream skills and session re
 - **Don't skip phases.** Each phase filters and validates — skipping leads to wasted effort later.
 - **Checkpoint between phases.** Briefly summarize what was found before moving on.
 - **Kill ideas early.** It's better to kill 10 bad ideas in Phase 3 than to implement one and fail.
-- **Empirical signal > theoretical appeal.** An idea with a positive pilot outranks a "sounds great" idea without evidence.
+- **Evaluation clarity beats vibes.** A publishable idea needs a credible baseline, workload, metrics, and handoff path, even if Workflow 1 does not run the experiment yet.
 - **Document everything.** Dead ends are just as valuable as successes for future reference.
-- **Be honest with the reviewer.** Include negative results and failed pilots in the review prompt.
+- **Be honest with the reviewer.** Include unclear canon mapping, unclear comparison targets, feasibility limits, and deferred platform blockers in the review prompt.
 - **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final report. If absent/off, skip silently.
 
 ## Composing with Workflow 2
@@ -358,7 +374,8 @@ After this pipeline produces a validated top idea:
 
 ```
 /idea-discovery "direction"         ← you are here (Workflow 1, includes method refinement + experiment planning)
-/run-experiment                     ← deploy experiments from the plan
+/experiment-bridge                  ← create EVALUATION_CONTRACT.md and baseline-first execution path
+/run-experiment                     ← deploy experiments selected by Workflow 1.5
 /auto-review-loop "top idea"        ← Workflow 2: iterate until submission-ready
 
 Or use /research-pipeline for the full end-to-end flow.

@@ -442,6 +442,12 @@ For each relevant paper (from all sources), extract:
 - **Source**: Where we found it (Zotero/Obsidian/local/web) — helps user know what they already have vs what's new
 - **AI infrastructure layer**: compute/accelerator, memory/storage/data movement, interconnect/network, runtime/system, or multi-layer
 - **Evidence level**: `peer-reviewed`, `preprint`, `local-note`, or `title-abstract-only`
+- **Evaluation platform/backend**: simulator, artifact, benchmark harness, trace framework, prototype, or `not_reported`
+- **Benchmark/workload/trace**: workload family, trace, benchmark scenario, synthetic setup, or `not_reported`
+- **Compared baselines**: systems, policies, default configs, published results, or `not_reported`
+- **Metrics used**: primary and secondary metrics, or `not_reported`
+- **Artifact/code availability**: official artifact, open-source system, reproducible config, paper-only, unavailable, or `not_reported`
+- **Evaluation limitations**: simulator gaps, trace realism, scale limits, unavailable artifacts, workload representativeness, or `not_reported`
 
 ### Step 3: Synthesize — Landscape Map + Structural Gaps
 
@@ -502,14 +508,21 @@ The **Landscape Pack** is a fixed Markdown contract consumed by Workflow 1. It i
 | cluster | layer | mechanism_family | representative_papers | plateau_or_missing_piece |
 |---------|-------|------------------|-----------------------|--------------------------|
 
+### Evaluation Canon
+| canon_id | category | item | applies_to_layer_or_subtopic | supporting_papers | evidence_level | adoption_strength | artifact_or_access | limitations | notes |
+|----------|----------|------|------------------------------|-------------------|----------------|-------------------|--------------------|-------------|-------|
+| EC-P1 | evaluation_platform |  |  |  |  | common/occasional/single_paper/weak_or_missing | open_source/public_trace/public_benchmark/paper_only/requires_reimplementation/proprietary_or_unavailable/unknown |  |  |
+| EC-W1 | benchmark_workload |  |  |  |  | common/occasional/single_paper/weak_or_missing | open_source/public_trace/public_benchmark/paper_only/requires_reimplementation/proprietary_or_unavailable/unknown |  |  |
+
+### Core Baseline Candidates
+| baseline_id | baseline_name | paper_or_system | scenario | evaluation_platform_used | workload_used | metrics_used | artifact_status | notes |
+|-------------|---------------|-----------------|----------|--------------------------|---------------|--------------|-----------------|-------|
+| CB1 |  |  |  |  |  |  | official_artifact/open_source_system/config_reproducible/requires_reimplementation/paper_only/proprietary_or_unavailable/unknown |  |
+
 ### Simulator / Prototype Readiness
-| backend | readiness | fits_layers | what_it_can_validate | blocker |
-|---------|-----------|-------------|-----------------------|---------|
-| analytical_model | ready | all | first-order throughput/latency/resource pressure | none |
-| gem5 | ready/partial | compute, memory, interconnect-host | CPU/memory/PCIe/cache effects | model integration |
-| Broadcom/csg-htsim | ready/partial | interconnect/network | flow-level congestion and retransmission sensitivity | adapter availability |
-| cosim_gem5_htsim | ready/partial | memory + interconnect | window-level closed-loop host/network pressure | persistent-worker setup |
-| RTL/HLS/FPGA | partial | compute, NIC, storage datapath | area, timing, line-rate pipeline feasibility | platform bring-up |
+| backend | readiness | fits_layers | what_it_can_validate | supporting_papers | blocker |
+|---------|-----------|-------------|-----------------------|-------------------|---------|
+|  | ready/partial/future |  |  |  |  |
 
 ### Gap Seeds
 | gap_id | gap_type | layer | hardware_bottleneck | supporting_papers | evidence_level | possible_mechanism_hint | minimum validation backend | decisive_metric | main_risk_or_kill_reason |
@@ -522,6 +535,16 @@ Rules for **Gap Seeds**:
 - `runtime/system` seeds are valid only when `hardware_bottleneck` names a concrete resource such as HBM capacity, PCIe bandwidth, NIC queue pressure, memory copy amplification, or accelerator utilization.
 - Preprint-backed seeds are allowed under `EVIDENCE_POLICY = arxiv-ok`, but the `evidence_level` must expose that risk.
 - Include **Rx decompression expansion pressure** as a valid interconnect/network seed when the topic involves NIC/DPU compression: compressed wire bytes can expand into larger PCIe/host-memory writes, creating Rx buffer overflow, stalls, drops, and sender-side retransmission pressure.
+
+Rules for **Evaluation Canon**, **Core Baseline Candidates**, and **Simulator / Prototype Readiness**:
+
+- Evaluation Canon is an environment map, not an idea-specific decision. It must contain only `evaluation_platform` and `benchmark_workload` rows.
+- Use stable IDs: `EC-P*` for platforms and `EC-W*` for workloads. Downstream skills cite these IDs in `canon_mapping`.
+- Put platform/workload caveats in the row-level `limitations` field, such as simulator abstraction gap, trace realism issue, scale limit, missing network/storage/compute model, artifact unavailable, workload not representative, or platform bring-up cost.
+- Core Baseline Candidates is a baseline candidate pool. Include `metrics_used` because it records how that baseline was evaluated in its original paper/system; it does not force future ideas to use the same metrics.
+- Do not carry over platforms, workloads, baselines, or metrics from a previous topic unless the current literature uses them.
+- If a canon item or baseline candidate is weak or missing, write `none_found` or `weak_or_missing` and explain the evidence gap in `limitations` or `notes`.
+- The readiness table should list both literature-standard backends and locally plausible backends, but `supporting_papers` must show which are common in the field.
 
 ### Step 4: Output
 
@@ -557,7 +580,7 @@ Bulleted list from Step 3c. These are the direct inputs for `/idea-creator` Phas
 Top 3 competing papers with positioning notes (from Step 3d).
 
 **Section 5 — Landscape Pack**
-The fixed `Landscape Pack` block from Step 3e. This is the primary machine-readable handoff for `/idea-creator`; include `Gap Seeds` even if only 2-3 high-quality seeds exist.
+The fixed `Landscape Pack` block from Step 3e. This is the primary machine-readable handoff for `/idea-creator`; include `Evaluation Canon`, `Core Baseline Candidates`, and `Gap Seeds` even if only 2-3 high-quality seeds exist.
 
 If Zotero BibTeX was exported, append a `references.bib` snippet for direct use in paper writing.
 
@@ -591,10 +614,10 @@ The saved file must include:
 3. **Section 2**: Landscape map by sub-direction (3–5 paragraphs)
 4. **Section 3**: Structural gaps — the 5-lens analysis (cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions)
 5. **Section 4**: Competitive landscape — top 3 competing papers with positioning
-6. **Section 5**: Landscape Pack — topic scope, bottleneck evidence, mechanism clusters, simulator/prototype readiness, and Gap Seeds
+6. **Section 5**: Landscape Pack — topic scope, bottleneck evidence, mechanism clusters, evaluation canon, core baseline candidates, simulator/prototype readiness, and Gap Seeds
 7. All reference links
 
-> Section 5 (Landscape Pack) is the primary input consumed by `/idea-creator`. Section 3 remains useful for human reading, but downstream idea generation should prioritize `Gap Seeds`.
+> Section 5 (Landscape Pack) is the primary input consumed by `/idea-creator`. Section 3 remains useful for human reading, but downstream idea generation should prioritize `Evaluation Canon`, `Core Baseline Candidates`, and `Gap Seeds`.
 
 #### Additional saves (optional)
 
