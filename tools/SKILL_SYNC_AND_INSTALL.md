@@ -128,6 +128,13 @@ The wrapper maps:
 
 Use `tools/install_claude_skills.sh` when the target repo is used by Claude Code and should read skills from `.claude/skills`.
 
+For the manifest-managed project installer, `tools/install_aris.sh` is the canonical path. It creates the same flat Claude skill links and also manages the project-local tools helper symlink described below:
+
+```bash
+bash tools/install_aris.sh /path/to/target/repo --dry-run --no-doc
+bash tools/install_aris.sh /path/to/target/repo --no-doc
+```
+
 Dry-run first:
 
 ```bash
@@ -149,11 +156,30 @@ This creates:
 
 The Claude installer uses the main `skills/` tree directly. It excludes Codex mirror and overlay packages.
 
+`tools/install_aris.sh` additionally creates:
+
+```text
+/path/to/target/repo/.aris/tools -> <aris-repo>/tools
+```
+
+This symlink is intentionally not recorded in `installed-skills.txt`. It is treated as managed only when its exact target is `<aris-repo>/tools`; an existing directory, file, or symlink to any other target is user-owned and must be preserved.
+
 After ARIS changes or after `git pull`, re-run the same command to reconcile added or removed skills:
 
 ```bash
 bash tools/install_claude_skills.sh --project /path/to/target/repo
+bash tools/install_aris.sh /path/to/target/repo --reconcile --no-doc
 ```
+
+Re-running `tools/install_aris.sh` refreshes both the flat skill symlinks and `.aris/tools`, which is required for helper-resolution chains such as `.aris/tools/research_wiki.py` and `.aris/tools/experiment_queue/queue_manager.py`.
+
+Uninstall removes only manifest-managed skill links and removes `.aris/tools` only if it is exactly the managed symlink:
+
+```bash
+bash tools/install_aris.sh /path/to/target/repo --uninstall --no-doc
+```
+
+User-created `.aris/tools` directories or symlinks to other targets are left in place.
 
 ## Recommended Update Flow
 
@@ -173,6 +199,7 @@ bash tools/install_aris_codex.sh /path/to/target/repo --reconcile
 
 # 4. Reconcile installed Claude skills in target repos
 bash tools/install_claude_skills.sh --project /path/to/target/repo
+bash tools/install_aris.sh /path/to/target/repo --reconcile --no-doc
 ```
 
 For Codex reviewer overlays, keep the overlay flag when reconciling:
