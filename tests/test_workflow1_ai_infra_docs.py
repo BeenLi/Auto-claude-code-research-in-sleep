@@ -14,6 +14,14 @@ def read_doc(path: str) -> str:
 
 
 class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
+    def test_agent_status_entrypoints_are_symlinks(self):
+        for path in ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]:
+            with self.subTest(path=path):
+                entry = ROOT / path
+                self.assertTrue(entry.is_symlink(), f"{path} must be a symlink")
+                self.assertEqual(Path("AGENT.md"), entry.readlink())
+                self.assertEqual((ROOT / "AGENT.md").resolve(), entry.resolve())
+
     def test_research_lit_uses_canonical_literature_review_output(self):
         for path in [
             "skills/research-lit/SKILL.md",
@@ -44,8 +52,11 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
 
     def test_active_contract_points_to_research_contract(self):
         for path in [
+            "AGENT.md",
             "AGENTS.md",
             "CLAUDE.md",
+            "GEMINI.md",
+            "templates/AGENT_MD_TEMPLATE.md",
             "templates/CLAUDE_MD_TEMPLATE.md",
         ]:
             with self.subTest(path=path):
@@ -53,7 +64,7 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
                 self.assertIn("contract: idea-stage/docs/research_contract.md", doc)
                 self.assertIn("Read idea-stage/docs/research_contract.md", doc)
                 self.assertNotIn("contract: refine-logs/EXPERIMENT_PLAN.md", doc)
-        for path in ["AGENTS.md", "CLAUDE.md"]:
+        for path in ["AGENT.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md"]:
             with self.subTest(path=path):
                 doc = read_doc(path)
                 self.assertIn("Reads `refine-logs/EXPERIMENT_PLAN.md`", doc)
@@ -61,7 +72,7 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
     def test_research_contract_exists_and_contains_current_state(self):
         doc = read_doc("idea-stage/docs/research_contract.md")
         for token in [
-            "Rx Expansion Budgeting for Compressed RDMA",
+            "C-Share",
             "Core Claims",
             "Method Summary",
             "Experiment Design Pointer",
@@ -70,7 +81,8 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
             "Current Evidence Status",
             "Immediate Research Gate",
             "refine-logs/EXPERIMENT_PLAN.md",
-            "M1 P0-only analytical sensitivity pack",
+            "shared compression-service fairness",
+            "No C-Share experiments have been executed yet",
         ]:
             self.assertIn(token, doc)
         self.assertNotIn("## Status", doc)
@@ -118,8 +130,10 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
 
     def test_idea_failure_refreshes_contract_from_candidate_pool(self):
         for path in [
+            "AGENT.md",
             "AGENTS.md",
             "CLAUDE.md",
+            "GEMINI.md",
             "skills/shared-references/research-contract-maintenance.md",
             "skills/skills-codex/shared-references/research-contract-maintenance.md",
         ]:
@@ -150,8 +164,10 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
 
     def test_no_stale_research_contract_path_or_topic_slug_in_active_docs(self):
         paths = [
+            "AGENT.md",
             "AGENTS.md",
             "CLAUDE.md",
+            "GEMINI.md",
             "docs/PROJECT_FILES_GUIDE.md",
             "docs/PROJECT_FILES_GUIDE_CN.md",
             "docs/SESSION_RECOVERY_GUIDE.md",
@@ -168,6 +184,7 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
             "skills/skills-codex/paper-plan/SKILL.md",
             "skills/auto-review-loop/SKILL.md",
             "skills/skills-codex/auto-review-loop/SKILL.md",
+            "templates/AGENT_MD_TEMPLATE.md",
             "templates/CLAUDE_MD_TEMPLATE.md",
             "templates/IDEA_CANDIDATES_TEMPLATE.md",
             "templates/IDEA_CANDIDATES_TEMPLATE_CN.md",
@@ -214,40 +231,40 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
         ]:
             self.assertIn(token, doc)
 
-    def test_idea_creator_reports_architecture_pilot_fields(self):
+    def test_idea_creator_reports_evaluation_handoff_fields(self):
         doc = read_doc("skills/idea-creator/SKILL.md")
 
         for token in [
-            "ai_infra_layer",
-            "hardware_bottleneck",
-            "validation_backend",
-            "pilot_status",
-            "pilot_budget",
-            "pilot_command_or_plan",
-            "key_metric",
-            "signal",
-            "readiness_blocker",
-            "Rx decompression expansion pressure",
+            "canon_mapping",
+            "core_baseline",
+            "metrics",
+            "target_validation_style",
+            "evaluation_target_clarity",
+            "evaluation_target_feasibility",
+            "baseline_reproducibility",
+            "evaluation_environment_access",
+            "idea_adapter_cost",
+            "pilot_runtime_cost",
+            "handoff_to_workflow_1_5",
         ]:
             self.assertIn(token, doc)
 
         self.assertNotIn("deploy to GPU", doc)
         self.assertNotIn("Requires > 1 week GPU time", doc)
 
-    def test_idea_discovery_defines_checkpoint_modes(self):
+    def test_idea_discovery_defines_handoff_controls(self):
         doc = read_doc("skills/idea-discovery/SKILL.md")
 
         for token in [
-            "CHECKPOINT_MODE = `standard`",
-            "CHECKPOINTS = `literature_scope, idea_selection`",
-            "standard",
-            "auto",
-            "strict",
-            "custom",
-            "literature_scope",
-            "idea_selection",
-            "pre_refine",
-            "final_report",
+            "MAX_HANDOFF_IDEAS = 6",
+            "MAX_READY_FOR_WORKFLOW_1_5 = 3",
+            "AUTO_PROCEED = true",
+            "Literature Survey",
+            "Idea Generation",
+            "Deep Novelty Verification",
+            "External Critical Review",
+            "Method Refinement",
+            "Final Report",
         ]:
             self.assertIn(token, doc)
 

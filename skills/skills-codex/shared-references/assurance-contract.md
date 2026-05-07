@@ -100,7 +100,7 @@ human-readable Markdown sibling). The JSON must contain at minimum:
     "/Users/me/project/results/run_2026_04_19.json": "sha256:c9e4..."
   },
   "trace_path": ".aris/traces/paper-claim-audit/2026-04-21_run01/",
-  "thread_id":  "019dae73-fc12-4ab8-...",
+  "agent_id":  "019dae73-fc12-4ab8-...",
   "reviewer_model": "gpt-5.5",
   "reviewer_reasoning": "xhigh",
   "generated_at": "2026-04-21T14:23:01Z",
@@ -124,7 +124,7 @@ Field semantics:
     after running `paper-claim-audit`? The next verifier run will catch it.)
 - **`trace_path`** — directory containing the full reviewer prompt + response
   pair, per `review-tracing.md`. Required for mandatory audits — not optional.
-- **`thread_id`** — Codex MCP thread ID, for forensic traceability.
+- **`agent_id`** — Codex subagent ID, for forensic traceability.
 - **`reviewer_model`** + **`reviewer_reasoning`** — proves cross-family review
   invariant was honored.
 - **`generated_at`** — UTC ISO-8601 timestamp ending in `Z`.

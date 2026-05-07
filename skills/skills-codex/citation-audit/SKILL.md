@@ -38,8 +38,8 @@ The dangerous citation problems are **not** wildly fake citations — those are 
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.5`** — Used via Codex MCP. Default for cross-model review with web access.
-- **CONTEXT_POLICY = `fresh`** — Each audit run uses a new reviewer thread (REVIEWER_BIAS_GUARD). Never `codex-reply`.
+- **REVIEWER_MODEL = `gpt-5.5`** — Used via Codex subagent. Default for cross-model review with web access.
+- **CONTEXT_POLICY = `fresh`** — Each audit run uses a new reviewer thread (REVIEWER_BIAS_GUARD). Never `send_input`.
 - **WEB_SEARCH = required** — The reviewer must perform real web/DBLP/arXiv lookups, not pattern-match from memory.
 - **OUTPUT = `CITATION_AUDIT.md`** — Human-readable per-entry verdict report.
 - **STATE = `CITATION_AUDIT.json`** — Machine-readable verdict ledger consumable by downstream tools.
@@ -69,14 +69,14 @@ Save the extracted contexts to `paper/.aris/citation-audit/contexts.txt` so the 
 
 ### Step 3: Send each entry to fresh cross-model reviewer
 
-For each bib entry, invoke `spawn_agent` (NOT `codex-reply` — fresh thread per entry, or batch with explicit per-entry isolation):
+For each bib entry, invoke `spawn_agent` (NOT `send_input` — fresh agent per entry, or batch with explicit per-entry isolation):
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: gpt-5.5
+  config: {"model_reasoning_effort": "xhigh"}
   sandbox: read-only
-  message: |
+  prompt: |
     You are auditing a bibliographic entry. Use web/DBLP/arXiv search.
 
     ## Bib entry
@@ -148,7 +148,7 @@ Concretely, `details` carries the per-entry ledger:
 
 See "Submission Artifact Emission" for the full artifact (top-level
 fields `audit_skill`, `verdict`, `reason_code`, `summary`,
-`audited_input_hashes`, `trace_path`, `thread_id`, `reviewer_model`,
+`audited_input_hashes`, `trace_path`, `agent_id`, `reviewer_model`,
 `reviewer_reasoning`, `generated_at`, `details`).
 
 ### Step 5: Generate human-readable report
@@ -273,7 +273,7 @@ The artifact conforms to the schema in `shared-references/assurance-contract.md`
     "sections/3.related.tex":     "sha256:..."
   },
   "trace_path":       ".aris/traces/citation-audit/<date>_run<NN>/",
-  "thread_id":        "<codex mcp thread id>",
+  "agent_id":        "<codex mcp agent id>",
   "reviewer_model":   "gpt-5.5",
   "reviewer_reasoning": "xhigh",
   "generated_at":     "<UTC ISO-8601 timestamp ending in Z>",
@@ -316,8 +316,8 @@ any file outside the paper dir.
 ### Thread independence
 
 Every invocation uses a fresh `spawn_agent` thread. Never
-`codex-reply`. Do not accept prior audit outputs (PROOF_AUDIT,
-PAPER_CLAIM_AUDIT, EXPERIMENT_LOG) as input — the fresh thread preserves
+`send_input`. Do not accept prior audit outputs (PROOF_AUDIT,
+PAPER_CLAIM_AUDIT, EXPERIMENT_LOG) as input — the fresh agent preserves
 reviewer independence per `shared-references/reviewer-independence.md`.
 
 This skill never blocks by itself; `paper-writing` Phase 6 plus the

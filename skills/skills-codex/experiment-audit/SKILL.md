@@ -27,7 +27,7 @@ This follows `shared-references/reviewer-independence.md` and `shared-references
 
 ## Constants
 
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 
 ## Workflow
 
@@ -47,17 +47,17 @@ Scan project directory for:
 
 **DO NOT summarize, interpret, or explain any file content.** Only collect paths.
 
-### Step 2: Send to Reviewer (GPT-5.5 via Codex MCP)
+### Step 2: Send to Reviewer (GPT-5.5 via Codex subagent)
 
 Pass ONLY file paths and the audit checklist to the reviewer. The reviewer reads everything directly.
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: gpt-5.5
+  config: {"model_reasoning_effort": "xhigh"}
   sandbox: read-only
   cwd: [project directory]
-  message: |
+  prompt: |
     You are an experiment integrity auditor. Read ALL files listed below
     and check for the following fraud patterns.
 

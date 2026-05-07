@@ -34,7 +34,7 @@ Grant proposals argue for **future work** (feasibility + potential), not complet
 
 - **GRANT_TYPE = `KAKENHI`** — Default grant type. Supported: `KAKENHI`, `NSF`, `NSFC`, `ERC`, `DFG`, `SNSF`, `ARC`, `NWO`, `GENERIC`. Override via argument (e.g., `/grant-proposal "topic — NSF"`).
 - **GRANT_SUBTYPE = `auto`** — Sub-type within the grant agency. Examples: KAKENHI `Start-up`/`Wakate`/`Kiban-B`; NSFC `Youth`/`Excellent-Youth`/`Distinguished`/`Overseas`/`Key`; NSF `CAREER`/`CRII`/`Standard`. Auto-detected from argument or defaults to the most common sub-type.
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for proposal review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex subagent for proposal review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
 - **OUTPUT_FORMAT = `markdown`** — Output format. Supported: `markdown`, `latex`. LaTeX uses grant-specific templates when available.
 - **MAX_REVIEW_ROUNDS = 2** — Maximum external review-revise cycles before finalizing.
 - **OUTPUT_DIR = `grant-proposal/`** — Directory for generated proposal files.
@@ -135,7 +135,7 @@ Grant proposal drafting is a long task that may trigger context compaction. Pers
   "grant_type": "KAKENHI",
   "grant_subtype": "Start-up",
   "language": "Japanese",
-  "codex_thread_id": "019cfcf4-...",
+  "codex_agent_id": "019cfcf4-...",
   "gap_statement": "...",
   "aims_count": 3,
   "status": "in_progress",
@@ -319,7 +319,7 @@ Options for the user:
 - Reply **"back"** → return to Phase 1 to adjust the gap/positioning
 - Reply **"stop"** → save current structure to `grant-proposal/DRAFT_NOTES.md`
 
-**State**: Write `GRANT_STATE.json` with `phase: 2`, aims summary, and Codex threadId.
+**State**: Write `GRANT_STATE.json` with `phase: 2`, aims summary, and Codex agent_id.
 
 ### Phase 3: Section Drafting
 
@@ -425,7 +425,7 @@ Invoke `/research-review` on the complete draft for grant-type-specific evaluati
 - Provides ranked action items for improvement
 - All feedback saved to `grant-proposal/GRANT_REVIEW.md`
 
-> ⚠️ **Codex MCP fallback**: If `spawn_agent` is not available (no OpenAI API key), skip external review. Note "External review skipped — no Codex MCP available. Consider running `/auto-review-loop-llm` separately." in GRANT_REVIEW.md. The proposal is still usable without external review.
+> ⚠️ **Codex subagent fallback**: If `spawn_agent` is not available (no OpenAI API key), skip external review. Note "External review skipped — no Codex subagent available. Consider running `/auto-review-loop-llm` separately." in GRANT_REVIEW.md. The proposal is still usable without external review.
 
 If `/research-review` is invoked (preferred), it handles the Codex call internally. If calling Codex directly (e.g., to maintain thread context from Phase 2):
 
@@ -433,9 +433,9 @@ If `/research-review` is invoked (preferred), it handles the Codex call internal
 
 ```
 send_input:
-  threadId: [from Phase 2]
+  agent_id: [from Phase 2]
   config: {"model_reasoning_effort": "xhigh"}
-  message: |
+  prompt: |
     Review this complete [GRANT_TYPE] [GRANT_SUBTYPE] proposal draft.
 
     Act as a [GRANT_TYPE] review panelist. Evaluate using the official criteria:
@@ -462,9 +462,9 @@ If MAX_REVIEW_ROUNDS > 1 and revisions were applied:
 
 ```
 send_input:
-  threadId: [saved from Round 1]
+  agent_id: [saved from Round 1]
   config: {"model_reasoning_effort": "xhigh"}
-  message: |
+  prompt: |
     [Round N review of revised [GRANT_TYPE] [GRANT_SUBTYPE] proposal]
 
     Since your last review, I have applied the following changes:
@@ -587,7 +587,7 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 | `max review rounds` | 2 | External review cycles | — |
 | `sources` | all | Literature sources | → `/research-lit` |
 | `arxiv download` | false | Download arXiv PDFs | → `/research-lit` |
-| `reviewer model` | gpt-5.5 | Codex review model | → Codex MCP |
+| `reviewer model` | gpt-5.5 | Codex review model | → Codex subagent |
 | `auto proceed` | false | Skip checkpoints | — |
 
 ## Composing with Other Skills

@@ -1,6 +1,6 @@
 ---
 name: result-to-claim
-description: Use when experiments complete to judge what claims the results support, what they don't, and what evidence is still missing. Codex MCP evaluates results against intended claims and routes to next action (pivot, supplement, or confirm). Use after experiments finish — before writing the paper or running ablations.
+description: Use when experiments complete to judge what claims the results support, what they don't, and what evidence is still missing. Codex subagent evaluates results against intended claims and routes to next action (pivot, supplement, or confirm). Use after experiments finish — before writing the paper or running ablations.
 argument-hint: [experiment-description-or-wandb-run]
 allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, spawn_agent, send_input
 ---
@@ -42,8 +42,8 @@ Send the collected results to Codex for objective evaluation:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     RESULT-TO-CLAIM EVALUATION
 
     I need you to judge whether experimental results support the intended claim.
@@ -188,7 +188,7 @@ if research-wiki/ exists:
 - Do not inflate claims beyond what the data supports. If Codex says "partial", do not round up to "yes".
 - A single positive result on one dataset does not support a general claim. Be honest about scope.
 - If `confidence` is low, treat the judgment as inconclusive and add experiments rather than committing to a claim.
-- If Codex MCP is unavailable (call fails), CC makes its own judgment and marks it `[pending Codex review]` — do not block the pipeline.
+- If Codex subagent is unavailable (call fails), CC makes its own judgment and marks it `[pending Codex review]` — do not block the pipeline.
 - Always record the verdict and reasoning in findings.md, regardless of outcome.
 
 ## Review Tracing

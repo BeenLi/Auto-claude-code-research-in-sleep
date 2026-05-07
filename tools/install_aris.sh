@@ -19,7 +19,8 @@
 #   --aris-repo PATH       override aris-repo discovery
 #   --dry-run              show plan, no writes
 #   --quiet                no prompts; abort on any condition that would prompt
-#   --no-doc               skip CLAUDE.md update
+#   --with-doc             opt in to CLAUDE.md managed block update
+#   --no-doc               legacy compatibility; docs are skipped by default
 #   --adopt-existing NAME  adopt a non-managed symlink that already points to
 #                          the correct upstream target (repeatable)
 #   --replace-link NAME    replace an upstream-internal symlink that points to
@@ -70,6 +71,7 @@ ACTION="auto"        # auto | reconcile | uninstall
 DRY_RUN=false
 QUIET=false
 NO_DOC=false
+WITH_DOC=false
 FROM_OLD=false
 MIGRATE_COPY=""      # "" | keep-user | prefer-upstream
 CLEAR_STALE_LOCK=false
@@ -85,6 +87,7 @@ while [[ $# -gt 0 ]]; do
         --aris-repo)         ARIS_REPO_OVERRIDE="${2:?--aris-repo requires path}"; shift 2 ;;
         --dry-run)           DRY_RUN=true; shift ;;
         --quiet)             QUIET=true; shift ;;
+        --with-doc)          WITH_DOC=true; shift ;;
         --no-doc)            NO_DOC=true; shift ;;
         --from-old)          FROM_OLD=true; shift ;;
         --migrate-copy)      MIGRATE_COPY="${2:?--migrate-copy requires keep-user|prefer-upstream}"; shift 2 ;;
@@ -139,6 +142,27 @@ canonicalize() {
         if [[ -d "$1" ]]; then ( cd "$1" && pwd )
         else d="$(dirname "$1")"; f="$(basename "$1")"; ( cd "$d" 2>/dev/null && echo "$(pwd)/$f" )
         fi
+    fi
+}
+
+# Return the path to mutate for doc updates. If the agent entry file is a
+# symlink, write the resolved target so the entry symlink itself survives.
+resolve_doc_write_path() {
+    local doc="$1"
+    if [[ -L "$doc" ]]; then
+        local link target
+        link="$(read_link_target "$doc")" || { warn "cannot read doc symlink: $doc"; return 1; }
+        if [[ "$link" == /* ]]; then target="$link"
+        else target="$(dirname "$doc")/$link"; fi
+        target="$(canonicalize "$target")"
+        [[ -n "$target" ]] || { warn "cannot resolve doc symlink target: $doc -> $link"; return 1; }
+        if [[ -L "$target" ]]; then
+            warn "doc symlink target is still a symlink, skipping doc update: $target"
+            return 1
+        fi
+        echo "$target"
+    else
+        echo "$doc"
     fi
 }
 
@@ -541,11 +565,14 @@ commit_manifest() {
 # ─── CLAUDE.md best-effort update (compare-and-swap) ──────────────────────────
 update_claude_doc() {
     local installed_names_file="$1"
+    if ! $WITH_DOC || $NO_DOC; then return 0; fi
     [[ -f "$DOC_FILE" ]] || { log "  (skip CLAUDE.md: file not present)"; return 0; }
-    if $NO_DOC; then return 0; fi
+
+    local doc_path
+    doc_path="$(resolve_doc_write_path "$DOC_FILE")" || return 0
 
     local original new_block tmp
-    original="$(cat "$DOC_FILE")"
+    original="$(cat "$doc_path")"
     # Build new block
     local count; count="$(wc -l < "$installed_names_file" | tr -d ' ')"
     new_block="$BLOCK_BEGIN
@@ -560,7 +587,7 @@ $BLOCK_END"
     # Compute new content
     local new_content
     if printf '%s' "$original" | grep -qF "$BLOCK_BEGIN"; then
-        new_content="$(python3 - "$DOC_FILE" "$BLOCK_BEGIN" "$BLOCK_END" "$new_block" <<'PYEOF'
+        new_content="$(python3 - "$doc_path" "$BLOCK_BEGIN" "$BLOCK_END" "$new_block" <<'PYEOF'
 import re, sys, pathlib
 path, begin, end, body = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 text = pathlib.Path(path).read_text()
@@ -581,15 +608,15 @@ PYEOF
 
     # Compare-and-swap: re-read file, only commit if unchanged from snapshot
     if $DRY_RUN; then log "  (dry-run) would update CLAUDE.md ARIS block"; return 0; fi
-    tmp="$DOC_FILE.aris-tmp.$$"
+    tmp="$doc_path.aris-tmp.$$"
     printf '%s' "$new_content" > "$tmp"
-    local current; current="$(cat "$DOC_FILE")"
+    local current; current="$(cat "$doc_path")"
     if [[ "$current" != "$original" ]]; then
         rm -f "$tmp"
         warn "CLAUDE.md changed during install — skipping doc update (rerun to retry)"
         return 0
     fi
-    mv -f "$tmp" "$DOC_FILE"
+    mv -f "$tmp" "$doc_path"
     log "  ✓ updated CLAUDE.md (ARIS managed block)"
 }
 

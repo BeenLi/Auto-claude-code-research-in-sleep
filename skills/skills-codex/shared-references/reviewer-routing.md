@@ -2,13 +2,13 @@
 
 ## Default (NEVER changes without explicit user request)
 
-All review calls use **Codex MCP** (`mcp__codex__codex`) with `reasoning_effort: xhigh`.
+All review calls use **Codex subagent** (`spawn_agent`) with `reasoning_effort: xhigh`.
 
 This is the default for ALL skills. No parameter, no config, no effort level changes this.
 
 ## Optional: GPT-5.5 Pro via Oracle
 
-When the user explicitly passes `— reviewer: oracle-pro`, route the review through Oracle MCP instead of Codex MCP.
+When the user explicitly passes `— reviewer: oracle-pro`, route the review through Oracle MCP instead of Codex subagent.
 
 ### Routing Logic (add to any reviewer-invoking skill)
 
@@ -16,7 +16,7 @@ When the user explicitly passes `— reviewer: oracle-pro`, route the review thr
 Parse $ARGUMENTS for `— reviewer:` directive.
 
 If not specified OR `— reviewer: codex`:
-    → Use mcp__codex__codex with reasoning_effort: xhigh
+    → Use spawn_agent with reasoning_effort: xhigh
     → This is the DEFAULT. No change from current behavior.
 
 If `— reviewer: oracle-pro`:
@@ -30,7 +30,7 @@ If `— reviewer: oracle-pro`:
               or browser mode (slow ~1-2 min, needs Chrome + ChatGPT login)
     → If NOT available:
         Print: "⚠️ Oracle MCP not installed. Falling back to Codex xhigh."
-        Use mcp__codex__codex as normal.
+        Use spawn_agent as normal.
 ```
 
 ### Invariants

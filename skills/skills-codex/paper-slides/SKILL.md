@@ -24,7 +24,7 @@ Unlike posters (single page, visual-first), slides tell a **temporal story**: ea
 - **SPEAKER_NOTES = true** — Generate `\note{}` blocks in beamer and corresponding PPTX notes. Set `false` for clean slides without notes.
 - **PAPER_DIR = `paper/`** — Directory containing the compiled paper.
 - **OUTPUT_DIR = `slides/`** — Output directory for all slide files.
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for slide review.
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex subagent for slide review.
 - **AUTO_PROCEED = false** — At each checkpoint, **always wait for explicit user confirmation**.
 - **COMPILER = `latexmk`** — LaTeX build tool.
 - **ENGINE = `pdflatex`** — LaTeX engine. Use `xelatex` for CJK text.
@@ -62,7 +62,7 @@ Persist state to `slides/SLIDES_STATE.json` after each phase:
   "venue": "NeurIPS",
   "talk_type": "spotlight",
   "slide_count": 10,
-  "codex_thread_id": "019cfcf4-...",
+  "codex_agent_id": "019cfcf4-...",
   "status": "in_progress",
   "timestamp": "2026-03-18T07:00:00Z"
 }
@@ -314,14 +314,14 @@ If page count differs significantly from outline (>2 slides off), investigate.
 
 **State**: Write `SLIDES_STATE.json` with `phase: 4`.
 
-### Phase 5: Codex MCP Review
+### Phase 5: Codex subagent Review
 
 Send the slide outline + selected LaTeX frames to GPT-5.5 xhigh:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     Review this [TALK_TYPE] presentation ([TALK_MINUTES] min) for [VENUE].
 
     Evaluate using these criteria (score 1-5 each):

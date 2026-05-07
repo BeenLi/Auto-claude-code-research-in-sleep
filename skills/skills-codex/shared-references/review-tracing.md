@@ -4,12 +4,12 @@
 
 Save full prompt/response pairs for every cross-model reviewer call, enabling:
 - **Reviewer-independence audit**: verify the executor only passed file paths, not summaries
-- **Reproducibility**: threadId preservation allows conversation continuation
+- **Reproducibility**: agent_id preservation allows conversation continuation
 - **Meta-optimize input**: richer data for harness improvement analysis
 
 ## When to Trace
 
-After **every** `mcp__codex__codex` or `mcp__codex__codex-reply` call that serves a reviewer/critique function. This includes review scoring, experiment auditing, claim verification, idea critique, and patch gating.
+After **every** `spawn_agent` or `send_input` call that serves a reviewer/critique function. This includes review scoring, experiment auditing, claim verification, idea critique, and patch gating.
 
 Do NOT trace: purely informational LLM calls (e.g., `codex exec` for code generation that is not a review).
 
@@ -38,7 +38,7 @@ bash tools/save_trace.sh \
   --skill "<skill-name>" \
   --purpose "<purpose>" \
   --model "<model>" \
-  --thread-id "<threadId from response>" \
+  --thread-id "<agent_id from response>" \
   --prompt "<full prompt as sent>" \
   --response "<full response content>"
 ```
@@ -66,7 +66,7 @@ If the `tools/save_trace.sh` script is not available (e.g., on Codex CLI), write
   "call_number": 1,
   "purpose": "round-1-review",
   "timestamp": "2026-04-15T06:31:00Z",
-  "tool": "mcp__codex__codex",
+  "tool": "spawn_agent",
   "model": "gpt-5.5",
   "config": {"model_reasoning_effort": "xhigh"},
   "files_referenced": ["paper/sections/3_method.tex", "results/table1.csv"],
@@ -83,7 +83,7 @@ The reviewer's full response, verbatim. No truncation, no summarization.
   "call_number": 1,
   "purpose": "round-1-review",
   "timestamp": "2026-04-15T06:33:00Z",
-  "thread_id": "019d8fe0-b25d-...",
+  "agent_id": "019d8fe0-b25d-...",
   "model": "gpt-5.5",
   "duration_ms": 142000,
   "status": "ok"
@@ -102,7 +102,7 @@ Tracing respects three modes, set via inline parameter `--- trace: off | meta | 
 After writing a trace, append a compact summary event to `.aris/meta/events.jsonl`:
 
 ```json
-{"event":"review_trace","skill":"auto-review-loop","purpose":"round-1-review","thread_id":"...","trace_path":".aris/traces/auto-review-loop/2026-04-15_run01/","status":"ok"}
+{"event":"review_trace","skill":"auto-review-loop","purpose":"round-1-review","agent_id":"...","trace_path":".aris/traces/auto-review-loop/2026-04-15_run01/","status":"ok"}
 ```
 
 This allows `/meta-optimize` to discover traces without reading the full trace files.

@@ -127,9 +127,9 @@ Send each patch to GPT-5.5 xhigh for adversarial review:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: gpt-5.5
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are reviewing a proposed optimization to an ARIS SKILL.md file.
     
     ## Original Skill (relevant section)

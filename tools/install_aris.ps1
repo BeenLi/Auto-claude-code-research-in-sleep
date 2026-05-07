@@ -46,8 +46,11 @@
 .PARAMETER Force
     Replace existing target. Existing target is backed up to aris.backup.<timestamp>.
 
+.PARAMETER WithDoc
+    Opt in to updating CLAUDE.md / AGENTS.md. Docs are skipped by default.
+
 .PARAMETER NoDoc
-    Skip updating CLAUDE.md / AGENTS.md.
+    Legacy compatibility switch. Docs are skipped by default.
 
 .PARAMETER DryRun
     Print plan without making changes.
@@ -69,6 +72,7 @@ param(
     [string]$ArisRepo = '',
 
     [switch]$Force,
+    [switch]$WithDoc,
     [switch]$NoDoc,
     [switch]$DryRun
 )
@@ -107,6 +111,38 @@ function Resolve-ArisRepo {
 }
 
 $ArisRepoResolved = Resolve-ArisRepo
+
+function Resolve-DocWritePath {
+    param([string]$Path)
+
+    if (Test-Path -LiteralPath $Path) {
+        $item = Get-Item -LiteralPath $Path -Force
+        if ($item.LinkType -eq 'SymbolicLink') {
+            $target = $item.Target | Select-Object -First 1
+            if (-not [System.IO.Path]::IsPathRooted($target)) {
+                $target = Join-Path (Split-Path $Path -Parent) $target
+            }
+            try {
+                $resolved = (Resolve-Path -LiteralPath $target -ErrorAction Stop).Path
+            } catch {
+                $parent = Split-Path $target -Parent
+                if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+                    Write-Host "Warning: cannot resolve doc symlink target: $Path -> $target" -ForegroundColor Yellow
+                    return $null
+                }
+                $resolved = Join-Path (Resolve-Path -LiteralPath $parent).Path (Split-Path $target -Leaf)
+            }
+            $targetItem = Get-Item -LiteralPath $resolved -Force -ErrorAction SilentlyContinue
+            if ($targetItem -and ($targetItem.LinkType -eq 'SymbolicLink')) {
+                Write-Host "Warning: doc symlink target is still a symlink, skipping doc update: $resolved" -ForegroundColor Yellow
+                return $null
+            }
+            return $resolved
+        }
+    }
+
+    return $Path
+}
 
 # ─── Resolve platform ─────────────────────────────────────────────────────────
 function Detect-Platform {
@@ -208,7 +244,7 @@ if (Test-Path $TargetDir) {
 # ─── Apply ────────────────────────────────────────────────────────────────────
 if ($DryRun) {
     Write-Host "(dry-run) would create junction: $TargetDir -> $SourceDir"
-    if (-not $NoDoc) { Write-Host "(dry-run) would update doc:  $DocFile" }
+    if ($WithDoc -and (-not $NoDoc)) { Write-Host "(dry-run) would update doc:  $DocFile" }
     Write-Host "(dry-run) would record metadata: $ProjectPath\.aris\skill-source.txt"
     exit 0
 }
@@ -245,7 +281,11 @@ Set-Content -Path (Join-Path $arisDir 'skill-source.txt') -Value $metaContent -N
 Write-Host "✓ Recorded metadata: $arisDir\skill-source.txt" -ForegroundColor Green
 
 # Update managed block in CLAUDE.md / AGENTS.md
-if (-not $NoDoc) {
+if ($WithDoc -and (-not $NoDoc)) {
+    $ResolvedDocFile = Resolve-DocWritePath -Path $DocFile
+    if (-not $ResolvedDocFile) {
+        Write-Host "Warning: skipping doc update because the doc path could not be resolved." -ForegroundColor Yellow
+    } else {
     $blockBegin = '<!-- ARIS:BEGIN -->'
     $blockEnd   = '<!-- ARIS:END -->'
     $blockBody = @"
@@ -256,18 +296,19 @@ Do not use global skills or non-ARIS project skills unless the user explicitly a
 $blockEnd
 "@
 
-    if ((Test-Path $DocFile) -and ((Get-Content $DocFile -Raw) -match [regex]::Escape($blockBegin))) {
-        $text = Get-Content $DocFile -Raw
+    if ((Test-Path $ResolvedDocFile) -and ((Get-Content $ResolvedDocFile -Raw) -match [regex]::Escape($blockBegin))) {
+        $text = Get-Content $ResolvedDocFile -Raw
         $pattern = [regex]::Escape($blockBegin) + '.*?' + [regex]::Escape($blockEnd)
         $new = [regex]::Replace($text, $pattern, $blockBody, [System.Text.RegularExpressions.RegexOptions]::Singleline)
-        Set-Content -Path $DocFile -Value $new -NoNewline
+        Set-Content -Path $ResolvedDocFile -Value $new -NoNewline
         Write-Host "✓ Updated managed ARIS block in: $DocFile" -ForegroundColor Green
     } else {
-        if ((Test-Path $DocFile) -and ((Get-Item $DocFile).Length -gt 0)) {
-            Add-Content -Path $DocFile -Value ""
+        if ((Test-Path $ResolvedDocFile) -and ((Get-Item $ResolvedDocFile).Length -gt 0)) {
+            Add-Content -Path $ResolvedDocFile -Value ""
         }
-        Add-Content -Path $DocFile -Value $blockBody
+        Add-Content -Path $ResolvedDocFile -Value $blockBody
         Write-Host "✓ Appended managed ARIS block to: $DocFile" -ForegroundColor Green
+    }
     }
 }
 

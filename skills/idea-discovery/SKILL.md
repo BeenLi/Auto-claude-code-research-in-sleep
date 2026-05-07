@@ -24,33 +24,14 @@ Each phase builds on the previous one's output. The final deliverables are a val
 
 - **MAX_HANDOFF_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not run pilots.
 - **MAX_READY_FOR_WORKFLOW_1_5 = 3** — Mark at most 3 ideas as immediate Workflow 1.5 candidates.
-- **AUTO_PROCEED = true** — If user doesn't respond at a checkpoint, automatically proceed with the best option after presenting results. Set to `false` to always wait for explicit user confirmation.
-- **CHECKPOINT_MODE = `standard`** — Controls human-in-the-loop stops. Values: `standard`, `auto`, `strict`, `custom`.
-- **CHECKPOINTS = `literature_scope, idea_selection`** — Used only when `CHECKPOINT_MODE = custom`. Valid checkpoint names: `literature_scope`, `idea_selection`, `pre_refine`, `final_report`.
+- **AUTO_PROCEED = true** — After each phase summary, automatically proceed with the best option if the user does not respond. Set to `false` to wait for explicit user confirmation at phase decision points.
 - **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Passed to sub-skills.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 - **ARXIV_DOWNLOAD = false** — When `true`, `/research-lit` downloads the top relevant arXiv PDFs during Phase 1. When `false` (default), only fetches metadata. Passed through to `/research-lit`.
 - **COMPACT = false** — When `true`, generate compact summary files for short-context models and session recovery. Writes `idea-stage/IDEA_CANDIDATES.md` (top 3-5 ideas only) at the end of this workflow. Downstream skills read this instead of the full `idea-stage/IDEA_REPORT.md`.
 - **REF_PAPER = false** — Reference paper to base ideas on. Accepts: local PDF path, arXiv URL, or any paper URL. When set, the paper is summarized first (`idea-stage/REF_PAPER_SUMMARY.md`), then idea generation uses it as context. Combine with `base repo` for "improve this paper with this codebase" workflows.
 
-> 💡 These are defaults. Override by telling the skill, e.g., `/idea-discovery "topic" — checkpoint mode: strict`, `/idea-discovery "topic" — checkpoint mode: custom, checkpoints: literature_scope, idea_selection`, `/idea-discovery "topic" — ref paper: https://arxiv.org/abs/2406.04329`, or `/idea-discovery "topic" — compact: true`.
-
-## Checkpoint Semantics
-
-`CHECKPOINT_MODE` is the primary control. `AUTO_PROCEED` remains for backward compatibility; if both are set, `CHECKPOINT_MODE` wins.
-
-| Mode | Stops | Behavior |
-|------|-------|----------|
-| `auto` | none | Present summaries, choose the top-ranked option, and continue. Equivalent to old `AUTO_PROCEED=true` behavior. |
-| `standard` | `literature_scope`, `idea_selection` | Default. Stop after literature scope/GAP review and before committing to the top idea. |
-| `strict` | `literature_scope`, `idea_selection`, `pre_refine`, `final_report` | Stop at every major decision point. |
-| `custom` | value of `CHECKPOINTS` | Stop only at the comma-separated checkpoints requested by the user. |
-
-Checkpoint definitions:
-- `literature_scope`: after `/research-lit` produces the Landscape Pack and Gap Seeds.
-- `idea_selection`: after `/idea-creator` produces ranked ideas with `overall_merit_score`, `evaluation_target_feasibility`, `core_baseline`, `canon_mapping`, metrics, `target_validation_style`, and Workflow 1.5 handoff status.
-- `pre_refine`: before `/research-refine-pipeline` turns the selected idea into a final proposal and experiment plan.
-- `final_report`: before finalizing `idea-stage/IDEA_REPORT.md`.
+> 💡 These are defaults. Override by telling the skill, e.g., `/idea-discovery "topic" — auto proceed: false`, `/idea-discovery "topic" — ref paper: https://arxiv.org/abs/2406.04329`, or `/idea-discovery "topic" — compact: true`.
 
 ## Pipeline
 
@@ -142,7 +123,7 @@ Invoke `/research-lit` to map the research landscape:
 - Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon` and `Core Baseline Candidates`
 - Output a literature summary (saved to working notes)
 
-**Checkpoint `literature_scope`:** If enabled by `CHECKPOINT_MODE`, present the landscape summary to the user. Ask:
+**Literature scope summary:** Present the landscape summary to the user. Ask:
 
 ```
 📚 Literature survey complete. Here's what I found:
@@ -156,7 +137,7 @@ Does this match your understanding? Should I adjust the scope before generating 
 (If no response, I'll proceed with the top-ranked direction.)
 ```
 
-- **User approves** (or checkpoint disabled / auto behavior) → proceed to Phase 2 with best direction.
+- **User approves** (or `AUTO_PROCEED=true` behavior) → proceed to Phase 2 with best direction.
 - **User requests changes** (e.g., "focus more on X", "ignore Y", "too broad") → refine the search with updated queries, re-run `/research-lit` with adjusted scope, and present again. Repeat until the user is satisfied.
 
 ### Phase 2: Idea Generation + Filtering + Evaluation Handoff
@@ -176,7 +157,7 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 - Rank by overall merit and evaluation target feasibility
 - Output `idea-stage/IDEA_REPORT.md`
 
-**Checkpoint `idea_selection`:** If enabled by `CHECKPOINT_MODE`, present `idea-stage/IDEA_REPORT.md` ranked ideas to the user. Ask:
+**Idea selection summary:** Present `idea-stage/IDEA_REPORT.md` ranked ideas to the user. Ask:
 
 ```
 💡 Generated X ideas, filtered to Y, wrote Z evaluation handoff plans. Top results:
@@ -189,7 +170,7 @@ Which ideas should I validate further? Or should I regenerate with different con
 (If no response, I'll proceed with the top-ranked ideas.)
 ```
 
-- **User picks ideas** (or checkpoint disabled / auto behavior) → proceed to Phase 3 with top-ranked ideas.
+- **User picks ideas** (or `AUTO_PROCEED=true` behavior) → proceed to Phase 3 with top-ranked ideas.
 - **User unhappy with all ideas** → collect feedback ("what's missing?", "what direction do you prefer?"), update the prompt with user's constraints, and re-run Phase 2 (idea generation). Repeat until the user selects at least 1 idea.
 - **User wants to adjust scope** → go back to Phase 1 with refined direction.
 
@@ -227,7 +208,7 @@ For the surviving top idea(s), get brutal feedback:
 
 ### Phase 4.5: Method Refinement + Experiment Planning
 
-After review, refine the top idea into a concrete proposal and plan experiments. If checkpoint `pre_refine` is enabled, pause here with the selected idea, novelty result, review summary, evaluation handoff summary, and known blockers before invoking the refinement pipeline:
+After review, refine the top idea into a concrete proposal and plan experiments. Present a pre-refine summary with the selected idea, novelty result, review summary, evaluation handoff summary, and known blockers before invoking the refinement pipeline:
 
 ```
 /research-refine-pipeline "[top idea description + evaluation handoff plan + reviewer feedback]"
@@ -257,13 +238,13 @@ This is only a workflow-exit gate; experiment-plan is the semantic owner of `ref
 Proceed to implementation? Or adjust the proposal?
 ```
 
-- **User approves** (or checkpoint disabled / auto behavior) → proceed to Final Report.
+- **User approves** (or `AUTO_PROCEED=true` behavior) → proceed to Final Report.
 - **User requests changes** → pass feedback to `/research-refine` for another round.
 - **Lite mode:** If reviewer score < 6 or the evaluation handoff is unclear, run `/research-refine` only (skip `/experiment-plan`) and note remaining risks in the report.
 
 ### Phase 5: Final Report
 
-If checkpoint `final_report` is enabled, present the final report summary before writing the latest copy. Then finalize `idea-stage/IDEA_REPORT.md` with all accumulated information:
+Present the final report summary before writing the latest copy. Then finalize `idea-stage/IDEA_REPORT.md` with all accumulated information:
 
 ```markdown
 # Idea Discovery Report
@@ -361,7 +342,7 @@ This file is intentionally small (~30 lines) so downstream skills and session re
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 
 - **Don't skip phases.** Each phase filters and validates — skipping leads to wasted effort later.
-- **Checkpoint between phases.** Briefly summarize what was found before moving on.
+- **Summarize between phases.** Briefly state what was found before moving on.
 - **Kill ideas early.** It's better to kill 10 bad ideas in Phase 3 than to implement one and fail.
 - **Evaluation clarity beats vibes.** A publishable idea needs a credible baseline, workload, metrics, and handoff path, even if Workflow 1 does not run the experiment yet.
 - **Document everything.** Dead ends are just as valuable as successes for future reference.

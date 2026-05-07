@@ -31,8 +31,8 @@ CC reads available project files to build the full picture:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are a rigorous ML reviewer planning ablation studies.
     Given this method and results, design ablations that:
 

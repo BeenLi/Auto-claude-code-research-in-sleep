@@ -14,8 +14,8 @@ Systematically verify a mathematical proof via cross-model adversarial review, f
 ## Constants
 
 - MAX_REVIEW_ROUNDS = 3
-- REVIEWER_MODEL = `gpt-5.5` via Codex MCP, reasoning effort always `xhigh`
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- REVIEWER_MODEL = `gpt-5.5` via Codex subagent, reasoning effort always `xhigh`
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 - AUDIT_DOC: `PROOF_AUDIT.md` at the paper directory root, alongside `main.tex` (cumulative log; when invoked via `/paper-writing`, this is `paper/PROOF_AUDIT.md`)
 - REPORT_TEX: `proof_audit_report.tex` (formal before/after PDF)
 - STATE_FILE: `PROOF_CHECK_STATE.json` (for recovery)
@@ -181,8 +181,8 @@ Submit the **complete proof content** with the following **mandatory reviewer ch
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are performing a rigorous mathematical proof review. For EVERY theorem,
     lemma, and proposition, check ALL of the following:
 
@@ -221,7 +221,7 @@ spawn_agent:
     [FULL PROOF CONTENT HERE]
 ```
 
-**Save the threadId.** Parse into structured issue list. Write to `PROOF_AUDIT.md`.
+**Save the agent id.** Parse into structured issue list. Write to `PROOF_AUDIT.md`.
 
 ### Phase 1.5: Counterexample Red Team
 
@@ -292,7 +292,7 @@ pdflatex -interaction=nonstopmode <file>.tex 2>&1 | grep -E "Error|Warning|undef
 
 ### Phase 3: Re-Review (Codex GPT-5.5 xhigh)
 
-Use `codex-reply` with saved agent id. Include fix summaries. Request the same mandatory checklist.
+Use `send_input` with saved agent_id. Include fix summaries. Request the same mandatory checklist.
 
 Check acceptance gate. If not met, repeat Phases 2-3 (up to MAX_REVIEW_ROUNDS).
 
@@ -312,8 +312,8 @@ For any fix that resolved a FATAL or CRITICAL issue, submit the **fixed section 
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     Blind review of the following proof section. You have NOT seen any prior
     review or discussion. Check every step for correctness, hidden assumptions,
     illegal interchanges, and counterexamples.
@@ -358,7 +358,7 @@ Write `PROOF_CHECK_STATE.json`:
 {
   "status": "completed",
   "rounds": 2,
-  "threadId": "...",
+  "agent_id": "...",
   "fatal_fixed": 0,
   "critical_fixed": 3,
   "major_fixed": 2,
@@ -386,7 +386,7 @@ Write `PROOF_CHECK_STATE.json`:
 - **Claude analyzes, Codex reviews**: Claude reads proof, formulates questions, implements fixes. Codex provides adversarial review.
 - **Codex reasoning always xhigh**: Never downgrade.
 - **Send full content**: Don't summarize — send actual math for line-by-line checking.
-- **Preserve threadId**: Use `codex-reply` for follow-up rounds.
+- **Preserve agent_id**: Use `send_input` for follow-up rounds.
 
 ### Fix quality
 - **Minimal fixes**: Fix exactly what's broken, nothing more.
@@ -433,7 +433,7 @@ The artifact conforms to the schema in `shared-references/assurance-contract.md`
     "sections/4.theory.tex":    "sha256:..."
   },
   "trace_path":       ".aris/traces/proof-checker/<date>_run<NN>/",
-  "thread_id":        "<codex mcp thread id>",
+  "agent_id":        "<codex mcp agent id>",
   "reviewer_model":   "gpt-5.5",
   "reviewer_reasoning": "xhigh",
   "generated_at":     "<UTC ISO-8601 timestamp ending in Z>",
@@ -477,7 +477,7 @@ must carry an explicit justification in `summary` + `details.issues`.
 ### Thread independence
 
 Every invocation uses a fresh `spawn_agent` thread. Never
-`codex-reply` across proof-checker runs. Do not accept prior audit outputs
+`send_input` across proof-checker runs. Do not accept prior audit outputs
 (PAPER_CLAIM_AUDIT, CITATION_AUDIT, EXPERIMENT_LOG) as input — the fresh
 thread preserves reviewer independence per
 `shared-references/reviewer-independence.md`.

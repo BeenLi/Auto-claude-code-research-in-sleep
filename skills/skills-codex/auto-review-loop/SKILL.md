@@ -1,6 +1,6 @@
 ---
 name: auto-review-loop
-description: Autonomous multi-round research review loop. Repeatedly reviews via Codex MCP, implements fixes, and re-reviews until positive assessment or max rounds reached. Use when user says "auto review loop", "review until it passes", or wants autonomous iterative improvement.
+description: Autonomous multi-round research review loop. Repeatedly reviews via Codex subagent, implements fixes, and re-reviews until positive assessment or max rounds reached. Use when user says "auto review loop", "review until it passes", or wants autonomous iterative improvement.
 argument-hint: [topic-or-scope]
 allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, spawn_agent, send_input
 ---
@@ -16,8 +16,8 @@ Autonomously iterate: review → implement fixes → re-review, until the extern
 - MAX_ROUNDS = 4
 - POSITIVE_THRESHOLD: score >= 6/10, or verdict contains "accept", "sufficient", "ready for submission"
 - REVIEW_DOC: `review-stage/AUTO_REVIEW.md` (cumulative log) *(fall back to `./AUTO_REVIEW.md` for legacy projects)*
-- REVIEWER_MODEL = `gpt-5.4` — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`)
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro (`gpt-5-5-pro`) via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- REVIEWER_MODEL = `gpt-5.4` — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`)
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro (`gpt-5-5-pro`) via Oracle MCP. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `review-stage/`** — All review-stage outputs go here. Create the directory if it doesn't exist.
 - **HUMAN_CHECKPOINT = false** — When `true`, pause after each round's review (Phase B) and present the score + weaknesses to the user. Wait for user input before proceeding to Phase C. The user can: approve the suggested fixes, provide custom modification instructions, skip specific fixes, or stop the loop early. When `false` (default), the loop runs fully autonomously.
 - **COMPACT = false** — When `true`, (1) read `EXPERIMENT_LOG.md` and `findings.md` instead of parsing full logs on session recovery, (2) append key findings to `findings.md` after each round.
@@ -35,7 +35,7 @@ Long-running loops may hit the context window limit, triggering automatic compac
 ```json
 {
   "round": 2,
-  "threadId": "019cd392-...",
+  "agent_id": "019cd392-...",
   "status": "in_progress",
   "difficulty": "medium",
   "last_score": 5.0,
@@ -65,7 +65,7 @@ Long-running loops may hit the context window limit, triggering automatic compac
    - If it exists AND `status` is `"completed"`: **fresh start** (previous loop finished normally)
    - If it exists AND `status` is `"in_progress"` AND `timestamp` is older than 24 hours: **fresh start** (stale state from a killed/abandoned run — delete the file and start over)
    - If it exists AND `status` is `"in_progress"` AND `timestamp` is within 24 hours: **resume**
-     - Read the state file to recover `round`, `threadId`, `last_score`, `pending_experiments`
+     - Read the state file to recover `round`, `agent_id`, `last_score`, `pending_experiments`
      - Read `review-stage/AUTO_REVIEW.md` to restore full context of prior rounds *(fall back to `./AUTO_REVIEW.md`)*
      - If `pending_experiments` is non-empty, check if they have completed (e.g., check screen sessions)
      - Resume from the next round (round = saved round + 1)
@@ -88,8 +88,8 @@ Send comprehensive context to the external reviewer:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     [Round N/MAX_ROUNDS of autonomous review loop]
 
     [Full research context: claims, methods, results, known weaknesses]
@@ -105,7 +105,7 @@ spawn_agent:
     Be brutally honest. If the work is ready, say so clearly.
 ```
 
-If this is round 2+, use `send_input` with the saved agent id to maintain conversation context.
+If this is round 2+, use `send_input` with the saved agent_id to maintain conversation context.
 
 ##### Hard — MCP Review + Reviewer Memory
 
@@ -113,8 +113,8 @@ Same as medium, but **prepend Reviewer Memory** to the prompt:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     [Round N/MAX_ROUNDS of autonomous review loop]
 
     ## Your Reviewer Memory (persistent across rounds)
@@ -243,9 +243,9 @@ Send Claude's rebuttal back to GPT for a ruling:
 *Hard mode (MCP):*
 ```
 send_input:
-  threadId: [saved]
+  agent_id: [saved]
   config: {"model_reasoning_effort": "xhigh"}
-  message: |
+  prompt: |
     The author rebuts your review:
 
     [paste Claude's rebuttal]
@@ -395,7 +395,7 @@ This is the authoritative record. Do NOT truncate or paraphrase.]
 - Difficulty: [medium/hard/nightmare]
 ```
 
-**Write `review-stage/REVIEW_STATE.json`** with current round, threadId, score, verdict, and any pending experiments.
+**Write `review-stage/REVIEW_STATE.json`** with current round, agent_id, score, verdict, and any pending experiments.
 
 **Append to `findings.md`** (when `COMPACT = true`): one-line entry per key finding this round:
 
@@ -425,7 +425,7 @@ When loop ends (positive assessment or max rounds):
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 
 - ALWAYS use `config: {"model_reasoning_effort": "xhigh"}` for maximum reasoning depth
-- Save threadId from first call, use `send_input` for subsequent rounds
+- Save agent_id from first call, use `send_input` for subsequent rounds
 - **Anti-hallucination citations**: When adding references during fixes, NEVER fabricate BibTeX. Use the same DBLP → CrossRef → `[VERIFY]` chain as `/paper-write`: (1) `curl -s "https://dblp.org/search/publ/api?q=TITLE&format=json"` → get key → `curl -s "https://dblp.org/rec/{key}.bib"`, (2) if not found, `curl -sLH "Accept: application/x-bibtex" "https://doi.org/{doi}"`, (3) if both fail, mark with `% [VERIFY]`. Do NOT generate BibTeX from memory.
 - Be honest — include negative results and failed experiments
 - Do NOT hide weaknesses to game a positive score
@@ -439,9 +439,9 @@ When loop ends (positive assessment or max rounds):
 
 ```
 send_input:
-  threadId: [saved from round 1]
+  agent_id: [saved from round 1]
   config: {"model_reasoning_effort": "xhigh"}
-  message: |
+  prompt: |
     [Round N update]
 
     Since your last review, we have:

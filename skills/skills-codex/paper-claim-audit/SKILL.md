@@ -82,9 +82,9 @@ Any .md file that is an executor-written summary
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: gpt-5.5
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are a paper-to-evidence auditor. You have ZERO prior context about
     this research. You will receive only paper source files and raw result
     files. Your job is to verify that every number in the paper exactly
@@ -236,7 +236,7 @@ Same pattern as `/experiment-audit`:
 
 ## Key Rules
 
-- **Fresh thread EVERY run.** Never use `codex-reply`. Never carry context.
+- **Fresh thread EVERY run.** Never use `send_input`. Never carry context.
 - **Zero executor interpretation.** Only file paths. No summaries.
 - **Only raw results.** No EXPERIMENT_LOG, no AUTO_REVIEW, no human summaries.
 - **Rounding rule.** Only standard rounding to displayed precision. 84.7% → 84.7% or 85% is OK. 84.7% → 85.3% is NOT OK.
@@ -269,7 +269,7 @@ The artifact conforms to the schema in `shared-references/assurance-contract.md`
     "/abs/path/to/results/run_2026_04_19.json": "sha256:..."
   },
   "trace_path":       ".aris/traces/paper-claim-audit/<date>_run<NN>/",
-  "thread_id":        "<codex mcp thread id>",
+  "agent_id":        "<codex mcp agent id>",
   "reviewer_model":   "gpt-5.5",
   "reviewer_reasoning": "xhigh",
   "generated_at":     "<UTC ISO-8601 timestamp ending in Z>",
@@ -312,7 +312,7 @@ external `results/` dirs. The verifier resolves relative entries via
 ### Thread independence
 
 Every invocation uses a fresh `spawn_agent` thread. Never
-`codex-reply`. Do not accept prior audit outputs (PROOF_AUDIT, CITATION_AUDIT,
+`send_input`. Do not accept prior audit outputs (PROOF_AUDIT, CITATION_AUDIT,
 EXPERIMENT_LOG, AUTO_REVIEW summaries) as input to this audit — the fresh
 thread preserves reviewer independence per
 `shared-references/reviewer-independence.md`.

@@ -130,9 +130,9 @@ For paper architecture figures, invoke cross-model review:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: gpt-5.5
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     Review this SVG figure for a technical paper (architecture / workflow diagram).
 
     Spec file: /path/to/spec.json

@@ -548,7 +548,18 @@ Rules for **Evaluation Canon**, **Core Baseline Candidates**, and **Simulator / 
 
 ### Step 4: Output
 
-Present six sections:
+Present seven sections:
+
+**Section 0 — Source Audit**
+A table documenting the execution status of all attempted data sources during this run. This provides transparency on fallback behaviors.
+
+```
+| Source | Status | Action Taken / Notes |
+|---|---|---|
+| Zotero | Unavailable | localhost 502, fell back to local/web |
+| arXiv API | Partial | Rate limited after 5 queries |
+| Local PDFs | Available | Parsed 3 files |
+```
 
 **Section 1 — Paper Table (primary)**
 
@@ -610,12 +621,13 @@ Example: `idea-stage/LITERATURE_REVIEW_20260502_041530Z.md`
 The saved file must include:
 
 1. A header with the generation date, skill name, and original topic query
-2. **Section 1**: Full paper table (with 🆕 markers if incremental)
-3. **Section 2**: Landscape map by sub-direction (3–5 paragraphs)
-4. **Section 3**: Structural gaps — the 5-lens analysis (cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions)
-5. **Section 4**: Competitive landscape — top 3 competing papers with positioning
-6. **Section 5**: Landscape Pack — topic scope, bottleneck evidence, mechanism clusters, evaluation canon, core baseline candidates, simulator/prototype readiness, and Gap Seeds
-7. All reference links
+2. **Section 0**: Source Audit — a table detailing the success, failure, or fallback state of each data source queried
+3. **Section 1**: Full paper table (with 🆕 markers if incremental)
+4. **Section 2**: Landscape map by sub-direction (3–5 paragraphs)
+5. **Section 3**: Structural gaps — the 5-lens analysis (cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions)
+6. **Section 4**: Competitive landscape — top 3 competing papers with positioning
+7. **Section 5**: Landscape Pack — topic scope, bottleneck evidence, mechanism clusters, evaluation canon, core baseline candidates, simulator/prototype readiness, and Gap Seeds
+8. All reference links
 
 > Section 5 (Landscape Pack) is the primary input consumed by `/idea-creator`. Section 3 remains useful for human reading, but downstream idea generation should prioritize `Evaluation Canon`, `Core Baseline Candidates`, and `Gap Seeds`.
 

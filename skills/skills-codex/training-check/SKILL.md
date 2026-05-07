@@ -15,7 +15,7 @@ Periodically read WandB metrics during training to catch problems early. Do not 
 
 - WANDB_ENTITY and WANDB_PROJECT: read from CLAUDE.md or passed as argument (format: `entity/project/run_id`)
 - CHECK_INTERVAL: starts at 10 minutes, then gradually increases if consistently healthy: 10 min → 20 min → 30 min → 60 min (cap)
-- REVIEWER_MODEL = `gpt-5.5` — used via Codex MCP for ambiguous cases only
+- REVIEWER_MODEL = `gpt-5.5` — used via Codex subagent for ambiguous cases only
 
 ## When to Use
 
@@ -65,8 +65,8 @@ Only escalate to Codex when the signal is ambiguous. For clearly good or clearly
 
 ```
 spawn_agent:
-  reasoning_effort: high
-  message: |
+  config: {"model_reasoning_effort": "high"}
+  prompt: |
     TRAINING HEALTH CHECK — need your judgment on ambiguous metrics.
 
     Run: <entity>/<project>/<run_id>

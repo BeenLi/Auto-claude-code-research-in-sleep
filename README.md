@@ -136,7 +136,7 @@ Two outputs: `PASTE_READY.txt` (exact char count, paste to venue) + `REBUTTAL_DR
 <summary>Earlier updates (2026-03-12 — 2026-04-17, 41 entries)</summary>
 
 - **2026-04-17** — 🔀 **`/experiment-queue` integrated into Workflow 1.5 + research-pipeline** — `experiment-bridge` Phase 4 Deploy now auto-routes by milestone job count: ≤5 jobs → `/run-experiment`, ≥10 jobs or phase dependencies → `/experiment-queue` (with OOM retry, stale-screen cleanup, wave-transition gating, crash-safe state). New `--- batch: queue` override for global force-queue mode. Large multi-seed sweeps from `EXPERIMENT_PLAN.md` (e.g., 36-cell `N × seed × n_train` grids) now get proper orchestration without manual queue invocation
-- **2026-04-17** — 🔗 **[Project-local symlink install](tools/install_aris.sh)** (resolves [#118](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/118)) — new recommended default install. `bash tools/install_aris.sh` auto-detects platform (Claude Code / Codex CLI), creates `.claude/skills/aris` or `.agents/skills/aris` symlink to the ARIS repo, adds a managed `<!-- ARIS:BEGIN -->` block to `CLAUDE.md` / `AGENTS.md` telling the agent to use only project-local skills, and records install metadata in `.aris/skill-source.txt`. **Solves the skill collision problem** when ARIS is mixed with Superpowers / OpenHands / other community packs in the same global skill directory. PowerShell version (`install_aris.ps1`) ships with junction support for Windows. **`smart_update.sh --target-subdir`** flag added for `.agents/skills/aris` (Codex) project-copy installs; symlinked installs now correctly refuse `smart_update` and direct users to `git pull`. Global install remains supported for power users
+- **2026-04-17** — 🔗 **[Project-local symlink install](tools/install_aris.sh)** (resolves [#118](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/118)) — new recommended default install. `bash tools/install_aris.sh` auto-detects platform (Claude Code / Codex CLI), creates `.claude/skills/aris` or `.agents/skills/aris` symlink to the ARIS repo, and records install metadata in `.aris/skill-source.txt`. It no longer writes `CLAUDE.md` / `AGENTS.md` unless you pass `--with-doc`. **Solves the skill collision problem** when ARIS is mixed with Superpowers / OpenHands / other community packs in the same global skill directory. PowerShell version (`install_aris.ps1`) ships with junction support for Windows. **`smart_update.sh --target-subdir`** flag added for `.agents/skills/aris` (Codex) project-copy installs; symlinked installs now correctly refuse `smart_update` and direct users to `git pull`. Global install remains supported for power users
 - **2026-04-16** — 🎨 **[`/figure-spec`](skills/figure-spec/SKILL.md)** — deterministic JSON→SVG renderer packaged as a first-class skill. Preferred default for architecture/workflow/pipeline/audit-cascade figures in papers. Shape-aware edge clipping (rect/circle/ellipse/diamond), self-loops, curved edges, multi-line labels with CJK width estimation. Editable vector output, reproducible (same spec → same SVG), no external API. **Phase 2b in Workflow 3 restored**: `illustration: figurespec` (new default) / `gemini` / `mermaid` / `false` — 4-way illustration selector with complementary strengths
 - **2026-04-16** — ⚙️ **[`/experiment-queue`](skills/experiment-queue/SKILL.md)** — SSH job queue for multi-seed/multi-config ML experiments. Designed from real 36-cell NeurIPS sweep pain points: OOM-aware retry with backoff, stale-screen cleanup, wave-transition race prevention, teacher→student phase dependencies, crash-safe scheduler that resumes from JSON state. Declarative grid specs expand automatically (e.g., `N × seed × n_train → 36 jobs`). Configurable `conda_hook` + `gpu_free_threshold_mib` for non-standard environments. Use for ≥10 jobs; `/run-experiment` stays for ad-hoc
 - **2026-04-15** — 🛡️ **Paper Writing Pipeline Hardening** — 10 empirically-motivated patches from a real NeurIPS run. `REVIEWER_BIAS_GUARD=true`: every review round uses a fresh thread (codex-reply inflated 3→8/10). Reviewer Independence Protocol: no fix summaries to reviewer. Step 4.5 Restatement Regression Test: catches theorem drift across fix rounds. Step 5.5 Kill Argument Exercise: final-round adversarial attack/defense for theory papers. Location-aware overfull blocking. Theory Paper Consistency Pass in `/paper-write`. Enforced Bib Hygiene with DBLP/CrossRef validation. Phase 5.5 Mandatory Final Claim Audit as submission gate. **Review Tracing Protocol**: full prompt/response pairs saved to `.aris/traces/` for reviewer-independence audit ([`review-tracing.md`](skills/shared-references/review-tracing.md), [`save_trace.sh`](tools/save_trace.sh)). Inspired by community contribution from @李傲龍
@@ -1210,7 +1210,7 @@ cd ~/your-paper-project
 bash ~/aris_repo/tools/install_aris.sh
 # → creates one symlink per skill: .claude/skills/<skill> → ~/aris_repo/skills/<skill>
 # → writes manifest .aris/installed-skills.txt (tracks every entry ARIS installed)
-# → updates managed CLAUDE.md ARIS block (best-effort, compare-and-swap)
+# → does not update agent docs unless you pass --with-doc
 # → re-runnable: rerun anytime to reconcile new/removed upstream skills
 
 # 3. To update existing skills' content for ALL attached projects:
@@ -1223,6 +1223,7 @@ bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project   # adds new symlink
 bash ~/aris_repo/tools/install_aris.sh --dry-run        # show plan, no changes
 bash ~/aris_repo/tools/install_aris.sh --uninstall      # remove only managed symlinks (per manifest)
 bash ~/aris_repo/tools/install_aris.sh --from-old       # migrate from old nested .claude/skills/aris/
+bash ~/aris_repo/tools/install_aris.sh --with-doc       # opt in to managed CLAUDE.md/AGENTS.md block
 
 # Windows (PowerShell, requires admin or developer mode for junctions):
 .\tools\install_aris.ps1 C:\path\to\your-paper-project
@@ -1750,8 +1751,6 @@ Skills are plain Markdown files. Fork and customize:
 | Constant | Default | Description | Pass-through |
 |----------|---------|-------------|:---:|
 | `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | → `idea-discovery` |
-| `CHECKPOINT_MODE` | standard | Workflow 1 checkpoint strategy: `auto`, `standard`, `strict`, `custom` | → `idea-discovery` |
-| `CHECKPOINTS` | literature_scope, idea_selection | Custom checkpoint list when `CHECKPOINT_MODE=custom` | → `idea-discovery` |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `idea-discovery` → `research-lit` |
 | `HUMAN_CHECKPOINT` | false | When `true`, pause after each review round for approval | → `auto-review-loop` |
 | `WANDB` | false | Auto-add W&B logging to experiments | → `experiment-bridge` → `run-experiment` |
@@ -1776,16 +1775,14 @@ Override inline: `/research-pipeline "topic" — auto proceed: false, illustrati
 
 | Constant | Default | Description | Pass-through |
 |----------|---------|-------------|:---:|
-| `PILOT_MAX_HOURS` | 2h | Skip any pilot estimated to take longer per GPU | — |
-| `PILOT_TIMEOUT_HOURS` | 3h | Hard timeout — kill runaway pilots, collect partial results | — |
-| `MAX_PILOT_IDEAS` | 3 | Maximum number of ideas to pilot in parallel | — |
-| `MAX_TOTAL_GPU_HOURS` | 8h | Total GPU budget across all pilots | — |
+| `MAX_HANDOFF_IDEAS` | 6 | Write evaluation handoff plans for at most 6 strong ideas; Workflow 1 does not run pilots | — |
+| `MAX_READY_FOR_WORKFLOW_1_5` | 3 | Mark at most 3 ideas as immediate Workflow 1.5 candidates | — |
 | `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | — |
-| `CHECKPOINT_MODE` | standard | Stop at literature scope and idea selection by default | — |
-| `CHECKPOINTS` | literature_scope, idea_selection | Custom checkpoint list for `CHECKPOINT_MODE=custom` | — |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `research-lit` |
+| `COMPACT` | false | Generate compact summary files for short-context models and session recovery | — |
+| `REF_PAPER` | false | Reference paper (PDF path or URL) to base ideas on | — |
 
-Override inline: `/idea-discovery "topic" — pilot budget: 4h per idea, sources: zotero, arxiv download: true`
+Override inline: `/idea-discovery "topic" — auto proceed: false, sources: zotero, arxiv download: true`
 
 ### Experiment Bridge (`experiment-bridge`)
 

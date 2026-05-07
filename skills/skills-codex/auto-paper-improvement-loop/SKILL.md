@@ -18,8 +18,8 @@ Unlike `/auto-review-loop` (which iterates on **research** — running experimen
 ## Constants
 
 - **MAX_ROUNDS = 2** — Two rounds of review→fix→recompile. Empirically, Round 1 catches structural issues (4→6/10), Round 2 catches remaining presentation issues (6→7/10). Diminishing returns beyond 2 rounds for writing-only improvements.
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for paper review.
-- **REVIEWER_BIAS_GUARD = true** — When `true`, every review round uses a fresh `spawn_agent` thread with no prior review context. Never use `send_input` for review rounds. Set to `false` only for deliberate debugging of the legacy behavior. **Empirical evidence (April 2026):** running the same paper with `codex-reply` + "since last round we did X" prompts inflated scores from real 3/10 → fake 8/10 across 5 rounds; switching to fresh threads recovered the true 3/10 assessment.
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex subagent for paper review.
+- **REVIEWER_BIAS_GUARD = true** — When `true`, every review round uses a fresh `spawn_agent` thread with no prior review context. Never use `send_input` for review rounds. Set to `false` only for deliberate debugging of the legacy behavior. **Empirical evidence (April 2026):** running the same paper with `send_input` + "since last round we did X" prompts inflated scores from real 3/10 → fake 8/10 across 5 rounds; switching to fresh agents recovered the true 3/10 assessment.
 - **REVIEW_LOG = `PAPER_IMPROVEMENT_LOG.md`** — Cumulative log of all rounds, stored in paper directory.
 - **HUMAN_CHECKPOINT = false** — When `true`, pause after each round's review and present score + weaknesses to the user. The user can approve fixes, provide custom modification instructions, skip specific fixes, or stop early. When `false` (default), runs fully autonomously.
 
@@ -37,7 +37,7 @@ If the context window fills up mid-loop, Claude Code auto-compacts. To recover, 
 ```json
 {
   "current_round": 1,
-  "threadId": "019ce736-...",
+  "agent_id": "019ce736-...",
   "last_score": 6,
   "status": "in_progress",
   "timestamp": "2026-03-13T13:00:00Z"
@@ -54,7 +54,7 @@ The reviewer must be context-naive on every round. Prior-round summaries, fix li
 
 Rules:
 - Every round starts with `spawn_agent`, not `send_input`.
-- Never pass a prior threadId into the next review prompt.
+- Never pass a prior agent_id into the next review prompt.
 - Never include "since last round", "we fixed", "after applying", or any fix summary in the reviewer prompt.
 - The only acceptable evidence of improvement is the current `.tex` source and compiled PDF.
 - If a fix cannot be observed in the files, the reviewer should not be told it happened.
@@ -88,9 +88,9 @@ Send the full paper text AND compiled PDF to GPT-5.5 xhigh:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: gpt-5.5
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are reviewing a [VENUE] paper. Please provide a detailed, structured review.
 
     ## Paper Files:
@@ -120,7 +120,7 @@ spawn_agent:
     self-containedness, notation consistency, AND visual presentation quality.
 ```
 
-Save the threadId for Round 2.
+Save the agent id for Round 2.
 
 ### Step 2b: Human Checkpoint (if enabled)
 
@@ -211,13 +211,13 @@ PY
 
 ### Step 5: Round 2 Review
 
-If `REVIEWER_BIAS_GUARD = true` (default), use a **fresh** `spawn_agent` thread for Round 2. Do not reuse the Round 1 threadId for prompting. Save the returned agent id only for recovery bookkeeping.
+If `REVIEWER_BIAS_GUARD = true` (default), use a **fresh** `spawn_agent` thread for Round 2. Do not reuse the Round 1 agent_id for prompting. Save the returned agent id only for recovery bookkeeping.
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: gpt-5.5
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are reviewing a [VENUE] paper. This is a fresh, zero-context review.
     Ignore any prior review rounds, prior fix lists, or executor explanations.
     Judge the paper only from the current LaTeX source and compiled PDF.
@@ -249,20 +249,20 @@ spawn_agent:
     self-containedness, notation consistency, and visual presentation quality.
 ```
 
-If `REVIEWER_BIAS_GUARD = false` (legacy debugging only), use `send_input` with the saved agent id; this is **not** the recommended path.
+If `REVIEWER_BIAS_GUARD = false` (legacy debugging only), use `send_input` with the saved agent_id; this is **not** the recommended path.
 
 ### Step 5.5: Kill Argument Exercise (theory papers only)
 
 Run this only if the paper is theory-heavy (≥5 `\begin{theorem}|\begin{lemma}|\begin{proposition}|\begin{corollary}` environments in the source) and only on the final scheduled round (`current_round == MAX_ROUNDS`).
 
-This is a late-stage adversarial check. It must always use **fresh** `spawn_agent` threads, never `codex-reply`, and it must not reuse any prior review context.
+This is a late-stage adversarial check. It must always use **fresh** `spawn_agent` threads, never `send_input`, and it must not reuse any prior review context.
 
 **Thread 1: Attack**
-- Use a fresh thread with only the current paper files.
+- Use a fresh agent with only the current paper files.
 - Prompt: "Construct the single best argument to reject this paper in 200 words. Focus on theorem validity, assumption mismatch, missing proof obligations, limit-order ambiguity, and claim/evidence gaps. Do not reference prior rounds or fixes."
 
 **Thread 2: Defense**
-- Use a second fresh thread with the current paper files plus the attack memo.
+- Use a second fresh agent with the current paper files plus the attack memo.
 - Prompt: "Now defend the paper against the attack memo. For each rejection point, classify it as already fixed, partially fixed, or still unresolved, and cite the current files. Do not reuse prior review context."
 
 **Merge rule**

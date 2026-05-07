@@ -17,63 +17,65 @@ For this repository, the default domain is **AI infrastructure for LLM** with a 
 
 ## Constants
 
-- **MAX_PILOT_IDEAS = 3** — Run pilots for at most 3 ideas. Additional strong ideas receive lightweight pilot plans but are not run in Workflow 1.
-- **MAX_PILOT_PLANS = 6** — Write lightweight pilot plans for at most 6 ideas.
-- **PILOT_MAX_HOURS = 2** — Keep each lightweight architecture pilot within two wall-clock hours. If a pilot needs platform bring-up, record `pilot_status: designed_not_run` and the blocker instead of stalling Workflow 1.
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- **MAX_HANDOFF_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not execute pilots.
+- **MAX_READY_FOR_WORKFLOW_1_5 = 3** — Mark at most 3 ideas as immediate Workflow 1.5 candidates.
+- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex subagent for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
-- **RANKING_PROFILE = `scientific-taste`** — Apply hard gates first, then rank by scientific taste, evaluation credibility, novelty, validation feasibility, and LLM infrastructure importance.
 
-> 💡 **Domain context**: This skill is configured for **AI infrastructure for LLM** research across compute/accelerator, memory/storage/data movement, interconnect/network, storage/checkpointing, and runtime/system. A concrete hardware or system bottleneck is mandatory. Simulator, trace, prototype, or platform readiness is a `readiness_risk` signal, not a default elimination reason.
 
-> Override via argument, e.g., `/idea-creator "topic" — pilot: analytical only`.
+> Override via argument, e.g., `/idea-creator "topic" — handoff: analytical_model only`.
 
 ## AI Infrastructure Layer Taxonomy
 
 Use this taxonomy to organize ideas and keep the brainstorm diverse. It is not a requirement that every run cover every layer, and ideas may be single-layer or multi-layer.
 
-| Layer | Examples | Typical validation backends | Key metrics |
-|-------|----------|-----------------------------|-------------|
-| `compute/accelerator` | attention/KV kernels, sparsity datapaths, inference accelerators, near-data compute | analytical model, gem5, GPGPU-Sim/Accel-Sim, RTL/HLS | TOPS/W, utilization, latency, SRAM pressure, area/power |
-| `memory/storage/data movement` | KV cache hierarchy, CXL memory, HBM pressure, compression, prefetch | analytical model, gem5, trace replay, microbench | GB/s, tail latency, cache miss rate, write amplification |
-| `interconnect/network` | collectives, congestion, packet/flow scheduling, transport offload, programmable datapaths | network simulator, gem5+network model, ns-3, microbench, trace replay | goodput, FCT, tail latency, retransmitted bytes, bandwidth utilization |
-| `storage/checkpointing/data pipeline` | checkpoint bursts, object store, SSD pipeline, data loading | analytical model, trace replay, storage microbench | checkpoint time, recovery time, IOPS, bandwidth, endurance |
-| `runtime/system` | batching, admission, prefill/decode split, KV placement | only when tied to hardware model; analytical/gem5/trace replay | HBM capacity, accelerator utilization, PCIe/network/storage traffic, tail latency |
+| Layer | Examples | Likely validation styles | Key metrics |
+|-------|----------|--------------------------|-------------|
+| `compute/accelerator` | attention/KV kernels, sparsity datapaths, inference accelerators, near-data compute | analytical_model, simulator_evaluation, prototype_measurement | TOPS/W, utilization, latency, SRAM pressure, area/power |
+| `memory/storage/data movement` | KV cache hierarchy, CXL memory, HBM pressure, compression, prefetch | analytical_model, simulator_evaluation, prototype_measurement | GB/s, tail latency, cache miss rate, write amplification |
+| `interconnect/network` | collectives, congestion, packet/flow scheduling, transport offload, programmable datapaths | analytical_model, simulator_evaluation, prototype_measurement | goodput, FCT, tail latency, retransmitted bytes, bandwidth utilization |
+| `storage/checkpointing/data pipeline` | checkpoint bursts, object store, SSD pipeline, data loading | analytical_model, simulator_evaluation, prototype_measurement | checkpoint time, recovery time, IOPS, bandwidth, endurance |
+| `runtime/system` | batching, admission, prefill/decode split, KV placement | analytical_model or simulator_evaluation, only when tied to a hardware/system bottleneck | HBM capacity, accelerator utilization, PCIe/network/storage traffic, tail latency |
+
+## Scoring and Filtering Rubric
+
+Use this rubric in Phase 3. Phase 2 only generates candidate ideas and hints.
 
 Hard gates:
-1. The problem must be an LLM infrastructure problem.
-2. The idea must name a concrete hardware or system bottleneck.
-3. The idea must have a minimum validation path: analytical model, simulator, trace replay, RTL/HLS sketch, prototype, or another credible route used in the topic's literature.
-
+1. The problem must be an LLM / AI infrastructure problem in the selected topic scope.
+2. The idea must name a concrete architecture, systems, measurement, benchmark, trace/workload, or mechanism question.
 
 Default weighted score after hard gates:
-- Scientific taste: 30%
-- Evaluation canon fit: 25%
-- Novelty: 20% (minimum 2/5)
-- Validation feasibility: 15%
-- LLM bottleneck importance: 10%
+- Overall merit: 60%
+- Evaluation target feasibility: 40%
 
-Readiness tiers:
-- **Ready**: can run now using existing analytical scripts, simulators, traces, public benchmarks, or local microbenchmarks.
-- **Partial**: needs adapter work, trace conversion, small benchmark construction, or lightweight modeling before it can run.
-- **Future**: needs new platform bring-up, large real cluster, proprietary traces, or unavailable hardware.
+`overall_merit_score` follows a MICRO/HPCA-style reviewer scale where 1 is best and 4 is worst:
+- `1`: Surprisingly new contribution, or likely to have major impact on future research/products; may inspire new research or start a new line.
+- `2`: New contribution, or likely to impact future research/products.
+- `3`: Incremental improvement, or likely to have minor impact.
+- `4`: No novelty, or unlikely to have meaningful impact.
 
-Treat readiness as `readiness_risk`. Do not eliminate a scientifically strong idea only because it is not immediately runnable; mark it as `designed_not_run` and describe the blocker unless there is no credible validation path at all.
+For weighted ranking, convert it with `overall_merit_points = 5 - overall_merit_score`.
+
+`evaluation_target_feasibility` estimates the distance to a credible first-signal pilot:
+- It is an aggregate score from `baseline_reproducibility`, `evaluation_environment_access`, `idea_adapter_cost`, and `pilot_runtime_cost`.
+- `high`: baseline is `official_artifact`, `open_source_system`, or `config_reproducible`; environment is `ready` or `small_adapter_needed`; idea adapter cost is `parameter_or_config_only`, `small_local_patch`, or `moderate_adapter`; `pilot_runtime_cost` is exactly `minutes_to_hours`; no subfactor is unknown and there is no unavailable/proprietary artifact, unavailable environment, or major platform bring-up.
+- `medium`: comparison target and evaluation environment are credible, but first-signal feedback takes `one_to_two_days` or `multi_day_to_two_weeks`, or the idea needs `major_system_change` while baseline/platform/workload remain available; no hard blocker is present.
+- `low`: baseline is paper-only/proprietary, platform/workload needs major bring-up, idea needs a new platform/prototype, workload is unavailable, or first-signal pilot is long-running/large-scale. Keep high-merit ideas as deferred rather than eliminated.
+- `unknown`: key artifact, platform, workload, baseline, or runtime information is missing; return to artifact/canon clarification rather than treating it as scientific rejection.
+
+For weighted ranking, map feasibility as `high=4`, `medium=3`, `low=2`, `unknown=1`.
 
 ## Evaluation Canon Extraction
 
 Before brainstorming, extract the current topic's evaluation canon from `idea-stage/LITERATURE_REVIEW.md`. This canon anchors idea quality without hard-coding any previous topic's assumptions.
 
 From the literature review, identify:
-- **evaluation_platforms**: simulators, prototypes, real systems, analytical models, trace frameworks, or hardware platforms commonly used by papers in this topic.
-- **benchmarks_workloads**: public benchmarks, traces, synthetic workloads, microbenchmarks, or application workloads used in the area.
-- **baselines**: systems, algorithms, hardware mechanisms, policies, or published results that papers compare against.
-- **metrics**: throughput, latency, tail behavior, bandwidth, utilization, energy, area, accuracy, reliability, recovery time, or other topic-standard metrics.
-- **validation_style**: the level of evidence papers usually provide, such as analytical sensitivity, trace replay, cycle simulation, RTL/HLS synthesis, hardware measurement, or end-to-end system experiments.
-- **known_limitations**: missing traces, simulator abstraction gaps, platform bring-up cost, scale limits, or unrealistic assumptions reported by the literature.
+- **Evaluation Canon**: item-level `evaluation_platform` and `benchmark_workload` rows with stable `EC-P*` / `EC-W*` IDs, supporting evidence, access status, and limitations.
+- **Core Baseline Candidates**: baseline candidates with stable `CB*` IDs, original evaluation platform/workload/metrics, artifact status, and notes.
 
-Use the canon in filtering and reviewer prompts. If the canon is weak or missing, mark `evaluation_canon_fit: weak` and explain what evidence would be needed; do not invent a platform requirement from a different topic.
+Use the canon in filtering and reviewer prompts as provenance for platform/workload choices. `canon_mapping` must only contain `platform=[EC-P*]; workload=[EC-W*]`. Baseline, metrics, and target validation style are idea-specific decisions: choose them from Core Baseline Candidates and the idea's hypothesis, not from a fixed canon menu. If the platform/workload canon is missing, mark `handoff_to_workflow_1_5: needs_canon_clarification` or `main_blocker: unclear_canon_mapping`; do not invent a platform requirement from a different topic.
 
 ## Workflow
 
@@ -85,7 +87,7 @@ Use the canon in filtering and reviewer prompts. If the canon is weak or missing
 if research-wiki/query_pack.md exists AND is less than 7 days old:
     Read query_pack.md and use it as initial landscape context:
     - Treat listed gaps as priority search seeds
-    - Treat failed ideas as a banlist (do NOT regenerate similar ideas)
+    - Treat failed ideas as context; only `already_done` or `low_overall_merit` ideas are hard banlist entries
     - Treat top papers as known prior work (do not re-search them)
     Still run Phase 1 below for papers from the last 3-6 months (wiki may be stale)
 else if research-wiki/ exists but query_pack.md is stale or missing:
@@ -110,10 +112,11 @@ Read: idea-stage/LITERATURE_REVIEW.md
 - **Section 2** (landscape map) → sub-direction clusters, what's been tried
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
 - **Section 4** (competitive landscape) → top competing papers and positioning
-- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence, simulator/prototype readiness, and `Gap Seeds`
-- **Evaluation canon** → platforms, benchmarks/workloads, baselines, metrics, validation style, and known limitations commonly used by papers in this topic
+- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence, Evaluation Canon, Core Baseline Candidates, simulator/prototype readiness, and `Gap Seeds`
+- **Evaluation Canon** → platform/workload rows commonly used by papers in this topic
+- **Core Baseline Candidates** → baseline candidates and their original platform/workload/metrics/artifact status
 
-Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {M} structural gaps, {K} Gap Seeds, and evaluation canon for {topic} identified."_
+Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {M} structural gaps, {K} Gap Seeds, {P} Evaluation Canon items, and {B} Core Baseline Candidates for {topic} identified."_
 
 **If not found**: Warn the user:
 > ⚠️ No `idea-stage/LITERATURE_REVIEW.md` found. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
@@ -124,13 +127,13 @@ Then run a condensed version: WebSearch across MICRO/ISCA/HPCA/NSDI/SIGCOMM for 
 
 ### Phase 2: Idea Generation (brainstorm with external LLM)
 
-Use the external LLM via Codex MCP for divergent thinking:
+Use the external LLM via Codex subagent for divergent thinking:
 
 ```
 spawn_agent:
-  reasoning_effort: xhigh
   model: REVIEWER_MODEL
-  message: |
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
     You are a senior computer architecture / systems researcher (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level) brainstorming research ideas.
 
     Research direction: [user's direction]
@@ -146,27 +149,28 @@ spawn_agent:
     [paste competitive landscape — top 3 papers and what they leave open]
 
     Landscape Pack (from /research-lit Section 5):
-    [paste Topic Scope, Bottleneck Evidence, Simulator / Prototype Readiness, and Gap Seeds]
+    [paste Topic Scope, Bottleneck Evidence, Evaluation Canon, Core Baseline Candidates, Simulator / Prototype Readiness, and Gap Seeds]
 
     Evaluation canon extracted from the literature:
-    [paste evaluation_platforms, benchmarks_workloads, baselines, metrics, validation_style, and known_limitations]
+    [paste item-level Evaluation Canon rows: evaluation_platform and benchmark_workload only, with EC-P*/EC-W* IDs, access status, and limitations]
 
-    Generate 8-12 concrete research ideas. For each idea:
-    1. One-sentence summary
-    2. Core hypothesis (what you expect to find and why)
-    3. ai_infra_layer: one of compute/accelerator, memory/storage/data movement, interconnect/network, storage/checkpointing/data pipeline, runtime/system, or multi-layer
-    4. hardware_bottleneck: the concrete resource pressure or timing path
-    5. evaluation_canon_fit: which platform, benchmark/workload, baseline, and metric from the canon would validate it
-    6. Minimum viable experiment (cheapest credible validation path for this topic)
-    7. Expected contribution type: hardware mechanism / microarchitecture / memory hierarchy / storage datapath / diagnostic / hardware-aware runtime / system design
-    8. validation_backend and readiness_risk: ready / partial / future, with the blocker if not runnable now
-    9. scientific_taste: why the result would be non-obvious and worth a reviewer caring about
-    10. Risk level: LOW / MEDIUM / HIGH
-    11. Estimated effort: hours / days / weeks / platform bring-up
-    12. Key metric that would constitute a win, chosen from the topic's evaluation canon when possible
+    Core baseline candidates extracted from the literature:
+    [paste Core Baseline Candidates rows with CB* IDs, original platform/workload/metrics, and artifact status]
+
+    Generate 8-12 concrete research ideas. Phase 2 is divergent: do not assign final ranking, feasibility, handoff, or Workflow 1.5 contract fields yet. For each idea:
+    1. idea_id: stable short ID
+    2. title
+    3. idea_shape: one compact paragraph describing the idea, the gap it targets, the proposed mechanism/study, and why the answer may matter
+    4. canon_platform_candidates: EC-P* candidates or missing
+    5. canon_workload_candidates: EC-W* candidates or missing
+    6. baseline_candidate_hint: CB* candidate or new_baseline_hint
+    7. validation_route_hint: analytical_model | simulator_evaluation | prototype_measurement | unknown
+    8. early_risk_notes
+    9. estimated_effort: hours | days | weeks | platform_bringup
 
     Prioritize ideas that are:
-    - Grounded in the topic's literature-derived evaluation canon
+    - Grounded in the topic's literature-derived platform/workload canon candidates
+    - Clear enough for Phase 3 to define the comparison target, decisive metrics, and target validation style
     - Diverse across AI infrastructure layers and research shapes, without requiring cross-layer mechanisms
     - Not "integrate X with Y" unless the integration reveals surprising performance/design insights
     - Differentiated from the 10-15 papers above
@@ -175,39 +179,43 @@ spawn_agent:
     Be creative but grounded. A great architecture idea is one whose answer — positive or negative — changes how people design AI infrastructure hardware or hardware/software boundaries.
 ```
 
-Save the threadId for follow-up.
+Save the agent id for follow-up.
 
 ### Phase 3: First-Pass Filtering
 
-For each generated idea, quickly evaluate:
+For each generated idea, convert the Phase 2 hints into authoritative ranking and handoff fields. Use the `Scoring and Filtering Rubric` above; do not redefine another scoring scheme here.
 
-1. **Hard gates**:
-   - LLM infrastructure problem: reject pure ML method ideas and unrelated architecture ideas.
-   - Hardware bottleneck claim: reject pure software scheduling unless it names a resource bottleneck and hardware-facing metric.
-   - Minimal validation path: reject ideas with no analytical, simulation, trace, RTL/HLS, prototype, or existing benchmark route.
+1. **Apply hard gates from the rubric**:
+   - Reject ideas outside the selected AI infrastructure topic.
+   - Reject ideas without a concrete architecture, systems, measurement, benchmark, trace/workload, or mechanism question.
 
-2. **Evaluation canon and readiness check**:
-   - Classify `ai_infra_layer` only for organization.
-   - Assign `evaluation_canon_fit`: platform, benchmark/workload, baseline, metrics, and validation style from the current topic's literature.
-   - Assign `validation_backend`: analytical model, simulator, trace replay, public benchmark, microbenchmark, RTL/HLS sketch, prototype, or future platform.
-   - Mark `readiness_risk` as `ready`, `partial`, or `future`; do not eliminate solely because an idea is not runnable now.
-   - For runtime/system ideas, keep only those tied to a measurable hardware or system bottleneck such as HBM capacity, PCIe/network traffic, accelerator utilization, memory-copy pressure, storage I/O, or tail latency.
+2. **Overall merit estimation**:
+   - Run a quick novelty check with 2-3 targeted searches for closest work; full `/novelty-check` comes later for survivors.
+   - Assign `overall_merit_score: 1 | 2 | 3 | 4` using the reviewer-style scale above.
+   - Write `overall_merit_rationale`: closest known work, differentiation, likely impact, and whether positive or negative results would matter.
+   - Use quick closest-work checks only to calibrate `overall_merit_score`: already-covered ideas should usually become `already_done` or score 4; differentiated and impactful ideas may score 1 or 2.
 
-3. **Workload availability**:
-   - Prefer public traces, synthetic LLM serving/training traffic, topic-standard benchmarks, microbenchmarks, or simulator-generated workloads when they match the evaluation canon.
-   - Mark ideas that require proprietary traces with no synthetic substitute as `readiness_risk: future` or `evaluation_canon_fit: weak`, rather than killing them by default.
+3. **Evaluation target definition**:
+   - Assign `canon_mapping`: `platform=[EC-P*]; workload=[EC-W*]`. Do not place baseline or metrics inside `canon_mapping`.
+   - Select `core_baseline` from Core Baseline Candidates, or use `new_baseline_with_rationale` when the comparison target is new.
+   - Assign `metrics`: decisive metric first, secondary metrics only when needed.
+   - Assign `target_validation_style`: `analytical_model`, `simulator_evaluation`, or `prototype_measurement`.
+   - Assign `evaluation_target_clarity`: `clear`, `partial`, or `missing`.
 
-4. **Novelty quick-check**: For each idea, do 2-3 targeted searches to see if it's already been done. Full `/novelty-check` comes later for survivors.
+4. **Evaluation target feasibility assessment**:
+   - Assign `baseline_reproducibility`: `official_artifact`, `open_source_system`, `config_reproducible`, `paper_only`, `proprietary_or_unavailable`, or `unknown`.
+   - Assign `evaluation_environment_access`: `ready`, `small_adapter_needed`, `major_bringup_needed`, `unavailable`, or `unknown`.
+   - Assign `idea_adapter_cost`: `parameter_or_config_only`, `small_local_patch`, `moderate_adapter`, `major_system_change`, or `new_platform_or_prototype`.
+   - Assign `pilot_runtime_cost`: `minutes_to_hours`, `one_to_two_days`, `multi_day_to_two_weeks`, `long_running_or_large_scale`, or `unknown`.
+   - Assign aggregate `evaluation_target_feasibility`: `high`, `medium`, `low`, or `unknown`, using the rubric. Explain the dominant cost or blocker.
 
-5. **Scientific taste and impact estimation**: Would a reviewer care about the result?
-   - Non-obvious bottleneck: does the idea expose a resource pressure or timing path people are likely underestimating?
-   - Mechanism insight: does it teach something deeper than "apply X to Y"?
-   - Design judgment: would a positive or negative result change how people build AI infrastructure?
-   - Evaluation credibility: does the proposed platform/benchmark/metric match what strong papers in this topic use?
-   - "So what?" test: if the experiment succeeds, does it change how people design AI infrastructure hardware or hardware/software boundaries?
-   - Is the finding actionable or just interesting?
-
-Apply the `scientific-taste` ranking profile after the hard gates: scientific taste 30%, evaluation canon fit 25%, novelty 20%, validation feasibility 15%, LLM bottleneck importance 10%. Typically 8-12 ideas reduce to 4-6.
+5. **Defer, eliminate, and rank**:
+   - Eliminate `overall_merit_score: 4` ideas by default. Negative-result, benchmark, or measurement ideas should only survive if the likely finding itself justifies `overall_merit_score: 1-3`.
+   - Mark high-merit but low-feasibility ideas as `handoff_to_workflow_1_5: designed_not_run`, not eliminated.
+   - Mark missing EC-P/EC-W evidence as `needs_canon_clarification` or `main_blocker: unclear_canon_mapping`.
+   - Mark unclear comparison targets as `main_blocker: unclear_comparison_target`.
+   - Mark ideas with no credible analytical, simulation, artifact, benchmark, trace/workload, or prototype route as `main_blocker: no_credible_evaluation_path` and eliminate or defer based on merit.
+   - Rank surviving ideas with `overall_merit` 60% and `evaluation_target_feasibility` 40%. Typically 8-12 ideas reduce to 4-6.
 
 ### Phase 4: Deep Validation (for top ideas)
 
@@ -215,57 +223,57 @@ For each surviving idea, run a deeper evaluation:
 
 1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + GPT-5.5 cross-verification) for each idea
 
-2. **Critical review**: Use GPT-5.5 via `send_input` (same thread):
+2. **Critical review**: Use GPT-5.5 via `send_input` (same agent):
    ```
    Here are our top ideas after filtering:
-   [paste surviving ideas with novelty check results, ai_infra_layer, hardware_bottleneck, evaluation_canon_fit, validation_backend, readiness_risk, scientific_taste, and pilot status]
+   [paste surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, metrics, target_validation_style, evaluation_target_clarity, evaluation_target_feasibility, feasibility subfields, handoff_to_workflow_1_5, and main_blocker]
 
    For each, play devil's advocate:
    - What's the strongest objection a MICRO/ISCA/HPCA/ASPLOS/NSDI reviewer would raise?
    - What's the most likely failure mode (e.g., bottleneck too small, simulator abstraction too weak, area/power overhead dominates, workload not representative)?
-   - Is the scientific taste strong, or is this just an engineering integration?
-   - Does the proposed platform/benchmark/baseline/metric match the topic's literature?
+   - What overall merit score would you assign, and why?
+   - Does the proposed platform/workload mapping cite the right EC-P*/EC-W* items?
+   - Is the selected core baseline credible for this idea, and are the chosen metrics decisive?
    - Is the novelty credible after considering the closest papers?
    - Which ideas have a positive-or-negative answer that would change design judgment?
+   - Is the evaluation target feasible enough for a credible first-signal pilot, or should it be deferred?
    - How would you rank these for a top venue submission?
-   - Which 2-3 would you actually pilot first, and which additional ideas deserve a designed_not_run pilot plan?
+   - Which 2-3 are ready for Workflow 1.5, and which high-upside ideas should be deferred or sent back for canon/comparison-target clarification?
 
    For runtime/system ideas:
    - Is the hardware bottleneck real and central, or is this a pure software scheduler?
    ```
 
-3. **Combine rankings**: Merge your assessment with GPT-5.5's ranking. Select top 4-6 ideas for lightweight pilot plans and top 2-3 ideas for pilots to run immediately when ready.
+3. **Combine rankings**: Merge your assessment with GPT-5.5's ranking. Select top 4-6 ideas for evaluation handoff plans and top 2-3 ideas as immediate Workflow 1.5 candidates when their comparison target, platform/workload mapping, and feasibility are clear enough.
 
-### Phase 5: Pilot Validation (plans for top 4-6, runs for top 2-3)
+### Phase 5: Evaluation Handoff Planning (top 4-6 ideas)
 
-Before committing to a full research effort, run or design cheap pilots to get early signal. For AI infrastructure architecture research, pilots are **analytical models, small simulator runs, trace replays, micro-benchmarks, or RTL/HLS sketches**. They are not full paper experiments.
+Workflow 1 does **not** run pilots or baseline reproduction. It only prepares enough evaluation context for Workflow 1.5 (`/experiment-bridge`) to lock an `EVALUATION_CONTRACT.md` and run baseline-first pilots after the idea and evaluation platform are selected.
 
-1. **Design pilots**: For each of the top 4-6 ideas, record `ai_infra_layer`, `hardware_bottleneck`, `evaluation_canon_fit`, and validation backend first. The pilot just needs to answer: **does the mechanism give meaningful signal before full implementation investment?**
+For each top 4-6 idea, write an `evaluation_handoff_plan`:
 
-   | Layer / backend | Pilot approach | What to run | Success signal |
-   |-----------------|---------------|-------------|---------------|
-   | Any / analytical model | Queue, bandwidth, latency, or resource model | First-order script with published baselines and sensitivity sweep | Model shows a decisive bottleneck and plausible gain |
-   | compute/accelerator | Kernel or pipeline model | Small simulator run, HLS/RTL sketch, or accelerator utilization trace | Utilization/latency/TOPS/W improves enough to justify mechanism |
-   | memory/storage/data movement | gem5 or trace replay | KV/cache/CXL/HBM traffic model, bandwidth amplification, prefetch or placement sensitivity | Tail latency, bandwidth, miss rate, or capacity pressure changes materially |
-   | interconnect/network | network simulation, trace replay, or microbench | Small flow/job smoke test, window summaries, congestion or tail-latency sensitivity when relevant | goodput, FCT, retransmitted bytes, queueing, utilization, or tail latency changes in expected direction |
-   | memory/storage/data movement | trace replay or storage microbench | checkpoint burst, compression, object-store, or SSD bandwidth replay | checkpoint/recovery time or I/O amplification improves |
-   | runtime/system | hardware-aware trace analysis | batching/admission/KV placement trace with hardware resource accounting | tail latency or throughput improves because a named hardware bottleneck is controlled |
-   | RTL/HLS/prototype | microarchitecture sketch | Minimal datapath or existing IP configuration, no full platform build required | throughput feasibility, area/power estimate, or platform blocker identified |
+```markdown
+### Evaluation Handoff Plan
 
-   - Default budget: `pilot_budget: <=2h mini-run`.
-   - If the backend is unavailable, set `pilot_status: designed_not_run`, write `pilot_command_or_plan`, and record `readiness_blocker`.
-   - Clear success metric defined upfront per row above.
+- **core_baseline**: [CB* candidate, or new baseline with rationale]
+- **canon_mapping**: platform=[EC-P*]; workload=[EC-W*]
+- **metrics**: [decisive metric first, secondary metrics if needed]
+- **target_validation_style**: analytical_model | simulator_evaluation | prototype_measurement
+- **evaluation_target_clarity**: clear | partial | missing
+- **evaluation_target_feasibility**: high | medium | low | unknown
+- **baseline_reproducibility**: official_artifact | open_source_system | config_reproducible | paper_only | proprietary_or_unavailable | unknown
+- **evaluation_environment_access**: ready | small_adapter_needed | major_bringup_needed | unavailable | unknown
+- **idea_adapter_cost**: parameter_or_config_only | small_local_patch | moderate_adapter | major_system_change | new_platform_or_prototype
+- **pilot_runtime_cost**: minutes_to_hours | one_to_two_days | multi_day_to_two_weeks | long_running_or_large_scale | unknown
+- **platform_access_path**: [repo/artifact/simulator/benchmark path, or adapter needed]
+- **main_blocker**: none | missing_artifact | trace_unavailable | backend_adapter | platform_bringup | unclear_canon_mapping | unclear_comparison_target | no_credible_evaluation_path | other
+- **handoff_to_workflow_1_5**: ready | needs_canon_clarification | designed_not_run
+```
 
-2. **Run pilots when ready**: Run at most `MAX_PILOT_IDEAS` pilots immediately. Use Bash to run analytical scripts, trace replays, small simulator invocations, or existing micro-benchmarks. Do not perform platform bring-up inside Workflow 1.
-
-3. **Collect results**: Once pilots complete, compare:
-   - Which ideas showed positive signal (model predicts improvement)?
-   - Which showed null/negative signal? (eliminate or deprioritize)
-   - Any surprising findings that suggest a pivot?
-
-4. **Re-rank based on pilot evidence**: An idea with strong analytical/simulation signal jumps ahead of a theoretically appealing but unvalidated idea, unless novelty or scientific taste is below the minimum bar. Do not eliminate a strong idea solely because the pilot was only designed and not run.
-
-Note: Skip this phase if no simulation environment or hardware is available. Flag skipped ideas as "needs pilot validation" in the report.
+Handoff rules:
+- `ready`: core baseline, workload, metrics, and platform access are clear enough to enter the Workflow 1.5 handoff gate; this is not unconditional permission to execute.
+- `needs_canon_clarification`: the idea is promising, but `canon_mapping` lacks clear EC-P*/EC-W* support or platform/workload evidence must be clarified before Workflow 1.5.
+- `designed_not_run`: the idea is high-upside but currently blocked by unavailable platform, trace, artifact, or major adapter work. Treat it as deferred, not eliminated.
 
 ### Phase 6: Output — Ranked Idea Report
 
@@ -276,7 +284,7 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 
 **Direction**: [user's research direction]
 **Generated**: [UTC ISO-8601 timestamp ending in Z, e.g. 2026-04-26T02:26:45Z]
-**Ideas evaluated**: X generated → Y survived filtering → Z piloted → W recommended
+**Ideas evaluated**: X generated → Y survived filtering → Z received evaluation handoff plans → W recommended
 
 ## Landscape Summary
 [3-5 paragraphs on the current state of the field]
@@ -284,26 +292,25 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 ## Recommended Ideas (ranked)
 
 ### Idea 1: [title]
-- **Hypothesis**: [one sentence]
-- **ai_infra_layer**: compute/accelerator | memory/storage/data movement | interconnect/network | storage/checkpointing/data pipeline | runtime/system | multi-layer
-- **hardware_bottleneck**: [concrete resource pressure or timing path]
-- **evaluation_canon**: platforms=[...]; benchmarks_workloads=[...]; baselines=[...]; metrics=[...]; validation_style=[...]
-- **evaluation_canon_fit**: strong | acceptable | weak — [why the proposed evaluation matches or diverges from the topic's literature]
-- **validation_backend**: analytical_model | simulator | trace_replay | public_benchmark | microbenchmark | RTL/HLS | prototype | future_platform
-- **readiness_risk**: ready | partial | future — [blocker if any]
-- **Minimum experiment**: [concrete description]
+- **Idea shape**: [compact summary of the idea, target gap, proposed mechanism/study, and why the answer matters]
+- **Overall merit**: [1-4] — [overall_merit_rationale]
+- **core_baseline**: [CB* candidate or new baseline with rationale]
+- **canon_mapping**: platform=[EC-P*]; workload=[EC-W*]
+- **metrics**: [decisive metric first, secondary metrics if needed]
+- **target_validation_style**: analytical_model | simulator_evaluation | prototype_measurement
+- **evaluation_target_clarity**: clear | partial | missing
+- **evaluation_target_feasibility**: high | medium | low | unknown
+- **baseline_reproducibility**: official_artifact | open_source_system | config_reproducible | paper_only | proprietary_or_unavailable | unknown
+- **evaluation_environment_access**: ready | small_adapter_needed | major_bringup_needed | unavailable | unknown
+- **idea_adapter_cost**: parameter_or_config_only | small_local_patch | moderate_adapter | major_system_change | new_platform_or_prototype
+- **pilot_runtime_cost**: minutes_to_hours | one_to_two_days | multi_day_to_two_weeks | long_running_or_large_scale | unknown
 - **Expected outcome**: [what success/failure looks like]
-- **Novelty**: X/10 — closest work: [paper]
-- **Feasibility**: [simulator/prototype readiness, data/trace availability, implementation estimates]
-- **Scientific taste**: [why this is non-obvious, mechanism-rich, and useful even if the result is negative]
+- **Feasibility**: [platform access path, data/trace availability, implementation estimates]
+- **Estimated effort**: hours | days | weeks | platform bring-up
 - **Risk**: LOW/MEDIUM/HIGH
-- **Contribution type**: hardware mechanism / microarchitecture / memory hierarchy / protocol co-design / diagnostic / hardware-aware runtime
-- **pilot_status**: runnable_now | completed | designed_not_run | skipped | killed
-- **pilot_budget**: <=2h mini-run by default
-- **pilot_command_or_plan**: [command if run; otherwise concrete plan]
-- **key_metric**: [decisive metric]
-- **signal**: POSITIVE / WEAK_POSITIVE / NEGATIVE / INCONCLUSIVE / NOT_RUN
-- **readiness_blocker**: [none, missing simulator adapter, platform bring-up, traces unavailable, etc.]
+- **handoff_to_workflow_1_5**: ready | needs_canon_clarification | designed_not_run
+- **platform_access_path**: [repo/artifact/simulator/benchmark path, or adapter needed]
+- **main_blocker**: none | missing_artifact | trace_unavailable | backend_adapter | platform_bringup | unclear_canon_mapping | unclear_comparison_target | no_credible_evaluation_path | other
 - **Reviewer's likely objection**: [strongest counterargument]
 - **Why we should do this**: [1-2 sentences]
 
@@ -314,26 +321,31 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 | Idea | Category | Reason | Revisit condition |
 |------|----------|--------|-------------------|
 | ... | already_done | Closest paper already covers the core mechanism/result | Revisit only if new workload/platform changes the conclusion |
-| ... | scientifically_weak | Result would not change design judgment either way | Revisit if a sharper bottleneck hypothesis appears |
-| ... | weak_evaluation_canon | No credible platform/benchmark/baseline/metric path found in the topic literature | Revisit after better traces, benchmarks, or methodology are available |
-| ... | missing_hardware_bottleneck | Pure software or ML idea without a hardware/system resource claim | Revisit if tied to a concrete bottleneck |
-| ... | not_currently_runnable | Scientifically interesting but blocked by platform, traces, or setup | Keep as designed_not_run backup, not a scientific rejection |
+| ... | not_ai_infrastructure | Idea falls outside the selected AI infrastructure topic | Revisit only if the project scope changes |
+| ... | low_overall_merit | Contribution is incremental or unlikely to have impact | Revisit if a sharper contribution or stronger impact path appears |
+| ... | unclear_canon_mapping | No credible EC-P*/EC-W* platform/workload path found in the topic literature | Revisit after better traces, benchmarks, or methodology are available |
+| ... | missing_concrete_question | Pure software or ML idea without a concrete architecture, systems, measurement, benchmark, trace/workload, or mechanism question | Revisit if tied to a concrete infrastructure question |
+| ... | no_credible_evaluation_path | No plausible platform/workload/baseline path found | Revisit after literature or artifact landscape changes |
 
-## Pilot Validation Results
-| Idea | ai_infra_layer | evaluation_canon_fit | validation_backend | readiness_risk | pilot_status | pilot_budget | pilot_command_or_plan | key_metric | signal | readiness_blocker |
-|------|----------------|----------------------|--------------------|----------------|--------------|--------------|-----------------------|------------|--------|-------------------|
-| Idea 1 | memory/storage/data movement | strong | trace_replay | ready | completed | <=2h mini-run | `python3 run_kv_cache_trace_smoke.py --sweep cxl_bw` | p99 latency, bandwidth utilization | POSITIVE | none |
-| Idea 2 | interconnect/network | acceptable | simulator | partial | designed_not_run | <=2h mini-run | small network simulation with topic-standard workload and baseline | FCT, utilization, tail latency | NOT_RUN | missing adapter |
-| Idea 3 | runtime/system | weak | trace_replay | future | skipped | <=2h mini-run | N/A | N/A | INCONCLUSIVE | no credible benchmark/baseline yet |
+## Deferred / Designed-Not-Run Ideas
+| Idea | Reason deferred | Required clarification or platform path |
+|------|-----------------|-----------------------------------------|
+| ... | missing_artifact / trace_unavailable / backend_adapter / platform_bringup / unclear_canon_mapping / unclear_comparison_target / no_credible_evaluation_path / other | [what must become available before Workflow 1.5] |
+
+## Evaluation Handoff Summary
+| Idea | overall_merit_score | evaluation_target_feasibility | baseline_reproducibility | evaluation_environment_access | idea_adapter_cost | pilot_runtime_cost | core_baseline | canon_mapping | metrics | target_validation_style | evaluation_target_clarity | handoff_to_workflow_1_5 | main_blocker |
+|------|---------------------|-------------------------------|--------------------------|-------------------------------|-------------------|--------------------|---------------|---------------|---------|-------------------------|---------------------------|-------------------------|--------------|
+| Idea 1 | 1 | high | open_source_system | ready | small_local_patch | minutes_to_hours | CB1 | platform=[EC-P1]; workload=[EC-W1] | p99 latency, bandwidth utilization | simulator_evaluation | clear | ready | none |
+| Idea 2 | 2 | medium | config_reproducible | small_adapter_needed | moderate_adapter | one_to_two_days | CB2 | platform=[EC-P2]; workload=[EC-W3] | FCT, utilization, tail latency | simulator_evaluation | partial | needs_canon_clarification | backend_adapter |
 
 ## Suggested Execution Order
-1. Start with Idea 1 (positive pilot signal, strong evaluation canon fit, credible novelty)
-2. Keep Idea 2 as backup (good scientific taste, partial readiness)
-3. Archive Idea 3 unless a stronger benchmark/baseline path appears
+1. Start with Idea 1 (highest overall merit and feasible first-signal path)
+2. Keep Idea 2 as backup (good merit, needs canon or adapter clarification)
+3. Archive eliminated ideas unless a stronger benchmark/baseline path appears
 
 ## Next Steps
 - [ ] Move the selected idea to `/research-refine-pipeline`
-- [ ] Let Workflow 1.5 expand the pilot into a full experiment plan and execution log
+- [ ] Let Workflow 1.5 run the handoff gate, create `refine-logs/EVALUATION_CONTRACT.md`, reproduce the core baseline, and run baseline-first evaluation pilots
 - [ ] If confirmed, invoke /auto-review-loop for full iteration
 ```
 
@@ -348,12 +360,12 @@ if research-wiki/ exists:
     for each idea in recommended_ideas + eliminated_ideas:
         1. Create page: research-wiki/ideas/<idea_id>.md
            - node_id: idea:<id>
-           - stage: proposed (or: piloted, archived)
+           - stage: proposed (or: handed_off, deferred, archived)
            - outcome: unknown (or: negative, mixed, positive)
            - based_on: [paper:<slug>, ...]
            - target_gaps: [gap:<id>, ...]
            - Include: hypothesis, proposed method, expected outcome
-           - If pilot was run: actual outcome, failure notes, reusable components
+           - If Workflow 1.5 later ran: actual outcome, failure notes, reusable components
 
         2. Add edges:
            python3 tools/research_wiki.py add_edge research-wiki/ --from "idea:<id>" --to "paper:<slug>" --type inspired_by --evidence "..."
@@ -380,7 +392,7 @@ if research-wiki/ exists:
 - Quantity first, quality second: brainstorm broadly, then filter ruthlessly.
 - A good negative result is just as publishable as a positive one. Prioritize ideas where the answer matters regardless of direction.
 - Don't fall in love with any idea before validating it. Be willing to kill ideas.
-- Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up gets `readiness_risk: future`; that is not the same as scientific rejection.
+- Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up should get low `evaluation_target_feasibility` or a `designed_not_run` handoff; that is not the same as scientific rejection.
 - "Apply X to Y" is the lowest form of research idea. Push for deeper questions.
 - Include eliminated ideas in the report — they save future time by documenting dead ends.
 - **If the user's direction is too broad (e.g., "AI infrastructure" with no bottleneck, workload, or layer), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the LLM infrastructure problem, hardware/system bottleneck, and validation constraint — e.g., "KV cache placement under CXL memory bandwidth limits" or "LLM checkpoint recovery under storage bandwidth and metadata pressure".
@@ -392,8 +404,8 @@ After this skill produces the ranked report:
 /idea-creator "direction"     → ranked ideas
 /novelty-check "top idea"     → deep novelty verification (already done in Phase 4, but user can re-run)
 /research-review "top idea"   → external critical feedback
-implement                     → write code
-/run-experiment               → execute simulator, microbenchmark, or other experiment command
+/experiment-bridge            → lock EVALUATION_CONTRACT.md and prepare baseline-first execution
+/run-experiment               → execute the experiment command selected by Workflow 1.5
 /auto-review-loop             → iterate until submission-ready
 ```
 
