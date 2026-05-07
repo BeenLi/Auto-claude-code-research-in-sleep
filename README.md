@@ -130,14 +130,14 @@ Two outputs: `PASTE_READY.txt` (exact char count, paste to venue) + `REBUTTAL_DR
 - **2026-05-04** — ![FIX](https://img.shields.io/badge/FIX-orange?style=flat-square) **`/research-wiki` and caller skills now resolve helpers via fallback chain** ([#204](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/pull/204)). Skills that touch the wiki now resolve `research_wiki.py` through `.aris/tools/` → `tools/` → `$ARIS_REPO/tools/`, preserving manual-copy installs while fixing project-local installs created by `install_aris.sh`. `/research-wiki` hard-fails when the helper is missing; caller skills warn and skip only the wiki side effect. Existing users should rerun `bash tools/install_aris.sh` to refresh `.aris/tools` and pick up the Python 3.9 helper import fix.
 - **2026-04-21** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📚 **Research Wiki ingest actually works now** ([`research_wiki.py`](tools/research_wiki.py), [`/research-wiki`](skills/research-wiki/SKILL.md), [`integration-contract.md`](skills/shared-references/integration-contract.md)) — fixes a user-reported bug where `/research-wiki init` created an empty `papers/` directory that stayed empty forever. Root cause was twofold: (1) the advertised `/research-wiki ingest` subcommand had **no implementation** in `research_wiki.py`, and (2) the five paper-reading skills (`/arxiv`, `/alphaxiv`, `/deepxiv`, `/semantic-scholar`, `/exa-search`) had no wiki hook at all, while `/research-lit`'s hook was marked *"optional and automatic"* — soft prose that the model skipped under context pressure. Fix: new canonical **`python3 tools/research_wiki.py ingest_paper <wiki> --arxiv-id <id>`** helper owns slugging / arXiv-API metadata fetch / dedup / page creation / index rebuild / log append; all six paper-reading skills now call the same helper (no duplicated business logic); **`sync --arxiv-ids a,b,c`** and **`sync --from-file ids.txt`** provide explicit manual backfill for papers read before the wiki existed. New diagnostic `tools/verify_wiki_coverage.sh` greps `.aris/traces/` / `paper/` / plan artifacts for arXiv IDs and reports which ones aren't in `papers/` (non-blocking). Ships alongside a new [`shared-references/integration-contract.md`](skills/shared-references/integration-contract.md) that formalizes the six-component pattern (predicate / canonical helper / artifact / visible checklist / backfill / verifier) every cross-skill integration in ARIS must follow — derived from this bug class and the assurance-gate bug the same week
 - **2026-04-21** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🛡️ **Assurance Gate: `— effort: beast | max` now really runs the mandatory audits** ([`assurance-contract.md`](skills/shared-references/assurance-contract.md), [`tools/verify_paper_audits.sh`](tools/verify_paper_audits.sh)) — fixes a user-reported bug where `— effort: beast` silently skipped `/proof-checker` / `/paper-claim-audit` / `/citation-audit` because each phase's content detector could fail open. New **`assurance`** axis (`draft` | `submission`) is independent from `effort`; `lite` / `balanced` (default) → `draft` with **zero behavior change**, `max` / `beast` → `submission`. At `submission` the three audits **always emit** a JSON artifact with 6-state verdict (`PASS`/`WARN`/`FAIL`/`NOT_APPLICABLE`/`BLOCKED`/`ERROR`), and `paper-writing` Phase 6 runs `tools/verify_paper_audits.sh` as the **external source of truth** — non-zero exit blocks the Final Report, not the model's self-report. SHA256 input hashing catches stale audits (paper edited after audit ran). Three rounds of cross-model review (GPT-5.5 xhigh) before shipping. Escape hatch: `— effort: beast, assurance: draft` keeps the old depth-only behavior. Optional Stop hook documented for teams that want harness-level enforcement. Empirical motivation: a real April 2026 run surfaced that `— effort: beast` produced a draft-quality paper with all three submission-gate audits skipped
-- **2026-04-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🩹 **Project install: flat layout + manifest tracking** — fixes a real bug where the previous nested install (`.claude/skills/aris/`) hid skills from Claude Code's slash-command discovery (CC only scans one directory level). Anyone who ran `install_aris.sh` before this date was silently affected. New `install_aris.sh` creates one symlink per skill at `.claude/skills/<name>`, writes a versioned manifest to `.aris/installed-skills.txt`, and is **re-runnable to reconcile** new/removed upstream skills. Defense-in-depth: 13 safety rules (no-symlinked-parents, exact-target revalidation, slug regex, atomic same-dir manifest rename, no-overwrite-real-files, mkdir-based portable lock, ADOPT for crash recovery, …). Granular `--adopt-existing` / `--replace-link` flags replace the all-or-nothing `--force`. Migration paths: `--from-old` for legacy nested symlink, `--migrate-copy keep-user|prefer-upstream` for legacy nested copy. `smart_update.sh --target-subdir .claude/skills/aris` is now deprecated with a redirect to `install_aris.sh`. Stale-file bug in `cp -r` overlay also fixed (now `rm -rf && cp -r` for safe-update path)
+- **2026-04-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🩹 **Project install: flat layout + manifest tracking** — fixes a real bug where the previous nested install (`.claude/skills/aris/`) hid skills from Claude Code's slash-command discovery (CC only scans one directory level). Anyone who ran `install_aris.sh` before this date was silently affected. New `install_aris.sh` creates one symlink per skill at `.claude/skills/<name>`, writes a versioned manifest to `.aris/installed-skills.txt`, and is **re-runnable to reconcile** new/removed upstream skills. Defense-in-depth: 13 safety rules (no-symlinked-parents, exact-target revalidation, slug regex, atomic same-dir manifest rename, no-overwrite-real-files, mkdir-based portable lock, ADOPT for crash recovery, …). Granular `--adopt-existing` / `--replace-link` flags replace the all-or-nothing `--force`. Migration paths: `--from-old` for legacy nested symlink, `--migrate-copy keep-user|prefer-upstream` for legacy nested copy. The old copied-install smart updater has since been removed; use `install_aris.sh` symlinks instead.
 - **2026-04-19** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔗 **[`/overleaf-sync`](skills/overleaf-sync/SKILL.md)** — two-way bridge between local ARIS paper directory and an Overleaf project via the official **Overleaf Git bridge** (Premium). Lets collaborators keep editing in the Overleaf web UI while ARIS audit/edit pipelines (`/paper-claim-audit`, `/citation-audit`, `/auto-paper-improvement-loop`) keep running locally. Sub-commands: `setup` (one-time, user-driven so the agent never sees the token) / `pull` (with diff-protocol — flags half-sentences, typos, claim/cite changes that should re-trigger audits) / `push` (with confirmation gate before writing to shared Overleaf state) / `status` (3-way divergence check). **Token never touches the agent or any file** — primed once into macOS Keychain via the user's terminal, then auth-free for all subsequent agent operations
 - **2026-04-19** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📚 **[`/citation-audit`](skills/citation-audit/SKILL.md)** — fourth and final layer of the evidence-and-claim assurance stack (`experiment-audit` → `result-to-claim` → `paper-claim-audit` → `citation-audit`). Fresh cross-family reviewer (gpt-5.5 via Codex MCP) with web/DBLP/arXiv lookup verifies every `\cite{...}` along three independent axes: **existence** (paper resolves at claimed arXiv ID/DOI/venue), **metadata correctness** (authors/year/venue/title match canonical sources), and **context appropriateness** (the cited paper actually establishes the claim it supports — the most diagnostic check). Per-entry verdicts: KEEP / FIX / REPLACE / REMOVE. Auto-integrated into **Workflow 3 Phase 5.8** as the pre-submission bibliography gate. Empirical motivation: in our April 2026 ARIS tech-report run, two real papers (`madaan2023selfrefine`, `liu2023reviewergpt`) were cited in contexts they did not actually support, and one entry had `author = "Anonymous"` — none caught by metadata-only checks
 <details>
 <summary>Earlier updates (2026-03-12 — 2026-04-17, 41 entries)</summary>
 
 - **2026-04-17** — 🔀 **`/experiment-queue` integrated into Workflow 1.5 + research-pipeline** — `experiment-bridge` Phase 4 Deploy now auto-routes by milestone job count: ≤5 jobs → `/run-experiment`, ≥10 jobs or phase dependencies → `/experiment-queue` (with OOM retry, stale-screen cleanup, wave-transition gating, crash-safe state). New `--- batch: queue` override for global force-queue mode. Large multi-seed sweeps from `EXPERIMENT_PLAN.md` (e.g., 36-cell `N × seed × n_train` grids) now get proper orchestration without manual queue invocation
-- **2026-04-17** — 🔗 **[Project-local symlink install](tools/install_aris.sh)** (resolves [#118](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/118)) — new recommended default install. `bash tools/install_aris.sh` auto-detects platform (Claude Code / Codex CLI), creates `.claude/skills/aris` or `.agents/skills/aris` symlink to the ARIS repo, and records install metadata in `.aris/skill-source.txt`. It no longer writes `CLAUDE.md` / `AGENTS.md` unless you pass `--with-doc`. **Solves the skill collision problem** when ARIS is mixed with Superpowers / OpenHands / other community packs in the same global skill directory. PowerShell version (`install_aris.ps1`) ships with junction support for Windows. **`smart_update.sh --target-subdir`** flag added for `.agents/skills/aris` (Codex) project-copy installs; symlinked installs now correctly refuse `smart_update` and direct users to `git pull`. Global install remains supported for power users
+- **2026-04-17** — 🔗 **[Project-local symlink install](tools/install_aris.sh)** (resolves [#118](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/118)) — early project-local install milestone. The current installer is the unified `install_aris.sh --target claude|codex|gemini` entry point and records target manifests under `.aris/`.
 - **2026-04-16** — 🎨 **[`/figure-spec`](skills/figure-spec/SKILL.md)** — deterministic JSON→SVG renderer packaged as a first-class skill. Preferred default for architecture/workflow/pipeline/audit-cascade figures in papers. Shape-aware edge clipping (rect/circle/ellipse/diamond), self-loops, curved edges, multi-line labels with CJK width estimation. Editable vector output, reproducible (same spec → same SVG), no external API. **Phase 2b in Workflow 3 restored**: `illustration: figurespec` (new default) / `gemini` / `mermaid` / `false` — 4-way illustration selector with complementary strengths
 - **2026-04-16** — ⚙️ **[`/experiment-queue`](skills/experiment-queue/SKILL.md)** — SSH job queue for multi-seed/multi-config ML experiments. Designed from real 36-cell NeurIPS sweep pain points: OOM-aware retry with backoff, stale-screen cleanup, wave-transition race prevention, teacher→student phase dependencies, crash-safe scheduler that resumes from JSON state. Declarative grid specs expand automatically (e.g., `N × seed × n_train → 36 jobs`). Configurable `conda_hook` + `gpu_free_threshold_mib` for non-standard environments. Use for ≥10 jobs; `/run-experiment` stays for ad-hoc
 - **2026-04-15** — 🛡️ **Paper Writing Pipeline Hardening** — 10 empirically-motivated patches from a real NeurIPS run. `REVIEWER_BIAS_GUARD=true`: every review round uses a fresh thread (codex-reply inflated 3→8/10). Reviewer Independence Protocol: no fix summaries to reviewer. Step 4.5 Restatement Regression Test: catches theorem drift across fix rounds. Step 5.5 Kill Argument Exercise: final-round adversarial attack/defense for theory papers. Location-aware overfull blocking. Theory Paper Consistency Pass in `/paper-write`. Enforced Bib Hygiene with DBLP/CrossRef validation. Phase 5.5 Mandatory Final Claim Audit as submission gate. **Review Tracing Protocol**: full prompt/response pairs saved to `.aris/traces/` for reviewer-independence audit ([`review-tracing.md`](skills/shared-references/review-tracing.md), [`save_trace.sh`](tools/save_trace.sh)). Inspired by community contribution from @李傲龍
@@ -148,7 +148,7 @@ Two outputs: `PASTE_READY.txt` (exact char count, paste to venue) + `REBUTTAL_DR
 - **2026-04-10** — ⚡ **[Effort Levels](skills/shared-references/effort-contract.md)** — `— effort: lite | balanced | max | beast`. Controls work intensity across all skills: papers found, ideas generated, review rounds, writing depth. Codex reasoning stays `xhigh` always. `beast` = every knob to maximum for top-venue sprints. Default `balanced` = zero change for existing users. [Details →](#-effort-levels)
 - **2026-04-10** — 🔎 **[DeepXiv integration](skills/deepxiv/SKILL.md)** — progressive paper retrieval via DeepXiv CLI. Opt-in: `— sources: deepxiv` or `— sources: all, deepxiv`. Staged reading: search → brief → head → section. `pip install deepxiv-sdk` to enable. Community contribution by [@DreamEnding](https://github.com/DreamEnding)
 - **2026-04-10** — 🛡️ **[`/experiment-audit`](skills/experiment-audit/SKILL.md)** — cross-model experiment integrity verification. GPT-5.5 reads your eval scripts and results directly, checks for fake ground truth, self-normalized scores, phantom results, and scope inflation ([#131](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/131), [#57](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/57)). Advisory — warns loudly, never blocks. `/result-to-claim` auto-reads audit if present. New [experiment-integrity.md](skills/shared-references/experiment-integrity.md) shared reference. **The executor must never judge its own integrity.**
-- **2026-04-10** — 🧠 **[`tools/smart_update.sh`](tools/smart_update.sh)** — intelligent skill updater. Compares local vs upstream, detects personal customizations (server paths, API keys), only updates safe skills. `bash tools/smart_update.sh --apply`
+- **2026-04-10** — 🧠 Legacy copied-install smart updater introduced. It has since been removed in favor of manifest-managed project symlinks via `tools/install_aris.sh`.
 - **2026-04-10** — 🏆 **Community paper: [UAV-CC](community_papers/UAV-CC.pdf)** — first community paper with full PDF archived. UAV change captioning benchmark for IEEE TGRS by [@wxx827](https://github.com/wxx827). Stack: Claude Opus 4.6 + Codex 5.5 xhigh + Cursor. Papers now archived in `community_papers/`
 - **2026-04-08** — 📚 **[`/research-wiki`](skills/research-wiki/SKILL.md)** — persistent research knowledge base inspired by [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). Accumulates papers, ideas, experiments, and claims across the entire research lifecycle with typed relationships. Wiki-aware hooks in `/research-lit` (ingest papers), `/idea-creator` (read wiki + write ideas back), and `/result-to-claim` (update claim status + trigger re-ideation). Failed ideas become anti-repetition memory. **ARIS now learns from its mistakes.**
 - **2026-04-05** — 🧬 **[`/meta-optimize`](skills/meta-optimize/SKILL.md)** — outer-loop harness optimization for ARIS. Passively logs skill invocations, tool calls, failures, and parameter overrides via [Claude Code hooks](templates/claude-hooks/meta_logging.json). Run `/meta-optimize` to analyze accumulated usage data and propose SKILL.md improvements — reviewer-gated, user-approved. Inspired by [Meta-Harness](https://arxiv.org/abs/2603.28052) (Lee et al., 2026). **ARIS now optimizes itself.**
@@ -190,13 +190,13 @@ Two outputs: `PASTE_READY.txt` (exact char count, paste to venue) + `REBUTTAL_DR
 ```bash
 # 1. Install skills
 git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git
-mkdir -p ~/.claude/skills/    # create if it doesn't exist (new Claude Code versions)
-cp -r Auto-claude-code-research-in-sleep/skills/* ~/.claude/skills/
+cd your-research-project
+bash ../Auto-claude-code-research-in-sleep/tools/install_aris.sh . --target claude
 
 # 1b. Update skills (when upstream has new versions)
 cd Auto-claude-code-research-in-sleep && git pull
-bash tools/smart_update.sh          # dry-run: shows what's new/changed/safe
-bash tools/smart_update.sh --apply  # apply: adds new + updates safe ones
+python3 tools/sync_codex_skill_mirror.py --apply  # only needed before reconciling Codex projects
+bash tools/install_aris.sh /path/to/your-research-project --target claude --reconcile
 
 # 2. Set up Codex MCP (for review skills)
 npm install -g @openai/codex
@@ -300,20 +300,21 @@ claude
 
 > **Important:** Codex MCP uses the model from `~/.codex/config.toml`, not from skill files. Make sure it says `model = "gpt-5.5"` (recommended). Other options: `gpt-5.3-codex`, `gpt-5.2-codex`, `o3`. Run `codex setup` or edit the file directly.
 
-> **Want Codex to execute but Claude Code to review?** See [`docs/CODEX_CLAUDE_REVIEW_GUIDE.md`](docs/CODEX_CLAUDE_REVIEW_GUIDE.md). The recommended project-local setup is `bash tools/install_codex_skills.sh --reviewer claude`, which symlinks base Codex skills and overlays review-heavy skills through the local `claude-review` MCP bridge.
+> **Want Codex to execute but Claude Code to review?** See [`docs/CODEX_CLAUDE_REVIEW_GUIDE.md`](docs/CODEX_CLAUDE_REVIEW_GUIDE.md). The recommended project-local setup is `bash tools/install_aris.sh /path/to/project --target codex --with-claude-review-overlay`, which symlinks base Codex skills and overlays review-heavy skills through the local `claude-review` MCP bridge.
 
-> **Want Codex to execute but Gemini to review locally?** See [`docs/CODEX_GEMINI_REVIEW_GUIDE.md`](docs/CODEX_GEMINI_REVIEW_GUIDE.md) and [CN](docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md). The recommended project-local setup is `bash tools/install_codex_skills.sh --reviewer gemini`, which symlinks base Codex skills and overlays reviewer-aware skills through the local `gemini-review` MCP bridge using direct Gemini API by default.
+> **Want Codex to execute but Gemini to review locally?** See [`docs/CODEX_GEMINI_REVIEW_GUIDE.md`](docs/CODEX_GEMINI_REVIEW_GUIDE.md) and [CN](docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md). The recommended project-local setup is `bash tools/install_aris.sh /path/to/project --target codex --with-gemini-review-overlay`, which symlinks base Codex skills and overlays reviewer-aware skills through the local `gemini-review` MCP bridge using direct Gemini API by default.
 
 See [full setup guide](#%EF%B8%8F-setup) for details and [alternative model combinations](#-alternative-model-combinations) if you don't have Claude/OpenAI API.
 
-> 🧠 **Update skills later?** Smart update analyzes what's safe:
+> 🧠 **Update skills later?** Project-local symlinks follow upstream content after `git pull`; rerun the installer to reconcile added or removed skills:
 > ```bash
 > cd Auto-claude-code-research-in-sleep
 > git pull
-> bash tools/smart_update.sh          # dry-run: shows what's new/changed/safe
-> bash tools/smart_update.sh --apply  # apply: adds new + updates safe ones
+> python3 tools/sync_codex_skill_mirror.py --apply
+> bash tools/install_aris.sh /path/to/project --target claude --reconcile
+> bash tools/install_aris.sh /path/to/project --target codex --reconcile
 > ```
-> Compares local skills with upstream, detects personal customizations (server paths, API keys, etc.), and only updates skills that are safe to replace. Skills with your personal info are flagged for manual review.
+> Copied installs are no longer auto-updated by ARIS scripts; migrate them to project-local symlinks when possible.
 
 ## ✨ Features
 
@@ -1200,7 +1201,7 @@ export OPENAI_API_KEY="your-key"
 
 ### Install Skills
 
-> 💡 **Recommended: project-local flat symlink install** (since 2026-04-20). Each ARIS skill is symlinked individually into `.claude/skills/<skill-name>`, so Claude Code's slash-command discovery picks them up. A manifest at `.aris/installed-skills.txt` tracks what ARIS installed — uninstall and reconcile only ever touch managed entries, never your own skills.
+> 💡 **Recommended: project-local flat symlink install**. `tools/install_aris.sh` installs Claude, Codex, or Gemini skills into the target repo. A target-specific manifest under `.aris/` tracks what ARIS installed — uninstall and reconcile only ever touch managed entries, never your own skills.
 
 ```bash
 # 1. Clone ARIS once to a stable location
@@ -1208,9 +1209,11 @@ git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~
 
 # 2. For each project that uses ARIS, attach via symlinks:
 cd ~/your-paper-project
-bash ~/aris_repo/tools/install_aris.sh
-# → creates one symlink per skill: .claude/skills/<skill> → ~/aris_repo/skills/<skill>
-# → writes manifest .aris/installed-skills.txt (tracks every entry ARIS installed)
+bash ~/aris_repo/tools/install_aris.sh . --target claude
+# → Claude: .claude/skills/<skill> → ~/aris_repo/skills/<skill>
+# → Codex:  use --target codex for .agents/skills/<skill> → ~/aris_repo/skills/skills-codex/<skill>
+# → Gemini: use --target gemini for .gemini/skills/<skill> → ~/aris_repo/skills/<skill>
+# → writes a target manifest under .aris/
 # → does not update agent docs unless you pass --with-doc
 # → re-runnable: rerun anytime to reconcile new/removed upstream skills
 
@@ -1218,13 +1221,15 @@ bash ~/aris_repo/tools/install_aris.sh
 cd ~/aris_repo && git pull   # symlinks resolve to live upstream — content updates automatically
 
 # 3a. To pick up newly added or removed upstream skills, rerun the installer:
-bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project   # adds new symlinks, removes broken ones
+bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project --target claude --reconcile
 
 # Other useful flags:
 bash ~/aris_repo/tools/install_aris.sh --dry-run        # show plan, no changes
 bash ~/aris_repo/tools/install_aris.sh --uninstall      # remove only managed symlinks (per manifest)
 bash ~/aris_repo/tools/install_aris.sh --from-old       # migrate from old nested .claude/skills/aris/
-bash ~/aris_repo/tools/install_aris.sh --with-doc       # opt in to managed CLAUDE.md/AGENTS.md block
+bash ~/aris_repo/tools/install_aris.sh --with-doc       # opt in to managed CLAUDE.md/AGENTS.md/GEMINI.md block
+bash ~/aris_repo/tools/install_aris.sh ~/your-project --target codex --with-claude-review-overlay
+bash ~/aris_repo/tools/install_aris.sh ~/your-project --target codex --with-gemini-review-overlay
 
 # Windows (PowerShell, requires admin or developer mode for junctions):
 .\tools\install_aris.ps1 C:\path\to\your-paper-project
@@ -1235,7 +1240,7 @@ bash ~/aris_repo/tools/install_aris.sh --with-doc       # opt in to managed CLAU
 <details>
 <summary><b>Migrating from the old nested install (pre-2026-04-20)</b></summary>
 
-If you previously installed via `install_aris.sh` (which created `.claude/skills/aris/` as a single nested symlink) or via `smart_update.sh --target-subdir .claude/skills/aris`, your slash commands probably weren't being auto-discovered by Claude Code. Migrate to the flat layout:
+If you previously installed via `install_aris.sh` (which created `.claude/skills/aris/` as a single nested symlink) or copied skills into `.claude/skills/aris`, your slash commands probably weren't being auto-discovered by Claude Code. Migrate to the flat layout:
 
 ```bash
 # Symlink-style legacy install:
@@ -1253,19 +1258,13 @@ bash ~/aris_repo/tools/install_aris.sh ~/your-project --from-old --migrate-copy 
 <details>
 <summary><b>Alternative installs (advanced)</b></summary>
 
-**Project-local copy (no symlinks, useful for per-project skill edits):**
-```bash
-mkdir -p ~/your-project/.claude/skills
-bash ~/aris_repo/tools/smart_update.sh --project ~/your-project --apply
-# Default --target-subdir is .claude/skills (flat), which is what Claude Code expects.
-# (The old --target-subdir .claude/skills/aris is now deprecated — see migration block above.)
-```
+Copied installs are no longer auto-managed by ARIS update scripts. Back up or remove copied skills manually, then use the project-local symlink installer above.
 
 **Global install (one copy in your home dir, available to every project):**
 ```bash
 mkdir -p ~/.claude/skills
 cp -r ~/aris_repo/skills/* ~/.claude/skills/
-# Update with: bash tools/smart_update.sh --apply
+# Update manually by re-copying, or migrate to project-local symlinks.
 ```
 
 > Global install increases the risk of skill name collisions with other globally-installed packs. Use only if you don't mix ARIS with Superpowers / OpenHands / etc. — otherwise prefer the project-local install above.
@@ -1306,18 +1305,13 @@ All plugin features are **optional** — if not installed, ARIS falls back to Cl
 ```bash
 cd Auto-claude-code-research-in-sleep
 git pull
-
-# 🧠 Smart update (recommended) — analyzes what's safe to update
-bash tools/smart_update.sh          # dry-run: shows what would change
-bash tools/smart_update.sh --apply  # apply: adds new + updates safe ones
-
-# Manual options (if you prefer):
-# cp -r skills/* ~/.claude/skills/       # Option A: overwrite all
-# cp -rn skills/* ~/.claude/skills/      # Option B: only add new, keep yours
-# cp -r skills/experiment-bridge ~/.claude/skills/  # Option C: specific skill
+python3 tools/sync_codex_skill_mirror.py --apply
+bash tools/install_aris.sh ~/your-paper-project --target claude --reconcile
+bash tools/install_aris.sh ~/your-paper-project --target codex --reconcile
+bash tools/install_aris.sh ~/your-paper-project --target gemini --reconcile
 ```
 
-> 💡 **Smart update** compares your local skills with upstream, detects personal customizations (server paths, API keys, etc.), and only updates skills that are safe to replace. Skills with your personal info are flagged for manual review.
+Keep the Codex overlay flag when reconciling an overlay install, for example `--with-gemini-review-overlay`.
 
 ### Usage
 

@@ -28,9 +28,9 @@ git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~
 
 # 2. Attach Codex skills to a project as flat symlinks:
 cd ~/your-paper-project
-bash ~/aris_repo/tools/install_codex_skills.sh
+bash ~/aris_repo/tools/install_aris.sh . --target codex
 # -> creates .agents/skills/<skill> symlinks to ~/aris_repo/skills/skills-codex/<skill>
-# -> writes .aris/codex-installed-skills.txt
+# -> writes .aris/installed-skills-codex.txt
 # -> re-runnable: reconcile new/removed skills and switch reviewer overlays
 
 # 3. Update existing skill content:
@@ -42,16 +42,16 @@ Reviewer overlay modes:
 
 ```bash
 # Codex executes, Claude Code reviews through claude-review MCP
-bash ~/aris_repo/tools/install_codex_skills.sh --project ~/your-paper-project --reviewer claude
+bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project --target codex --with-claude-review-overlay
 
 # Codex executes, Gemini reviews through gemini-review MCP
-bash ~/aris_repo/tools/install_codex_skills.sh --project ~/your-paper-project --reviewer gemini
+bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project --target codex --with-gemini-review-overlay
 
 # Switch back to Codex-as-reviewer skills
-bash ~/aris_repo/tools/install_codex_skills.sh --project ~/your-paper-project --reviewer codex
+bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project --target codex --reconcile
 ```
 
-Use `bash ~/aris_repo/tools/install_codex_skills.sh --help` for all options, including `--dry-run` and `--no-mcp`.
+Use `bash ~/aris_repo/tools/install_aris.sh --help` for all options, including `--dry-run` and `--with-doc`.
 
 <details>
 <summary><b>Alternative: legacy global install (`~/.codex/skills/`)</b></summary>
@@ -82,4 +82,4 @@ Optional companion dependency for the `deepxiv` skill:
 pip install deepxiv-sdk
 ```
 
-If you also use reviewer overlay packages, prefer `tools/install_codex_skills.sh`; it chooses the final symlink target for each overridden skill.
+If you also use reviewer overlay packages, prefer `tools/install_aris.sh --target codex`; it chooses the final symlink target for each overridden skill.

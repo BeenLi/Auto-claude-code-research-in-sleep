@@ -19,7 +19,7 @@ The install order matters:
 
 1. install `skills/skills-codex/*`
 2. install `skills/skills-codex-gemini-review/*`
-3. register `gemini-review` MCP
+3. register `gemini-review` MCP separately
 
 ## Install
 
@@ -29,14 +29,14 @@ git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~
 
 # In each Codex project, install base skills plus the Gemini-review overlay.
 cd /path/to/your/project
-bash ~/aris_repo/tools/install_codex_skills.sh --reviewer gemini
+bash ~/aris_repo/tools/install_aris.sh . --target codex --with-gemini-review-overlay
 ```
 
 The installer creates flat project-local symlinks under `.agents/skills/`, writes
-`.aris/codex-installed-skills.txt`, and registers the `gemini-review` MCP bridge
-with `GEMINI_REVIEW_BACKEND=api`. To update skill content later, run `git pull`
-in `~/aris_repo`; re-run the installer only for newly added/removed skills or
-reviewer switching.
+`.aris/installed-skills-codex.txt`, and selects the Gemini-review overlay.
+Register the `gemini-review` MCP bridge with `GEMINI_REVIEW_BACKEND=api`
+separately. To update skill content later, run `git pull` in `~/aris_repo`;
+re-run the installer only for newly added/removed skills or reviewer switching.
 
 Recommended credential file:
 

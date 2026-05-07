@@ -1,9 +1,10 @@
----
+***
+
 name: idea-discovery
-description: "Workflow 1: Full idea discovery pipeline. Orchestrates research-lit → idea-creator → novelty-check → research-review to go from a broad research direction to validated ideas with evaluation handoff plans. Use when user says \"找idea全流程\", \"idea discovery pipeline\", \"从零开始找方向\", or wants the complete idea exploration workflow."
-argument-hint: [research-direction]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, spawn_agent, send_input
----
+description: "Workflow 1: Full idea discovery pipeline. Orchestrates research-lit → idea-creator → novelty-check → research-review to go from a broad research direction to validated ideas with evaluation handoff plans. Use when user says "找idea全流程", "idea discovery pipeline", "从零开始找方向", or wants the complete idea exploration workflow."
+argument-hint: \[research-direction]
+allowed-tools: Bash(\*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp\_\_codex\_\_codex, mcp\_\_codex\_\_send_input
+---------------------------------------------------------------------------------------------------------------------------------------------
 
 # Workflow 1: Idea Discovery Pipeline
 
@@ -22,14 +23,14 @@ Each phase builds on the previous one's output. The final deliverables are a val
 
 ## Constants
 
-- **MAX_HANDOFF_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not run pilots.
-- **MAX_READY_FOR_WORKFLOW_1_5 = 3** — Mark at most 3 ideas as immediate Workflow 1.5 candidates.
-- **AUTO_PROCEED = true** — After each phase summary, automatically proceed with the best option if the user does not respond. Set to `false` to wait for explicit user confirmation at phase decision points.
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Passed to sub-skills.
-- **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
-- **ARXIV_DOWNLOAD = false** — When `true`, `/research-lit` downloads the top relevant arXiv PDFs during Phase 1. When `false` (default), only fetches metadata. Passed through to `/research-lit`.
+- **MAX\_HANDOFF\_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not run pilots.
+- **MAX\_READY\_FOR\_WORKFLOW\_1\_5 = 3** — Mark at most 3 ideas as immediate Workflow 1.5 candidates.
+- **AUTO\_PROCEED = true** — After each phase summary, automatically proceed with the best option if the user does not respond. Set to `false` to wait for explicit user confirmation at phase decision points.
+- **REVIEWER\_MODEL =** **`gpt-5.5`** — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Passed to sub-skills.
+- **OUTPUT\_DIR =** **`idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
+- **ARXIV\_DOWNLOAD = false** — When `true`, `/research-lit` downloads the top relevant arXiv PDFs during Phase 1. When `false` (default), only fetches metadata. Passed through to `/research-lit`.
 - **COMPACT = false** — When `true`, generate compact summary files for short-context models and session recovery. Writes `idea-stage/IDEA_CANDIDATES.md` (top 3-5 ideas only) at the end of this workflow. Downstream skills read this instead of the full `idea-stage/IDEA_REPORT.md`.
-- **REF_PAPER = false** — Reference paper to base ideas on. Accepts: local PDF path, arXiv URL, or any paper URL. When set, the paper is summarized first (`idea-stage/REF_PAPER_SUMMARY.md`), then idea generation uses it as context. Combine with `base repo` for "improve this paper with this codebase" workflows.
+- **REF\_PAPER = false** — Reference paper to base ideas on. Accepts: local PDF path, arXiv URL, or any paper URL. When set, the paper is summarized first (`idea-stage/REF_PAPER_SUMMARY.md`), then idea generation uses it as context. Combine with `base repo` for "improve this paper with this codebase" workflows.
 
 > 💡 These are defaults. Override by telling the skill, e.g., `/idea-discovery "topic" — auto proceed: false`, `/idea-discovery "topic" — ref paper: https://arxiv.org/abs/2406.04329`, or `/idea-discovery "topic" — compact: true`.
 
@@ -53,23 +54,20 @@ If no brief exists, proceed normally with `$ARGUMENTS` as the research direction
 
 > 💡 Create a brief from the template: `cp templates/RESEARCH_BRIEF_TEMPLATE.md RESEARCH_BRIEF.md`
 
-### Phase 0.5: Reference Paper Summary (when REF_PAPER is set)
+### Phase 0.5: Reference Paper Summary (when REF\_PAPER is set)
 
-**Skip entirely if `REF_PAPER` is `false`.**
+**Skip entirely if** **`REF_PAPER`** **is** **`false`.**
 
 Summarize the reference paper before searching the literature:
 
 1. **If arXiv URL** (e.g., `https://arxiv.org/abs/2406.04329`):
    - Invoke `/arxiv "ARXIV_ID" — download` to fetch the PDF
    - Read the first 5 pages (title, abstract, intro, method overview)
-
 2. **If local PDF path** (e.g., `papers/reference.pdf`):
    - Read the PDF directly (first 5 pages)
-
 3. **If other URL**:
    - Fetch and extract content via WebFetch
-
-4. **Generate `idea-stage/REF_PAPER_SUMMARY.md`**:
+4. **Generate** **`idea-stage/REF_PAPER_SUMMARY.md`**:
 
 ```markdown
 # Reference Paper Summary
@@ -109,15 +107,24 @@ Phase 1 and Phase 2 will use `idea-stage/REF_PAPER_SUMMARY.md` as additional con
 
 ### Phase 1: Literature Survey
 
-Invoke `/research-lit` to map the research landscape:
+Invoke `/research-lit` to map the research landscape. Idea discovery is exactly the place where Gemini's AI-driven broad coverage adds value, so include `gemini` as a source by default unless the user already specified an explicit `— sources:` directive in their idea-discovery invocation:
 
 ```
+# If $ARGUMENTS already contains "— sources:", pass through unchanged
+# (the user is in control of source selection):
 /research-lit "$ARGUMENTS"
+
+# Otherwise (the common case), include gemini explicitly for broader discovery:
+/research-lit "$ARGUMENTS" — sources: all, gemini
 ```
+
+If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracefully with a warning — no break to the pipeline. Users who want to force-disable Gemini in idea-discovery can pass `/idea-discovery "topic" — sources: all` explicitly (which becomes the literal source list, no auto-injection).
 
 **What this does:**
+
 - Search local/Zotero/Obsidian/web/arXiv sources for recent papers and preprints
 - Infer the AI infrastructure layer and expand the topic within the same layer
+- Plus Gemini-driven broad discovery (sub-problem decomposition, naming variants, alias coverage) when `gemini-cli` is available
 - Build a landscape map: sub-directions, approaches, open problems
 - Identify structural gaps, bottleneck evidence, and `Gap Seeds`
 - Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon` and `Core Baseline Candidates`
@@ -149,6 +156,7 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 ```
 
 **What this does:**
+
 - If `idea-stage/REF_PAPER_SUMMARY.md` exists, include it as context — ideas should build on, improve, or extend the reference paper
 - Brainstorm 8-12 concrete idea candidates from `Landscape Pack` / `Gap Seeds`
 - Filter by the `idea-creator` scoring rubric: topic fit and concrete architecture/systems/measurement/benchmark question
@@ -184,12 +192,13 @@ For each selected top idea with strong overall merit and a credible evaluation h
 ```
 
 **What this does:**
+
 - Multi-source literature search (arXiv, Scholar, Semantic Scholar)
 - Cross-verify with GPT-5.5 xhigh
 - Check for concurrent work (last 3-6 months)
 - Identify closest existing work and differentiation points
 
-**Update `idea-stage/IDEA_REPORT.md`** with deep novelty results. Eliminate any idea that turns out to be already published.
+**Update** **`idea-stage/IDEA_REPORT.md`** with deep novelty results. Eliminate any idea that turns out to be already published.
 
 ### Phase 4: External Critical Review
 
@@ -200,11 +209,12 @@ For the surviving top idea(s), get brutal feedback:
 ```
 
 **What this does:**
+
 - GPT-5.5 xhigh acts as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level)
 - Scores the idea, identifies weaknesses, suggests minimum viable improvements
 - Provides concrete feedback on experimental design
 
-**Update `idea-stage/IDEA_REPORT.md`** with reviewer feedback and revised plan.
+**Update** **`idea-stage/IDEA_REPORT.md`** with reviewer feedback and revised plan.
 
 ### Phase 4.5: Method Refinement + Experiment Planning
 
@@ -215,6 +225,7 @@ After review, refine the top idea into a concrete proposal and plan experiments.
 ```
 
 **What this does:**
+
 - Freeze a **Problem Anchor** to prevent scope drift
 - Iteratively refine the method via GPT-5.5 review (up to 5 rounds, until score ≥ 9)
 - Generate a claim-driven experiment roadmap with ablations, budgets, and run order
@@ -300,7 +311,7 @@ Present the final report summary before writing the latest copy. Then finalize `
 
 ### Phase 5.5: Write Compact Files (when COMPACT = true)
 
-**Skip entirely if `COMPACT` is `false`.**
+**Skip entirely if** **`COMPACT`** **is** **`false`.**
 
 Write `idea-stage/IDEA_CANDIDATES.md` — a lean summary of the top 3-5 surviving ideas:
 
@@ -328,11 +339,12 @@ Write `idea-stage/IDEA_CANDIDATES.md` — a lean summary of the top 3-5 survivin
 - Next step: /experiment-bridge or /research-refine
 ```
 
-This file is intentionally small (~30 lines) so downstream skills and session recovery can read it without loading the full `idea-stage/IDEA_REPORT.md` (~200+ lines).
+This file is intentionally small (\~30 lines) so downstream skills and session recovery can read it without loading the full `idea-stage/IDEA_REPORT.md` (\~200+ lines).
 
 ## Output Protocols
 
 > Follow these shared protocols for all output files:
+>
 > - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
 > - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
 > - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting
@@ -340,7 +352,6 @@ This file is intentionally small (~30 lines) so downstream skills and session re
 ## Key Rules
 
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
-
 - **Don't skip phases.** Each phase filters and validates — skipping leads to wasted effort later.
 - **Summarize between phases.** Briefly state what was found before moving on.
 - **Kill ideas early.** It's better to kill 10 bad ideas in Phase 3 than to implement one and fail.
@@ -349,7 +360,7 @@ This file is intentionally small (~30 lines) so downstream skills and session re
 - **Be honest with the reviewer.** Include unclear canon mapping, unclear comparison targets, feasibility limits, and deferred platform blockers in the review prompt.
 - **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final report. If absent/off, skip silently.
 
-## Composing with Workflow 2
+## Composing with Workflow 1.5 & 2
 
 After this pipeline produces a validated top idea:
 

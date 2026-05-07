@@ -1,1 +1,0 @@
-AGENT_MD_TEMPLATE.md

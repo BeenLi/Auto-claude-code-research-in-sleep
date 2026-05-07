@@ -12,7 +12,6 @@ Ready-to-use templates for each ARIS workflow. Copy, fill in your content, and r
 | [NARRATIVE_REPORT_TEMPLATE.md](NARRATIVE_REPORT_TEMPLATE.md) | Workflow 3 | Research narrative with claims, experiments, results |
 | [PAPER_PLAN_TEMPLATE.md](PAPER_PLAN_TEMPLATE.md) | Workflow 3 | Pre-made outline to skip planning phase |
 | [AGENT_MD_TEMPLATE.md](AGENT_MD_TEMPLATE.md) | All Workflows | Project dashboard with Pipeline Status - create once per project |
-| [CLAUDE_MD_TEMPLATE.md](CLAUDE_MD_TEMPLATE.md) | All Workflows | Compatibility alias for AGENT_MD_TEMPLATE.md |
 | [MANIFEST_TEMPLATE.md](MANIFEST_TEMPLATE.md) | All Workflows | Output tracking manifest — auto-maintained by skills |
 
 ### Chinese Templates (中文模板)

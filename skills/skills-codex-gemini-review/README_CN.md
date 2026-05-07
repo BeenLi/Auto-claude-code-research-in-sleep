@@ -94,20 +94,13 @@
 
 - **Gemini CLI**：只有在你明确想用 `GEMINI_REVIEW_BACKEND=cli` 时，才需要本机安装 `gemini` 并完成登录/认证
 
-1. 先安装上游原生 Codex 技能包：
+1. 安装上游原生 Codex 技能包并叠加 Gemini-review overlay：
 
 ```bash
-mkdir -p ~/.codex/skills
-cp -a skills/skills-codex/* ~/.codex/skills/
+bash ~/aris_repo/tools/install_aris.sh /path/to/your/project --target codex --with-gemini-review-overlay
 ```
 
-2. 再安装这个 Gemini-review 覆盖层：
-
-```bash
-cp -a skills/skills-codex-gemini-review/* ~/.codex/skills/
-```
-
-3. 注册本地 reviewer bridge：
+2. 注册本地 reviewer bridge：
 
 ```bash
 mkdir -p ~/.codex/mcp-servers/gemini-review

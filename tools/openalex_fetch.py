@@ -142,22 +142,27 @@ class OpenAlexClient:
 
         return self._parse_work(response.json())
 
+    @staticmethod
+    def _dict_or_empty(value) -> Dict:
+        return value if isinstance(value, dict) else {}
+
     def _parse_work(self, work: Dict) -> Dict:
         """Parse OpenAlex work object into simplified format."""
         # Extract authors
         authors = []
-        for authorship in work.get("authorships", []):
-            author = authorship.get("author", {})
+        for authorship in work.get("authorships", []) or []:
+            authorship = self._dict_or_empty(authorship)
+            author = self._dict_or_empty(authorship.get("author"))
             author_name = author.get("display_name", "Unknown")
             authors.append(author_name)
 
         # Extract venue/source
-        primary_location = work.get("primary_location", {})
-        source = primary_location.get("source", {})
+        primary_location = self._dict_or_empty(work.get("primary_location"))
+        source = self._dict_or_empty(primary_location.get("source"))
         venue = source.get("display_name", "Unknown")
 
         # Extract open access info
-        oa_info = work.get("open_access", {})
+        oa_info = self._dict_or_empty(work.get("open_access"))
         oa_status = oa_info.get("oa_status", "closed")
         oa_url = oa_info.get("oa_url")
 
@@ -166,8 +171,14 @@ class OpenAlexClient:
         abstract = self._reconstruct_abstract(abstract_inverted) if abstract_inverted else None
 
         # Extract topics/keywords
-        topics = [t.get("display_name") for t in work.get("topics", [])[:3]]
-        keywords = [k.get("display_name") for k in work.get("keywords", [])[:5]]
+        topics = [
+            self._dict_or_empty(t).get("display_name")
+            for t in (work.get("topics") or [])[:3]
+        ]
+        keywords = [
+            self._dict_or_empty(k).get("display_name")
+            for k in (work.get("keywords") or [])[:5]
+        ]
 
         return {
             "id": work.get("id"),
@@ -181,7 +192,7 @@ class OpenAlexClient:
             "venue": venue,
             "venue_type": source.get("type"),
             "cited_by_count": work.get("cited_by_count", 0),
-            "is_oa": work.get("is_oa", False),
+            "is_oa": oa_info.get("is_oa", False),
             "oa_status": oa_status,
             "oa_url": oa_url,
             "abstract": abstract,

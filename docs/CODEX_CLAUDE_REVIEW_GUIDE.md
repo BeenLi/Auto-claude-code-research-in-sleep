@@ -18,7 +18,7 @@ The install order matters:
 
 1. install `skills/skills-codex/*`
 2. install `skills/skills-codex-claude-review/*`
-3. register `claude-review` MCP
+3. register `claude-review` MCP separately
 
 ## Install
 
@@ -28,11 +28,12 @@ git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~
 
 # In each Codex project, install base skills plus the Claude-review overlay.
 cd /path/to/your/project
-bash ~/aris_repo/tools/install_codex_skills.sh --reviewer claude
+bash ~/aris_repo/tools/install_aris.sh . --target codex --with-claude-review-overlay
 ```
 
 The installer creates flat project-local symlinks under `.agents/skills/`, writes
-`.aris/codex-installed-skills.txt`, and registers the `claude-review` MCP bridge.
+`.aris/installed-skills-codex.txt`, and selects the Claude-review overlay.
+Register the `claude-review` MCP bridge separately.
 To update skill content later, run `git pull` in `~/aris_repo`; re-run the
 installer only for newly added/removed skills or reviewer switching.
 

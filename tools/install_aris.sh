@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # install_aris.sh — Project-local ARIS skill installation (flat per-skill symlinks).
 #
-# Each ARIS skill is symlinked into `<project>/.claude/skills/<skill-name>` so
-# Claude Code's slash-command discovery (which only scans one level deep) finds it.
-# A versioned manifest at `<project>/.aris/installed-skills.txt` tracks every
-# entry this installer created — uninstall and reconcile read from the manifest
-# and never touch user-owned skills with the same name.
+# ARIS skills are symlinked into a project-local target directory:
+#   claude -> <project>/.claude/skills/<skill-name>
+#   codex  -> <project>/.agents/skills/<skill-name>
+#   gemini -> <project>/.gemini/skills/<skill-name>
+#
+# A versioned manifest under `<project>/.aris/` tracks every entry this
+# installer created for the selected target. Uninstall and reconcile read from
+# the manifest and never touch user-owned skills with the same name.
 #
 # Usage:
 #   bash tools/install_aris.sh [project_path] [options]
@@ -16,7 +19,14 @@
 #   --uninstall      remove only entries in manifest; delete manifest
 #
 # Options:
+#   --target NAME           claude, codex, or gemini (default: claude)
 #   --aris-repo PATH       override aris-repo discovery
+#   --with-claude-review-overlay
+#                          codex target only: override review-heavy skills from
+#                          skills/skills-codex-claude-review
+#   --with-gemini-review-overlay
+#                          codex target only: override review-heavy skills from
+#                          skills/skills-codex-gemini-review
 #   --dry-run              show plan, no writes
 #   --quiet                no prompts; abort on any condition that would prompt
 #   --with-doc             opt in to CLAUDE.md managed block update
@@ -66,11 +76,13 @@ BLOCK_BEGIN="<!-- ARIS:BEGIN -->"
 BLOCK_END="<!-- ARIS:END -->"
 SAFE_NAME_REGEX='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 SUPPORT_NAMES=("shared-references")
-EXCLUDE_TOP_NAMES=("skills-codex" "skills-codex.bak")  # not skills, not symlinked
+EXCLUDE_TOP_NAMES=("skills-codex" "skills-codex-claude-review" "skills-codex-gemini-review" "skills-codex.bak")
+BASE_CODEX_PACKAGE="skills-codex"
 
 # ─── Argument parsing ─────────────────────────────────────────────────────────
 PROJECT_PATH=""
 ARIS_REPO_OVERRIDE=""
+TARGET="claude"
 ACTION="auto"        # auto | reconcile | uninstall
 DRY_RUN=false
 QUIET=false
@@ -79,6 +91,8 @@ WITH_DOC=false
 FROM_OLD=false
 MIGRATE_COPY=""      # "" | keep-user | prefer-upstream
 CLEAR_STALE_LOCK=false
+WITH_CLAUDE_REVIEW_OVERLAY=false
+WITH_GEMINI_REVIEW_OVERLAY=false
 ADOPT_NAMES=()
 REPLACE_LINK_NAMES=()
 
@@ -88,7 +102,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --reconcile)         ACTION="reconcile"; shift ;;
         --uninstall)         ACTION="uninstall"; shift ;;
+        --target)            TARGET="${2:?--target requires claude|codex|gemini}"; shift 2 ;;
         --aris-repo)         ARIS_REPO_OVERRIDE="${2:?--aris-repo requires path}"; shift 2 ;;
+        --with-claude-review-overlay) WITH_CLAUDE_REVIEW_OVERLAY=true; shift ;;
+        --with-gemini-review-overlay) WITH_GEMINI_REVIEW_OVERLAY=true; shift ;;
         --dry-run)           DRY_RUN=true; shift ;;
         --quiet)             QUIET=true; shift ;;
         --with-doc)          WITH_DOC=true; shift ;;
@@ -99,8 +116,7 @@ while [[ $# -gt 0 ]]; do
         --adopt-existing)    ADOPT_NAMES+=("${2:?--adopt-existing requires NAME}"); shift 2 ;;
         --replace-link)      REPLACE_LINK_NAMES+=("${2:?--replace-link requires NAME}"); shift 2 ;;
         --platform)
-            echo "Error: --platform is removed. ARIS now only supports Claude Code (.claude/skills/)." >&2
-            echo "       Codex CLI users: see docs for the manual codex setup." >&2
+            echo "Error: --platform is removed. Use --target claude|codex|gemini." >&2
             exit 2 ;;
         --force)
             echo "Error: --force is removed. Use the granular flags:" >&2
@@ -119,6 +135,18 @@ done
 
 if [[ -n "$MIGRATE_COPY" && "$MIGRATE_COPY" != "keep-user" && "$MIGRATE_COPY" != "prefer-upstream" ]]; then
     echo "Error: --migrate-copy must be keep-user or prefer-upstream (got: $MIGRATE_COPY)" >&2; exit 2
+fi
+case "$TARGET" in
+    claude|codex|gemini) ;;
+    *) echo "Error: --target must be one of: claude, codex, gemini (got: $TARGET)" >&2; exit 2 ;;
+esac
+if $WITH_CLAUDE_REVIEW_OVERLAY && $WITH_GEMINI_REVIEW_OVERLAY; then
+    echo "Error: --with-claude-review-overlay and --with-gemini-review-overlay are mutually exclusive" >&2
+    exit 2
+fi
+if [[ "$TARGET" != "codex" ]] && { $WITH_CLAUDE_REVIEW_OVERLAY || $WITH_GEMINI_REVIEW_OVERLAY; }; then
+    echo "Error: reviewer overlay flags are only valid with --target codex" >&2
+    exit 2
 fi
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -173,6 +201,14 @@ resolve_doc_write_path() {
 # True if $1 is a symlink (lstat-style; doesn't follow)
 is_symlink() { [[ -L "$1" ]]; }
 
+name_in_replace_allowlist() {
+    local needle="$1" item
+    for item in "${REPLACE_LINK_NAMES[@]}"; do
+        [[ "$item" == "$needle" ]] && return 0
+    done
+    return 1
+}
+
 # Find aris-repo location
 resolve_aris_repo() {
     local p
@@ -198,38 +234,125 @@ resolve_aris_repo() {
     die "cannot find ARIS repo. Use --aris-repo PATH or set ARIS_REPO env var."
 }
 
-# Build the upstream inventory: array of "kind|name" entries
-# Skills = top-level dirs in <aris-repo>/skills/ containing SKILL.md
-# Support = explicitly listed support directories (shared-references)
-# Rejects: anything in EXCLUDE_TOP_NAMES, names failing slug regex, symlinks to outside aris-repo (S10)
+selected_packages() {
+    if [[ "$TARGET" != "codex" ]]; then
+        printf "skills\n"
+        return 0
+    fi
+
+    printf "%s\n" "$BASE_CODEX_PACKAGE"
+    $WITH_CLAUDE_REVIEW_OVERLAY && printf "%s\n" "skills-codex-claude-review"
+    $WITH_GEMINI_REVIEW_OVERLAY && printf "%s\n" "skills-codex-gemini-review"
+    return 0
+}
+
+packages_csv() {
+    selected_packages | paste -sd, -
+}
+
+reconcile_flag_args() {
+    printf -- "--target %s" "$TARGET"
+    $WITH_CLAUDE_REVIEW_OVERLAY && printf " --with-claude-review-overlay"
+    $WITH_GEMINI_REVIEW_OVERLAY && printf " --with-gemini-review-overlay"
+    return 0
+}
+
+configure_target() {
+    case "$TARGET" in
+        claude)
+            TARGET_LABEL="Claude"
+            MANIFEST_NAME="installed-skills.txt"
+            LOCK_DIR_NAME=".install.lock.d"
+            SKILLS_REL=".claude/skills"
+            DOC_FILE_NAME="CLAUDE.md"
+            BLOCK_BEGIN="<!-- ARIS:BEGIN -->"
+            BLOCK_END="<!-- ARIS:END -->"
+            ;;
+        codex)
+            TARGET_LABEL="Codex"
+            MANIFEST_NAME="installed-skills-codex.txt"
+            LOCK_DIR_NAME=".install-codex.lock.d"
+            SKILLS_REL=".agents/skills"
+            DOC_FILE_NAME="AGENTS.md"
+            BLOCK_BEGIN="<!-- ARIS-CODEX:BEGIN -->"
+            BLOCK_END="<!-- ARIS-CODEX:END -->"
+            ;;
+        gemini)
+            TARGET_LABEL="Gemini"
+            MANIFEST_NAME="installed-skills-gemini.txt"
+            LOCK_DIR_NAME=".install-gemini.lock.d"
+            SKILLS_REL=".gemini/skills"
+            DOC_FILE_NAME="GEMINI.md"
+            BLOCK_BEGIN="<!-- ARIS-GEMINI:BEGIN -->"
+            BLOCK_END="<!-- ARIS-GEMINI:END -->"
+            ;;
+    esac
+    MANIFEST_PREV_NAME="$MANIFEST_NAME.prev"
+}
+
+# Build the upstream inventory: "kind|name|source_rel" entries.
+# Claude/Gemini use main skills/*. Codex uses skills/skills-codex plus at
+# most one reviewer overlay package, with overlay entries taking precedence.
 build_upstream_inventory() {
-    local repo="$1"
-    local skills_dir="$repo/skills"
-    local entries=() name kind src
-    # skills (with SKILL.md)
+    local repo="$1" out="$2"
+    local tmp package package_dir d name kind source_rel skills_dir src resolved
+    tmp="$(mktemp -t aris-upstream-raw.XXXX)"
+    : > "$tmp"
+    : > "$out"
+
+    if [[ "$TARGET" == "codex" ]]; then
+        while IFS= read -r package; do
+            [[ -z "$package" ]] && continue
+            package_dir="$repo/skills/$package"
+            [[ -d "$package_dir" ]] || die "selected package missing: $package_dir"
+            for d in "$package_dir"/*; do
+                [[ -d "$d" ]] || continue
+                name="$(basename "$d")"
+                is_safe_name "$name" || { warn "skipping unsafe upstream name: $name"; continue; }
+                if [[ "$name" == "shared-references" ]]; then
+                    kind="support"
+                elif [[ -f "$d/SKILL.md" ]]; then
+                    kind="skill"
+                else
+                    continue
+                fi
+                src="$package_dir/$name"
+                if is_symlink "$src"; then
+                    resolved="$(canonicalize "$src")"
+                    [[ "$resolved" == "$repo"/* ]] || { warn "skipping upstream symlink leading outside repo: $name -> $resolved"; continue; }
+                fi
+                source_rel="skills/$package/$name"
+                printf "%s|%s|%s\n" "$kind" "$name" "$source_rel" >> "$tmp"
+            done
+        done < <(selected_packages)
+
+        awk -F'|' '{row[$2]=$0} END {for (name in row) print row[name]}' "$tmp" | sort -t'|' -k2,2 > "$out"
+        rm -f "$tmp"
+        return 0
+    fi
+
+    skills_dir="$repo/skills"
     for d in "$skills_dir"/*/; do
+        [[ -d "$d" ]] || continue
         name="$(basename "$d")"
         is_safe_name "$name" || { warn "skipping unsafe upstream name: $name"; continue; }
-        # exclude listed
         for ex in "${EXCLUDE_TOP_NAMES[@]}"; do [[ "$name" == "$ex" ]] && continue 2; done
-        # support entries handled separately
         local is_support=false
         for s in "${SUPPORT_NAMES[@]}"; do [[ "$name" == "$s" ]] && { is_support=true; break; }; done
         if $is_support; then continue; fi
-        if [[ ! -f "$d/SKILL.md" ]]; then continue; fi
-        # S10: source must not be a symlink leading outside the repo
+        [[ -f "$d/SKILL.md" ]] || continue
         src="$skills_dir/$name"
         if is_symlink "$src"; then
-            local resolved; resolved="$(canonicalize "$src")"
+            resolved="$(canonicalize "$src")"
             [[ "$resolved" == "$repo"/* ]] || { warn "skipping upstream symlink leading outside repo: $name -> $resolved"; continue; }
         fi
-        entries+=("skill|$name")
+        printf "skill|%s|skills/%s\n" "$name" "$name" >> "$tmp"
     done
-    # support directories (existing only)
     for s in "${SUPPORT_NAMES[@]}"; do
-        if [[ -d "$skills_dir/$s" ]]; then entries+=("support|$s"); fi
+        [[ -d "$skills_dir/$s" ]] && printf "support|%s|skills/%s\n" "$s" "$s" >> "$tmp"
     done
-    printf "%s\n" "${entries[@]}"
+    sort -t'|' -k2,2 "$tmp" > "$out"
+    rm -f "$tmp"
 }
 
 # Parse manifest into a global associative-style array via temp file lookup
@@ -256,6 +379,7 @@ manifest_lookup_target() {
 manifest_lookup_source() {
     awk -F'\t' -v n="$2" '$2==n {print $3; exit}' "$1"
 }
+manifest_repo_root() { awk -F'\t' '$1=="repo_root" {print $2; exit}' "$1"; }
 manifest_names() { awk -F'\t' '{print $2}' "$1"; }
 manifest_kind_of() {
     awk -F'\t' -v n="$2" '$2==n {print $1; exit}' "$1"
@@ -266,6 +390,7 @@ PROJECT_PATH="${PROJECT_PATH:-$(pwd)}"
 [[ -d "$PROJECT_PATH" ]] || die "project path does not exist: $PROJECT_PATH"
 PROJECT_PATH="$(abs_path "$PROJECT_PATH")"
 ARIS_REPO="$(resolve_aris_repo)"
+configure_target
 SKILLS_DIR_ABS="$ARIS_REPO/skills"
 PROJECT_SKILLS_DIR="$PROJECT_PATH/$SKILLS_REL"
 PROJECT_ARIS_DIR="$PROJECT_PATH/$ARIS_DIR_NAME"
@@ -278,7 +403,7 @@ DOC_FILE="$PROJECT_PATH/$DOC_FILE_NAME"
 # (.aris and .claude/skills may not exist yet — only check if present.)
 check_no_symlinked_parents() {
     local p
-    for p in "$PROJECT_ARIS_DIR" "$PROJECT_PATH/.claude" "$PROJECT_SKILLS_DIR"; do
+    for p in "$PROJECT_ARIS_DIR" "$PROJECT_PATH/${SKILLS_REL%%/*}" "$PROJECT_SKILLS_DIR"; do
         if is_symlink "$p"; then
             die "S9: $p is a symlink — refusing to install (would mutate symlink target)"
         fi
@@ -386,52 +511,56 @@ archive_legacy_copy() {
 }
 
 # ─── Plan computation ─────────────────────────────────────────────────────────
-# Plan is written to a temp file, one line per action: ACTION|kind|name|extra
+# Plan is written to a temp file, one line per action:
+#   ACTION|kind|name|source_rel|extra
 # Actions: CREATE | UPDATE_TARGET | REUSE | REMOVE | ADOPT | CONFLICT
 compute_plan() {
     local upstream_file="$1" manifest_data="$2" out="$3"
     : > "$out"
-    local target_path src expected_target current_target line kind name
+    local target_path expected_target current_target kind name source_rel
     # Iterate upstream entries
-    while IFS='|' read -r kind name; do
+    while IFS='|' read -r kind name source_rel; do
         [[ -z "$name" ]] && continue
         target_path="$PROJECT_SKILLS_DIR/$name"
-        expected_target="$SKILLS_DIR_ABS/$name"
+        expected_target="$ARIS_REPO/$source_rel"
         if [[ -L "$target_path" ]]; then
             current_target="$(read_link_target "$target_path")"
             # Convert relative readlink to absolute (relative to symlink's dir)
             if [[ "$current_target" != /* ]]; then
-                current_target="$(canonicalize "$PROJECT_SKILLS_DIR/$current_target")"
+                current_target="$(canonicalize "$(dirname "$target_path")/$current_target")"
             fi
             local in_manifest=false
             if [[ -n "$(manifest_lookup_target "$manifest_data" "$name")" ]]; then in_manifest=true; fi
             if [[ "$current_target" == "$expected_target" ]]; then
-                if $in_manifest; then echo "REUSE|$kind|$name|" >> "$out"
-                else echo "ADOPT|$kind|$name|" >> "$out"
+                if $in_manifest; then echo "REUSE|$kind|$name|$source_rel|" >> "$out"
+                else echo "ADOPT|$kind|$name|$source_rel|" >> "$out"
                 fi
             else
                 # symlink exists but points elsewhere
-                if $in_manifest; then
+                if $in_manifest || name_in_replace_allowlist "$name"; then
                     # managed symlink with stale target — can update with --replace-link or auto if safely inside repo
-                    echo "UPDATE_TARGET|$kind|$name|$current_target" >> "$out"
+                    echo "UPDATE_TARGET|$kind|$name|$source_rel|$current_target" >> "$out"
                 else
                     # foreign symlink (user's own?) — conflict
-                    echo "CONFLICT|$kind|$name|symlink_to:$current_target" >> "$out"
+                    echo "CONFLICT|$kind|$name|$source_rel|symlink_to:$current_target" >> "$out"
                 fi
             fi
         elif [[ -e "$target_path" ]]; then
             # real file/dir
-            echo "CONFLICT|$kind|$name|real_path" >> "$out"
+            echo "CONFLICT|$kind|$name|$source_rel|real_path" >> "$out"
         else
-            echo "CREATE|$kind|$name|" >> "$out"
+            echo "CREATE|$kind|$name|$source_rel|" >> "$out"
         fi
     done < "$upstream_file"
     # Manifest entries no longer in upstream → REMOVE
+    local recorded_repo_root
+    recorded_repo_root="$(manifest_repo_root "$MANIFEST_PATH" 2>/dev/null || true)"
     while IFS=$'\t' read -r mkind mname msrc mtarget mmode; do
         [[ -z "$mname" ]] && continue
         # is name in upstream?
-        if grep -q "^[^|]*|$mname$" "$upstream_file"; then continue; fi
-        echo "REMOVE|$mkind|$mname|" >> "$out"
+        if awk -F'|' -v n="$mname" '$2==n {found=1} END{exit found?0:1}' "$upstream_file"; then continue; fi
+        [[ -n "$recorded_repo_root" ]] || recorded_repo_root="$ARIS_REPO"
+        echo "REMOVE|$mkind|$mname|$msrc|$recorded_repo_root/$msrc" >> "$out"
     done < "$manifest_data"
 }
 
@@ -456,7 +585,7 @@ print_plan() {
     if (( n_conflict > 0 )); then
         log ""
         log "Conflicts (need user action):"
-        grep '^CONFLICT|' "$plan" | while IFS='|' read -r _ kind name extra; do
+        grep '^CONFLICT|' "$plan" | while IFS='|' read -r _ kind name _source extra; do
             log "  - $name ($kind): $extra"
         done
     fi
@@ -474,14 +603,16 @@ write_manifest_tmp() {
     local plan="$1" out="$2"
     {
         printf "version\t%s\n" "$MANIFEST_VERSION"
+        printf "target\t%s\n" "$TARGET"
         printf "repo_root\t%s\n" "$ARIS_REPO"
         printf "project_root\t%s\n" "$PROJECT_PATH"
         printf "generated\t%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf "packages\t%s\n" "$(packages_csv)"
         printf "kind\tname\tsource_rel\ttarget_rel\tmode\n"
         # New manifest = REUSE + ADOPT + CREATE + UPDATE_TARGET (i.e., everything that will exist as a managed symlink after apply)
         awk -F'|' '$1=="REUSE"||$1=="ADOPT"||$1=="CREATE"||$1=="UPDATE_TARGET"{print $0}' "$plan" \
-        | while IFS='|' read -r action kind name _; do
-            printf "%s\t%s\tskills/%s\t%s/%s\tsymlink\n" "$kind" "$name" "$name" "$SKILLS_REL" "$name"
+        | while IFS='|' read -r action kind name source_rel _extra; do
+            printf "%s\t%s\t%s\t%s/%s\tsymlink\n" "$kind" "$name" "$source_rel" "$SKILLS_REL" "$name"
         done
     } > "$out"
 }
@@ -498,11 +629,11 @@ revalidate_symlink_target() {
 apply_plan() {
     local plan="$1" manifest_tmp="$2"
     mkdir -p "$PROJECT_SKILLS_DIR"
-    local action kind name extra target_path expected_target
-    while IFS='|' read -r action kind name extra; do
+    local action kind name source_rel extra target_path expected_target
+    while IFS='|' read -r action kind name source_rel extra; do
         [[ -z "$name" ]] && continue
         target_path="$PROJECT_SKILLS_DIR/$name"
-        expected_target="$SKILLS_DIR_ABS/$name"
+        expected_target="$ARIS_REPO/$source_rel"
         case "$action" in
             REUSE|ADOPT)
                 : # nothing to do; manifest will record it
@@ -524,11 +655,6 @@ apply_plan() {
                     warn "S11: $target_path target changed since plan ($plan_saw_target vs $extra) — skipping"
                     continue
                 fi
-                # S2: stale target must point inside aris-repo
-                if [[ "$plan_saw_target" != "$ARIS_REPO"/* ]]; then
-                    warn "S2: refusing to replace symlink pointing outside aris-repo: $target_path -> $plan_saw_target"
-                    continue
-                fi
                 if $DRY_RUN; then log "  (dry-run) update target: $target_path -> $expected_target"
                 else
                     rm -f "$target_path"
@@ -537,12 +663,12 @@ apply_plan() {
                 fi
                 ;;
             REMOVE)
+                [[ -n "$extra" ]] || die "remove action missing recorded target for $name"
                 # S1: must be a symlink
                 is_symlink "$target_path" || { warn "S1: $target_path is not a symlink, refusing to remove"; continue; }
-                # S2: target must be inside aris-repo
                 local cur; cur="$(read_link_target "$target_path")"
                 [[ "$cur" != /* ]] && cur="$(canonicalize "$(dirname "$target_path")/$cur")"
-                [[ "$cur" == "$ARIS_REPO"/* ]] || { warn "S2: $target_path target $cur outside aris-repo, refusing"; continue; }
+                [[ "$cur" == "$extra" ]] || { warn "S8: refusing to remove $target_path; target changed to $cur"; continue; }
                 if $DRY_RUN; then log "  (dry-run) rm $target_path"
                 else rm -f "$target_path"; log "  - $name"
                 fi
@@ -595,8 +721,9 @@ ensure_tools_symlink() {
 # managed symlink (target == $ARIS_REPO/tools). User-created directories /
 # files / different symlinks are untouched.
 remove_tools_symlink() {
+    local expected_repo="${1:-$ARIS_REPO}"
     local link_path="$PROJECT_ARIS_DIR/tools"
-    local expected_target="$ARIS_REPO/tools"
+    local expected_target="$expected_repo/tools"
 
     is_symlink "$link_path" || return 0
     local cur; cur="$(read_link_target "$link_path")"
@@ -613,6 +740,18 @@ remove_tools_symlink() {
     fi
 }
 
+other_target_manifest_exists() {
+    local manifest
+    for manifest in \
+        "$PROJECT_ARIS_DIR/installed-skills.txt" \
+        "$PROJECT_ARIS_DIR/installed-skills-codex.txt" \
+        "$PROJECT_ARIS_DIR/installed-skills-gemini.txt"; do
+        [[ "$manifest" == "$MANIFEST_PATH" ]] && continue
+        [[ -f "$manifest" ]] && return 0
+    done
+    return 1
+}
+
 commit_manifest() {
     local manifest_tmp="$1"
     if $DRY_RUN; then log "  (dry-run) would commit manifest"; return; fi
@@ -625,11 +764,11 @@ commit_manifest() {
     mv -f "$manifest_tmp" "$MANIFEST_PATH"
 }
 
-# ─── CLAUDE.md best-effort update (compare-and-swap) ──────────────────────────
+# ─── Agent doc best-effort update (compare-and-swap) ─────────────────────────
 update_claude_doc() {
     local installed_names_file="$1"
     if ! $WITH_DOC || $NO_DOC; then return 0; fi
-    [[ -f "$DOC_FILE" ]] || { log "  (skip CLAUDE.md: file not present)"; return 0; }
+    [[ -f "$DOC_FILE" || -L "$DOC_FILE" ]] || { log "  (skip $DOC_FILE_NAME: file not present)"; return 0; }
 
     local doc_path
     doc_path="$(resolve_doc_write_path "$DOC_FILE")" || return 0
@@ -637,14 +776,27 @@ update_claude_doc() {
     local original new_block tmp
     original="$(cat "$doc_path")"
     # Build new block
-    local count; count="$(wc -l < "$installed_names_file" | tr -d ' ')"
+    local count title repo_lookup_cmd
+    count="$(wc -l < "$installed_names_file" | tr -d ' ')"
+    case "$TARGET" in
+        claude) title="ARIS Skill Scope" ;;
+        codex) title="ARIS Codex Skill Scope" ;;
+        gemini) title="ARIS Gemini Skill Scope" ;;
+    esac
+    repo_lookup_cmd="ARIS_REPO=\$(awk -F'\\t' '\$1==\"repo_root\"{print \$2; exit}' \"$PROJECT_PATH/$ARIS_DIR_NAME/$MANIFEST_NAME\")"
     new_block="$BLOCK_BEGIN
-## ARIS Skill Scope
-ARIS skills installed in this project: $count entries.
-Manifest: \`$ARIS_DIR_NAME/$MANIFEST_NAME\` (lists every skill ARIS installed and its upstream target).
+## $title
+ARIS target: \`$TARGET\`
+ARIS packages installed in this project: $(packages_csv)
+Managed entries: $count
+Manifest: \`$ARIS_DIR_NAME/$MANIFEST_NAME\`
+ARIS repo root: \`$ARIS_REPO\`
+Project skill path: \`$SKILLS_REL/<skill-name>\`
 For ARIS workflows, prefer the project-local skills under \`$SKILLS_REL/\` over global skills.
-Do not modify or delete files inside any skill that is a symlink (symlinks point into \`$ARIS_REPO\`).
-Update with: \`bash $ARIS_REPO/tools/install_aris.sh\`  (re-runnable; reconciles new/removed skills).
+When a skill needs ARIS helper scripts, resolve the repo root from the manifest or set it explicitly:
+\`$repo_lookup_cmd\`
+Do not modify or delete files inside any skill that is a symlink; update upstream or rerun:
+\`bash $ARIS_REPO/tools/install_aris.sh \"$PROJECT_PATH\" $(reconcile_flag_args) --reconcile\`
 $BLOCK_END"
 
     # Compute new content
@@ -657,12 +809,12 @@ text = pathlib.Path(path).read_text()
 pattern = re.compile(re.escape(begin) + r".*?" + re.escape(end), re.DOTALL)
 matches = pattern.findall(text)
 if len(matches) > 1:
-    sys.stderr.write("ARIS:WARN multiple ARIS blocks found in CLAUDE.md; skipping update\n")
+    sys.stderr.write("ARIS:WARN multiple managed blocks found; skipping update\n")
     sys.stdout.write(text)
 else:
     sys.stdout.write(pattern.sub(body, text))
 PYEOF
-        )" || { warn "CLAUDE.md update failed (best-effort, continuing)"; return 0; }
+        )" || { warn "$DOC_FILE_NAME update failed (best-effort, continuing)"; return 0; }
     else
         new_content="$original"
         [[ -n "$original" ]] && new_content="${new_content}"$'\n'
@@ -670,17 +822,66 @@ PYEOF
     fi
 
     # Compare-and-swap: re-read file, only commit if unchanged from snapshot
-    if $DRY_RUN; then log "  (dry-run) would update CLAUDE.md ARIS block"; return 0; fi
+    if $DRY_RUN; then log "  (dry-run) would update $DOC_FILE_NAME ARIS block"; return 0; fi
     tmp="$doc_path.aris-tmp.$$"
     printf '%s' "$new_content" > "$tmp"
     local current; current="$(cat "$doc_path")"
     if [[ "$current" != "$original" ]]; then
         rm -f "$tmp"
-        warn "CLAUDE.md changed during install — skipping doc update (rerun to retry)"
+        warn "$DOC_FILE_NAME changed during install — skipping doc update (rerun to retry)"
         return 0
     fi
     mv -f "$tmp" "$doc_path"
-    log "  ✓ updated CLAUDE.md (ARIS managed block)"
+    log "  ✓ updated $DOC_FILE_NAME (ARIS managed block)"
+}
+
+remove_target_doc_block() {
+    if ! $WITH_DOC || $NO_DOC; then return 0; fi
+    [[ -f "$DOC_FILE" || -L "$DOC_FILE" ]] || return 0
+
+    local doc_path
+    doc_path="$(resolve_doc_write_path "$DOC_FILE")" || return 0
+    [[ -f "$doc_path" ]] || return 0
+
+    local original new_content tmp current
+    original="$(cat "$doc_path")"
+    if ! printf '%s' "$original" | grep -qF "$BLOCK_BEGIN"; then
+        return 0
+    fi
+
+    new_content="$(python3 - "$doc_path" "$BLOCK_BEGIN" "$BLOCK_END" <<'PYEOF'
+import pathlib
+import re
+import sys
+
+path, begin, end = sys.argv[1], sys.argv[2], sys.argv[3]
+text = pathlib.Path(path).read_text()
+pattern = re.compile(r"\n?" + re.escape(begin) + r".*?" + re.escape(end) + r"\n?", re.DOTALL)
+matches = pattern.findall(text)
+if len(matches) > 1:
+    sys.stderr.write("ARIS:WARN multiple managed blocks found; skipping removal\n")
+    sys.stdout.write(text)
+else:
+    updated = pattern.sub("\n", text)
+    sys.stdout.write(updated.lstrip("\n"))
+PYEOF
+    )" || { warn "$DOC_FILE_NAME managed block removal failed; continuing"; return 0; }
+
+    if $DRY_RUN; then
+        log "  (dry-run) would remove $DOC_FILE_NAME ARIS block"
+        return 0
+    fi
+
+    tmp="$doc_path.aris-tmp.$$"
+    printf '%s' "$new_content" > "$tmp"
+    current="$(cat "$doc_path")"
+    if [[ "$current" != "$original" ]]; then
+        rm -f "$tmp"
+        warn "$DOC_FILE_NAME changed during uninstall — skipping doc update"
+        return 0
+    fi
+    mv -f "$tmp" "$doc_path"
+    log "  ✓ removed $DOC_FILE_NAME ARIS managed block"
 }
 
 # ─── Uninstall ────────────────────────────────────────────────────────────────
@@ -688,6 +889,9 @@ do_uninstall() {
     [[ -f "$MANIFEST_PATH" ]] || die "no manifest at $MANIFEST_PATH; nothing to uninstall"
     local manifest_data; manifest_data="$(mktemp -t aris-manifest.XXXX)"
     load_manifest "$MANIFEST_PATH" "$manifest_data"
+    local recorded_repo_root
+    recorded_repo_root="$(manifest_repo_root "$MANIFEST_PATH")"
+    [[ -n "$recorded_repo_root" ]] || die "manifest missing repo_root: $MANIFEST_PATH"
     log ""
     log "Uninstall plan:"
     while IFS=$'\t' read -r kind name src target mode; do
@@ -700,7 +904,7 @@ do_uninstall() {
     while IFS=$'\t' read -r kind name src target mode; do
         [[ -z "$name" ]] && continue
         local target_path="$PROJECT_PATH/$target"
-        local expected="$SKILLS_DIR_ABS/$name"
+        local expected="$recorded_repo_root/$src"
         # S1: must be symlink
         is_symlink "$target_path" || { warn "S1: $target_path not a symlink, skipping"; continue; }
         # S8 + S11: revalidate target
@@ -715,43 +919,49 @@ do_uninstall() {
         fi
     done < "$manifest_data"
     rm -f "$manifest_data"
-    # #174 Phase 0: best-effort cleanup of `.aris/tools` symlink, only if it
-    # is exactly the managed symlink. Anything else (user-created dir, custom
-    # symlink target) is left alone.
-    remove_tools_symlink
     if ! $DRY_RUN; then
         # Keep .prev for forensics, remove current manifest
         [[ -f "$MANIFEST_PATH" ]] && mv -f "$MANIFEST_PATH" "$MANIFEST_PREV"
         log "  ✓ uninstalled (manifest preserved as $MANIFEST_PREV)"
     fi
+    if ! other_target_manifest_exists; then
+        remove_tools_symlink "$recorded_repo_root"
+    fi
+    remove_target_doc_block
 }
 
 # ─── Main flow ────────────────────────────────────────────────────────────────
 log ""
-log "ARIS Project Install"
-log "  Project:    $PROJECT_PATH"
-log "  ARIS repo:  $ARIS_REPO"
-log "  Action:     $ACTION$($DRY_RUN && echo ' (dry-run)')"
+log "ARIS $TARGET_LABEL Project Install"
+log "  Project:   $PROJECT_PATH"
+log "  Repo:      $ARIS_REPO"
+log "  Packages:  $(packages_csv)"
+log "  Action:    $ACTION$($DRY_RUN && echo ' (dry-run)')"
 log ""
 
 check_no_symlinked_parents
-acquire_lock
+if ! $DRY_RUN; then
+    acquire_lock
+fi
 
 if [[ "$ACTION" == "uninstall" ]]; then
     do_uninstall
     exit 0
 fi
 
-# Migration check (only for install/reconcile)
-LEGACY_KIND="$(detect_legacy)"
-if [[ "$LEGACY_KIND" != "none" ]]; then
-    if ! $FROM_OLD; then
-        log "Legacy nested install detected: $LEGACY_NESTED ($LEGACY_KIND)"
-        log "→ to migrate, rerun with --from-old"
-        log "  for COPY-style legacy installs, also pass --migrate-copy keep-user|prefer-upstream"
-        exit 1
+LEGACY_KIND="none"
+if [[ "$TARGET" == "claude" ]]; then
+    # Migration check (only for legacy Claude install/reconcile)
+    LEGACY_KIND="$(detect_legacy)"
+    if [[ "$LEGACY_KIND" != "none" ]]; then
+        if ! $FROM_OLD; then
+            log "Legacy nested install detected: $LEGACY_NESTED ($LEGACY_KIND)"
+            log "→ to migrate, rerun with --from-old"
+            log "  for COPY-style legacy installs, also pass --migrate-copy keep-user|prefer-upstream"
+            exit 1
+        fi
+        migrate_legacy
     fi
-    migrate_legacy
 fi
 
 # If --reconcile but no manifest, fail
@@ -761,7 +971,7 @@ fi
 
 # Build inventories
 UPSTREAM_FILE="$(mktemp -t aris-upstream.XXXX)"
-build_upstream_inventory "$ARIS_REPO" > "$UPSTREAM_FILE"
+build_upstream_inventory "$ARIS_REPO" "$UPSTREAM_FILE"
 [[ -s "$UPSTREAM_FILE" ]] || die "upstream inventory empty (broken aris-repo?)"
 
 MANIFEST_DATA="$(mktemp -t aris-manifest.XXXX)"
@@ -774,16 +984,6 @@ print_plan "$PLAN_FILE"
 # Conflict resolution
 N_CONFLICT=$(grep -c '^CONFLICT|' "$PLAN_FILE" || true)
 if (( N_CONFLICT > 0 )); then
-    # Check if any can be auto-resolved by --adopt-existing (where current target == expected)
-    # (Already handled by ADOPT classification — anything still in CONFLICT is a real conflict.)
-    # Apply --replace-link allowlist for symlink-to-other-repo-entry conflicts
-    if [[ ${#REPLACE_LINK_NAMES[@]} -gt 0 ]]; then
-        for n in "${REPLACE_LINK_NAMES[@]}"; do
-            sed -i.bak "s|^CONFLICT|$n|UPDATE_TARGET|$n|" "$PLAN_FILE" 2>/dev/null || true
-            rm -f "$PLAN_FILE.bak"
-        done
-        N_CONFLICT=$(grep -c '^CONFLICT|' "$PLAN_FILE" || true)
-    fi
     if (( N_CONFLICT > 0 )); then
         log ""
         log "Aborting due to $N_CONFLICT unresolved conflicts."

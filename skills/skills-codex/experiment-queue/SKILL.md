@@ -116,7 +116,7 @@ Bind the run identifiers once so every later step (manifest save, scp, launch, m
 ```bash
 # REPLACE the placeholder path before running, or pre-export PROJECT_DIR:
 PROJECT_DIR="${PROJECT_DIR:?set PROJECT_DIR to the local project root}"
-RUN_TS=$(date -u +%Y%m%dT%H%M%SZ)
+RUN_TS=$(date -u +%Y%m%dT%H%M%SZ)             # one timestamp per run, reused everywhere
 LOCAL_RUN_DIR="$PROJECT_DIR/experiment_queue/$RUN_TS"
 mkdir -p "$LOCAL_RUN_DIR"
 ```

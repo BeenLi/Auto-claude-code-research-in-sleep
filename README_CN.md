@@ -91,11 +91,11 @@ ARIS 读论文 → 找弱点 → 克隆代码 → 针对*那些*弱点用*那套
 ## 📢 最近更新
 
 - **2026-05-04** — ![FIX](https://img.shields.io/badge/FIX-orange?style=flat-square) **`/research-wiki` 和调用方 skill 改用 fallback chain 解析 helper** ([#204](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/pull/204))。所有写入 research wiki 的 skill 现在按 `.aris/tools/` → `tools/` → `$ARIS_REPO/tools/` 查找 `research_wiki.py`，既保留手动复制 helper 的安装方式，也修复 `install_aris.sh` 项目级安装后没有 `<project>/tools/` 导致 wiki 副作用静默丢失的问题。`/research-wiki` 找不到 helper 时 hard-fail；调用方 skill 只 warn 并跳过 wiki 副作用。已安装用户请重跑 `bash tools/install_aris.sh` 刷新 `.aris/tools`，同时拿到 Python 3.9 helper import 修复。
-- **2026-04-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🩹 **项目级安装重构：扁平布局 + manifest 追踪** — 修一个真 bug：老的嵌套安装（`.claude/skills/aris/`）让 Claude Code 的 slash command 自动补全发现不了 skill（CC 只扫一层目录）。在此日期之前用过 `install_aris.sh` 的项目都中招但大多没意识到。新的 `install_aris.sh` 给每个 skill 单独创建 symlink 到 `.claude/skills/<name>`，写版本化 manifest 到 `.aris/installed-skills.txt`，**可重入**——再跑一次会自动 reconcile 上游的新增/删除。防御性设计：13 条安全规则（不写穿 symlinked 父目录、mutate 前精确 revalidate target、slug 正则、同目录 atomic rename、绝不覆盖真实文件、mkdir 锁跨平台、ADOPT 状态用于崩溃恢复、…）。`--force` 拆成细粒度 `--adopt-existing` / `--replace-link`。迁移路径：`--from-old` 走老 symlink；`--migrate-copy keep-user|prefer-upstream` 走老 copy。`smart_update.sh --target-subdir .claude/skills/aris` 已弃用并重定向到 `install_aris.sh`。同时修了 `cp -r` 的 stale-file bug（现在用 `rm -rf && cp -r`，上游删的文件不再残留）
+- **2026-04-20** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🩹 **项目级安装重构：扁平布局 + manifest 追踪** — 修一个真 bug：老的嵌套安装（`.claude/skills/aris/`）让 Claude Code 的 slash command 自动补全发现不了 skill（CC 只扫一层目录）。新的 `install_aris.sh` 给每个 skill 单独创建 symlink，写版本化 manifest 到 `.aris/`，**可重入**。旧 copied-install smart updater 现已移除；推荐统一使用 `install_aris.sh` 项目级 symlink。
 - **2026-04-19** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔗 **[`/overleaf-sync`](skills/overleaf-sync/SKILL.md)** — 本地 ARIS 论文目录与 Overleaf 项目的双向桥接，基于官方 **Overleaf Git Bridge**（Premium）。让合作者继续在 Overleaf 网页端编辑，本地同时跑 ARIS 审计/改写流水线（`/paper-claim-audit`、`/citation-audit`、`/auto-paper-improvement-loop`）。子命令：`setup`（一次性，由用户在终端完成，agent 全程不接触 token）/ `pull`（diff-protocol——自动识别半截草稿、typo、需要重新触发审计的数字/引用改动）/ `push`（写入共享 Overleaf 状态前必须用户确认）/ `status`（三方差异诊断）。**Token 永远不进入 agent 或任何文件**——只在用户终端里输入一次，存进 macOS Keychain，之后 agent 所有操作都免认证
 - **2026-04-19** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📚 **[`/citation-audit`](skills/citation-audit/SKILL.md)** — 证据-到-claim 审计栈的第四层也是最后一层（`experiment-audit` → `result-to-claim` → `paper-claim-audit` → `citation-audit`）。新鲜跨家族 reviewer（gpt-5.5 通过 Codex MCP）配合 web/DBLP/arXiv 实时查找，对每个 `\cite{...}` 沿三条独立轴进行验证：**存在性**（论文是否真在所声称的 arXiv ID/DOI/会议）、**元数据正确性**（作者/年份/会议/标题与权威源一致）、**上下文恰当性**（被引论文是否真正支持引用处的 claim——这是最具诊断价值的检查）。每条 entry 给出 KEEP / FIX / REPLACE / REMOVE 判决。已**自动集成到 Workflow 3 Phase 5.8** 作为投稿前的参考文献门控。实证动机：在 2026 年 4 月 ARIS 技术报告 run 中，两篇真实论文（`madaan2023selfrefine`、`liu2023reviewergpt`）被引用在它们实际不支持的语境中，另有一条 entry 的 `author` 字段是 `"Anonymous"`——这些都是仅做元数据检查会漏掉的问题
 - **2026-04-17** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔀 **`/experiment-queue` 集成到 Workflow 1.5 + research-pipeline** — `experiment-bridge` Phase 4 Deploy 阶段按 milestone 任务数自动路由：≤5 jobs → `/run-experiment`，≥10 jobs 或 phase 依赖 → `/experiment-queue`（自带 OOM 重试 / stale screen 清理 / wave 切换门控 / 崩溃安全状态）。新增 `--- batch: queue` 全局强制选项。`EXPERIMENT_PLAN.md` 里的大型多种子 sweep（如 36 格 `N × seed × n_train` grid）现在自动用队列调度，无需手动调用
-- **2026-04-17** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔗 **[项目级 symlink 安装](tools/install_aris.sh)**（解决 [#118](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/118)）— 新推荐默认安装方式。`bash tools/install_aris.sh` 自动检测平台（Claude Code / Codex CLI），创建 `.claude/skills/aris` 或 `.agents/skills/aris` symlink 指向 ARIS 仓库，并在 `.aris/skill-source.txt` 记录安装元数据；默认不再写 `CLAUDE.md` / `AGENTS.md`，需要文档管理块时显式传 `--with-doc`。**解决 skill 命名冲突问题**——当 ARIS 与 Superpowers / OpenHands 等社区 skill 包共用全局目录时，agent 会错误调用其他包的 skill 打断 ARIS 工作流。Windows 用户用 `install_aris.ps1`（基于 junction）。同时 `smart_update.sh` 新增 `--target-subdir` 参数支持 Codex `.agents/skills/aris` 项目级 copy 安装；symlink 安装会被拒绝并提示用 `git pull` 更新。全局安装继续支持给 power user
+- **2026-04-17** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔗 **[项目级 symlink 安装](tools/install_aris.sh)**（解决 [#118](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/118)）— 早期项目级安装里程碑。当前统一入口是 `install_aris.sh --target claude|codex|gemini`，并在 `.aris/` 下记录各 target manifest。
 - **2026-04-16** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🎨 **[`/figure-spec`](skills/figure-spec/SKILL.md)** — 确定性 JSON→SVG 渲染器正式包装为一级 skill。论文架构图/工作流/流水线/审计级联图的首选默认方案。形状感知边裁剪（矩形/圆/椭圆/菱形）、自环、弯曲边、多行标签含 CJK 宽度估算。矢量输出可编辑、可复现（相同 spec → 相同 SVG）、无外部 API。**Workflow 3 Phase 2b 恢复**：`illustration: figurespec`（新默认）/ `gemini` / `mermaid` / `false`——四档作图引擎互补并存
 - **2026-04-16** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) ⚙️ **[`/experiment-queue`](skills/experiment-queue/SKILL.md)** — 面向多 seed 多配置 ML 实验的 SSH 任务队列。从真实 36 格 NeurIPS sweep 的痛点反推设计：OOM 感知重试（延迟退避）、stale screen 清理、wave 切换竞争防护、teacher→student 阶段依赖、崩溃安全的调度器（从 JSON 状态恢复）。声明式 grid 自动展开（如 `N × seed × n_train → 36 jobs`）。`conda_hook` + `gpu_free_threshold_mib` 可配置以适应非标准环境。≥10 jobs 时使用；`/run-experiment` 继续服务单点实验
 - **2026-04-15** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🛡️ **论文写作流水线加固** — 基于真实 NeurIPS run 失败分析的 10 个 patch。`REVIEWER_BIAS_GUARD=true`：每轮 review 用全新 thread（codex-reply 导致分数从真实 3/10 膨胀到虚假 8/10）。Reviewer Independence Protocol：禁止向 reviewer 传递修复摘要。Step 4.5 定理重述回归测试：捕捉修复轮次中的定理漂移。Step 5.5 Kill Argument Exercise：理论论文最终轮对抗攻防。位置感知 overfull 阻断。`/paper-write` 新增 Theory Paper Consistency Pass。Bib Hygiene 强制 DBLP/CrossRef 验证。Phase 5.5 Mandatory Final Claim Audit 作为投稿门控。**Review Tracing Protocol**：完整 prompt/response 对保存到 `.aris/traces/`，支持 reviewer-independence 审计（[`review-tracing.md`](skills/shared-references/review-tracing.md)，[`save_trace.sh`](tools/save_trace.sh)）。灵感来自社区贡献 @李傲龍
@@ -106,7 +106,7 @@ ARIS 读论文 → 找弱点 → 克隆代码 → 针对*那些*弱点用*那套
 - **2026-04-10** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) ⚡ **[Effort Levels](skills/shared-references/effort-contract.md)** — `— effort: lite | balanced | max | beast`。控制工作强度。Codex reasoning 永远 `xhigh`。`beast` = 全部拉满。默认 `balanced` = 零变化。
 - **2026-04-10** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔎 **[DeepXiv 集成](skills/deepxiv/SKILL.md)** — 渐进式文献检索。`— sources: deepxiv`。`pip install deepxiv-sdk`。社区贡献 by [@DreamEnding](https://github.com/DreamEnding)
 - **2026-04-10** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🛡️ **[`/experiment-audit`](skills/experiment-audit/SKILL.md)** — 跨模型实验诚实度验证。GPT-5.5 直接读你的评估脚本和结果，检查伪造 GT、分数归一化作弊、幽灵结果、范围夸大（[#131](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/131), [#57](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/57)）。仅警告不阻断。`/result-to-claim` 自动读取审计结果。新增 [experiment-integrity.md](skills/shared-references/experiment-integrity.md) 共享规则。**执行者不得审判自己的诚实度。**
-- **2026-04-10** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🧠 **[`tools/smart_update.sh`](tools/smart_update.sh)** — 智能技能更新器。对比本地 vs 上游，检测个人定制（服务器路径、API key 等），只更新安全的 skill。`bash tools/smart_update.sh --apply`
+- **2026-04-10** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🧠 曾引入 copied-install smart updater；现已改为统一 `tools/install_aris.sh` 的 manifest-managed symlink 安装。
 - **2026-04-10** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🏆 **社区论文：[UAV-CC](community_papers/UAV-CC.pdf)** — 首篇带完整 PDF 存档的社区论文。无人机变化描述基准，投稿 IEEE TGRS，作者 [@wxx827](https://github.com/wxx827)。配置：Claude Opus 4.6 + Codex 5.5 xhigh + Cursor。论文存档于 `community_papers/`
 - **2026-04-08** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📚 **[`/research-wiki`](skills/research-wiki/SKILL.md)** — 持久化研究知识库，灵感来自 [Karpathy 的 LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)。跨研究全生命周期积累论文、想法、实验、claim 及其 typed 关系。Wiki hooks 集成到 `/research-lit`（论文入库）、`/idea-creator`（读 wiki + 写回 idea）、`/result-to-claim`（更新 claim 状态 + 触发重新构思）。失败的 idea 成为防重复记忆。**ARIS 现在能从错误中学习。**
 - **2026-04-05** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🧬 **[`/meta-optimize`](skills/meta-optimize/SKILL.md)** — ARIS 外循环 harness 优化。通过 [Claude Code hooks](templates/claude-hooks/meta_logging.json) 被动记录技能调用、工具执行、失败和参数覆盖。运行 `/meta-optimize` 分析使用数据，提出 SKILL.md 改进方案——经 reviewer 审核、用户批准。灵感来自 [Meta-Harness](https://arxiv.org/abs/2603.28052)（Lee et al., 2026）。**ARIS 现在可以优化自己。**
@@ -244,9 +244,9 @@ claude
 
 > **重要：** Codex MCP 使用的模型取决于 `~/.codex/config.toml`，而非 skill 文件中的设置。请确认其中写的是 `model = "gpt-5.5"`（推荐）。其他可用模型：`gpt-5.3-codex`、`gpt-5.2-codex`、`o3`。运行 `codex setup` 或直接编辑该文件。
 
-> **想让 Codex 执行、Claude Code 审稿？** 见 [`docs/CODEX_CLAUDE_REVIEW_GUIDE_CN.md`](docs/CODEX_CLAUDE_REVIEW_GUIDE_CN.md)。推荐项目级安装命令是 `bash tools/install_codex_skills.sh --reviewer claude`，会用 symlink 安装基础 Codex skills，并把 review-heavy skills 覆盖到本地 `claude-review` MCP bridge。
+> **想让 Codex 执行、Claude Code 审稿？** 见 [`docs/CODEX_CLAUDE_REVIEW_GUIDE_CN.md`](docs/CODEX_CLAUDE_REVIEW_GUIDE_CN.md)。推荐项目级安装命令是 `bash tools/install_aris.sh /path/to/project --target codex --with-claude-review-overlay`，会用 symlink 安装基础 Codex skills，并把 review-heavy skills 覆盖到本地 `claude-review` MCP bridge。
 
-> **想让 Codex 执行、Gemini 在本地做审稿？** 见 [`docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md`](docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md) 和[英文版](docs/CODEX_GEMINI_REVIEW_GUIDE.md)。推荐项目级安装命令是 `bash tools/install_codex_skills.sh --reviewer gemini`，会用 symlink 安装基础 Codex skills，并把 reviewer-aware skills 覆盖到本地 `gemini-review` MCP bridge，默认 direct Gemini API。
+> **想让 Codex 执行、Gemini 在本地做审稿？** 见 [`docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md`](docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md) 和[英文版](docs/CODEX_GEMINI_REVIEW_GUIDE.md)。推荐项目级安装命令是 `bash tools/install_aris.sh /path/to/project --target codex --with-gemini-review-overlay`，会用 symlink 安装基础 Codex skills，并把 reviewer-aware skills 覆盖到本地 `gemini-review` MCP bridge，默认 direct Gemini API。
 
 详见[完整安装指南](#%EF%B8%8F-安装)和[替代模型组合](#-替代模型组合)（无需 Claude/OpenAI API）。
 
@@ -851,7 +851,7 @@ export OPENAI_API_KEY="your-key"         # API 模式（快）
 
 ### 安装 Skills
 
-> 💡 **推荐：项目级扁平 symlink 安装**（2026-04-20 起）。每个 ARIS skill 独立 symlink 到 `.claude/skills/<skill-name>`，让 Claude Code 的 slash command 自动补全能直接发现。manifest 在 `.aris/installed-skills.txt` 跟踪 ARIS 装了什么——uninstall 和 reconcile 只动 manifest 里的条目，绝不碰你自己的 skill。
+> 💡 **推荐：项目级扁平 symlink 安装**。`tools/install_aris.sh` 统一安装 Claude、Codex、Gemini 三类项目级 skills。manifest 在 `.aris/` 下按 target 记录 ARIS 装了什么——uninstall 和 reconcile 只动对应 manifest 里的条目，绝不碰你自己的 skill。
 
 ```bash
 # 1. 克隆 ARIS 一次到稳定位置
@@ -859,9 +859,11 @@ git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~
 
 # 2. 在每个使用 ARIS 的项目里 attach：
 cd ~/your-paper-project
-bash ~/aris_repo/tools/install_aris.sh
-# → 每个 skill 一个 symlink: .claude/skills/<skill> → ~/aris_repo/skills/<skill>
-# → 写 manifest .aris/installed-skills.txt（追踪 ARIS 装的每条）
+bash ~/aris_repo/tools/install_aris.sh . --target claude
+# → Claude: .claude/skills/<skill> → ~/aris_repo/skills/<skill>
+# → Codex:  --target codex 使用 .agents/skills/<skill> → ~/aris_repo/skills/skills-codex/<skill>
+# → Gemini: --target gemini 使用 .gemini/skills/<skill> → ~/aris_repo/skills/<skill>
+# → 写入对应 target 的 .aris/installed-skills*.txt manifest
 # → 默认不更新 agent 文档；需要时传 --with-doc
 # → 可重入：再跑一次会自动 reconcile 上游的新增/删除
 
@@ -869,13 +871,15 @@ bash ~/aris_repo/tools/install_aris.sh
 cd ~/aris_repo && git pull
 
 # 3a. 上游新增 / 删除 skill 时，重跑安装器（一次的事）：
-bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project
+bash ~/aris_repo/tools/install_aris.sh ~/your-paper-project --target claude --reconcile
 
 # 其他常用：
 bash ~/aris_repo/tools/install_aris.sh --dry-run        # 看计划，不写盘
 bash ~/aris_repo/tools/install_aris.sh --uninstall      # 按 manifest 卸载（不动你自己的 skill）
 bash ~/aris_repo/tools/install_aris.sh --from-old       # 从老的 .claude/skills/aris/ 嵌套布局迁移
-bash ~/aris_repo/tools/install_aris.sh --with-doc       # 显式写入 CLAUDE.md/AGENTS.md 管理块
+bash ~/aris_repo/tools/install_aris.sh --with-doc       # 显式写入 CLAUDE.md/AGENTS.md/GEMINI.md 管理块
+bash ~/aris_repo/tools/install_aris.sh ~/your-project --target codex --with-claude-review-overlay
+bash ~/aris_repo/tools/install_aris.sh ~/your-project --target codex --with-gemini-review-overlay
 
 # Windows（PowerShell，需要管理员权限或开发者模式以创建 junction）：
 .\tools\install_aris.ps1 C:\path\to\your-paper-project
@@ -886,7 +890,7 @@ bash ~/aris_repo/tools/install_aris.sh --with-doc       # 显式写入 CLAUDE.md
 <details>
 <summary><b>从老的嵌套布局迁移（2026-04-20 之前的安装）</b></summary>
 
-如果你之前用的是 `install_aris.sh`（创建 `.claude/skills/aris/` 嵌套 symlink）或 `smart_update.sh --target-subdir .claude/skills/aris`（嵌套 copy），那你的 slash command 大概率没被 Claude Code 自动发现。迁移到扁平布局：
+如果你之前用的是 `install_aris.sh`（创建 `.claude/skills/aris/` 嵌套 symlink）或手动 copy 到 `.claude/skills/aris`，那你的 slash command 大概率没被 Claude Code 自动发现。迁移到扁平布局：
 
 ```bash
 # Symlink 老安装：
@@ -904,19 +908,13 @@ bash ~/aris_repo/tools/install_aris.sh ~/your-project --from-old --migrate-copy 
 <details>
 <summary><b>其他安装方式（进阶）</b></summary>
 
-**项目级 copy（不要 symlink，适合需要为单个项目定制 skill 内容）：**
-```bash
-mkdir -p ~/your-project/.claude/skills
-bash ~/aris_repo/tools/smart_update.sh --project ~/your-project --apply
-# 默认 --target-subdir 是 .claude/skills（扁平），这是 Claude Code 期望的布局。
-# （老的 --target-subdir .claude/skills/aris 已弃用，见上面的迁移段。）
-```
+项目级 copy 不再由 ARIS 更新脚本自动维护。需要迁移时，请先备份或手动移除 copy，再使用上面的项目级 symlink 安装。
 
 **全局安装（一份 copy 在 home 目录，所有项目可用）：**
 ```bash
 mkdir -p ~/.claude/skills
 cp -r ~/aris_repo/skills/* ~/.claude/skills/
-# 更新：bash tools/smart_update.sh --apply
+# 更新：手动重新复制，或迁移到项目级 symlink。
 ```
 
 > 全局安装会增加和其他全局 skill 包名字冲突的风险。只在不混装 ARIS 与 Superpowers / OpenHands 等的情况下使用——否则用上面的项目级安装。

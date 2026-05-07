@@ -47,6 +47,30 @@ class InstallTest(unittest.TestCase):
         )
         return result
 
+    def _make_minimal_repo(self, name):
+        repo = self.tmp / name
+        skill = repo / "skills" / "alpha"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("# alpha\n")
+        (repo / "tools").mkdir()
+        return repo
+
+    def _run_with_repo(self, aris_repo, *extra_args):
+        return subprocess.run(
+            [
+                "bash",
+                str(INSTALL_SCRIPT),
+                str(self.project),
+                "--aris-repo",
+                str(aris_repo),
+                "--quiet",
+                "--no-doc",
+                *extra_args,
+            ],
+            capture_output=True,
+            text=True,
+        )
+
     # ─── install behaviour ────────────────────────────────────────────────
 
     def test_install_creates_tools_symlink(self):
@@ -129,6 +153,36 @@ class InstallTest(unittest.TestCase):
             (self.project / ".aris" / "tools").exists(),
             "uninstall must remove the managed symlink",
         )
+
+    def test_uninstall_keeps_tools_until_last_target_is_removed(self):
+        self._run("--target", "claude")
+        self._run("--target", "codex")
+        link = self.project / ".aris" / "tools"
+        self.assertTrue(link.is_symlink())
+
+        result = self._run("--target", "codex", "--uninstall")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertTrue(
+            link.is_symlink(),
+            "shared tools link must remain while another ARIS target is still installed",
+        )
+
+        result = self._run("--target", "claude", "--uninstall")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertFalse(link.exists(), "last target uninstall removes managed tools link")
+
+    def test_uninstall_removes_managed_tools_link_using_manifest_repo_root(self):
+        old_repo = self._make_minimal_repo("old-aris")
+        new_repo = self._make_minimal_repo("new-aris")
+
+        result = self._run_with_repo(old_repo)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        link = self.project / ".aris" / "tools"
+        self.assertEqual(os.readlink(link), str(old_repo / "tools"))
+
+        result = self._run_with_repo(new_repo, "--uninstall")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertFalse(link.exists(), "uninstall must remove the old managed tools link")
 
     def test_uninstall_preserves_non_managed_dir(self):
         # First install, then replace tools symlink with a user dir, then uninstall

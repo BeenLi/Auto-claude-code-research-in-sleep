@@ -38,7 +38,7 @@ last_updated: ""     # YYYY-MM-DD HH:mm — 技能每次输出时自动更新
 next: 下一步行动
 ```
 
-> 💡 从模板开始：`cp templates/CLAUDE_MD_TEMPLATE.md CLAUDE.md`
+> 💡 从模板开始：`cp templates/AGENT_MD_TEMPLATE.md AGENT.md`
 
 | 字段 | 用途 | 示例 |
 |------|------|------|

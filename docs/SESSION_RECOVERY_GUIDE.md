@@ -38,7 +38,7 @@ last_updated: ""     # YYYY-MM-DD HH:mm — auto-updated by skills on every outp
 next: what to do next
 ```
 
-> 💡 Start from the template: `cp templates/CLAUDE_MD_TEMPLATE.md CLAUDE.md`
+> 💡 Start from the template: `cp templates/AGENT_MD_TEMPLATE.md AGENT.md`
 
 | Field | Purpose | Example |
 |-------|---------|---------|

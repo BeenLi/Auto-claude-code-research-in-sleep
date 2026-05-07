@@ -98,13 +98,13 @@ Optional fallback only:
 # Clone ARIS once, then run this from each Codex project.
 git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
 cd /path/to/your/project
-bash ~/aris_repo/tools/install_codex_skills.sh --reviewer gemini
+bash ~/aris_repo/tools/install_aris.sh . --target codex --with-gemini-review-overlay
 ```
 
 The installer links base skills from `skills/skills-codex/`, points the
-reviewer-aware overrides at this package, writes `.aris/codex-installed-skills.txt`,
-and registers `gemini-review` MCP with `GEMINI_REVIEW_BACKEND=api`. This is the
-intended reviewer backend for this overlay.
+reviewer-aware overrides at this package, and writes `.aris/installed-skills-codex.txt`.
+Register `gemini-review` MCP with `GEMINI_REVIEW_BACKEND=api` separately. This
+is the intended reviewer backend for this overlay.
 
 If the default API model is temporarily rate-limited on your current free-tier window, keep the same overlay and bridge, and override only the reviewer model:
 

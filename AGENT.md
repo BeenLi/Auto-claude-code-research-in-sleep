@@ -28,16 +28,7 @@ Parses external reviews -> enforces coverage and grounding -> drafts text-only r
 ## Pipeline Status
 
 ```yaml
-stage: implementation
-idea: "C-Share: Multi-Resource Fairness for Shared Lossless Communication Compression on DPUs/NICs"
-contract: idea-stage/docs/research_contract.md
-current_branch: codex/computer-architecture
-baseline: "Uncompressed communication, FIFO DPU compression service, wire-byte fair sharing, ratio-greedy compression, current Rx output-only budgeter, generic DPU QoS without compression hints, oracle scheduler"
-validation_status: "Workflow 1 idea discovery complete on 2026-05-07; external gpt-5.5 reviewer selected C-Share, score 5/6, confidence high; no C-Share experiments executed yet"
-active_tasks: []
-language: zh
-last_updated: "2026-05-07"
-next: "Proceed only with /experiment-bridge for C-Share P0 model plumbing: multi-resource compression-service simulator, naive scheduler failure matrix, resource ablations, and literature-profile calibration. Do not claim real LLM payload compressibility, DPU deployment benefit, or line-rate hardware feasibility until P2/P3 evidence exists."
+{}
 ```
 
 ## State Persistence Rules

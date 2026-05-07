@@ -5,9 +5,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-INSTALL_SCRIPT = REPO_ROOT / "tools" / "install_aris_codex.sh"
-CLAUDE_INSTALL_SCRIPT = REPO_ROOT / "tools" / "install_aris.sh"
-UPDATE_SCRIPT = REPO_ROOT / "tools" / "smart_update_codex.sh"
+INSTALL_SCRIPT = REPO_ROOT / "tools" / "install_aris.sh"
 
 
 def run(
@@ -57,6 +55,8 @@ def test_install_aris_codex_dry_run_has_no_project_writes(tmp_path: Path) -> Non
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(repo),
             "--dry-run",
@@ -83,7 +83,7 @@ def test_install_aris_default_skips_doc_update(tmp_path: Path) -> None:
     run(
         [
             "bash",
-            str(CLAUDE_INSTALL_SCRIPT),
+            str(INSTALL_SCRIPT),
             str(project),
             "--aris-repo",
             str(repo),
@@ -105,7 +105,7 @@ def test_install_aris_with_doc_preserves_agent_symlink(tmp_path: Path) -> None:
     run(
         [
             "bash",
-            str(CLAUDE_INSTALL_SCRIPT),
+            str(INSTALL_SCRIPT),
             str(project),
             "--aris-repo",
             str(repo),
@@ -128,6 +128,8 @@ def test_install_aris_codex_reconcile_and_uninstall(tmp_path: Path) -> None:
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(repo),
             "--quiet",
@@ -147,6 +149,8 @@ def test_install_aris_codex_reconcile_and_uninstall(tmp_path: Path) -> None:
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(repo),
             "--reconcile",
@@ -165,6 +169,8 @@ def test_install_aris_codex_reconcile_and_uninstall(tmp_path: Path) -> None:
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(repo),
             "--reconcile",
@@ -181,6 +187,8 @@ def test_install_aris_codex_reconcile_and_uninstall(tmp_path: Path) -> None:
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(repo),
             "--uninstall",
@@ -204,8 +212,11 @@ def test_install_aris_codex_with_doc_opt_in_preserves_agent_symlink(tmp_path: Pa
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(repo),
+            "--with-claude-review-overlay",
             "--with-doc",
             "--quiet",
         ]
@@ -218,12 +229,16 @@ def test_install_aris_codex_with_doc_opt_in_preserves_agent_symlink(tmp_path: Pa
     assert "repo_root" in agents_text
     assert '$1=="repo_root"{print $2; exit}' in agents_text
     assert "$1==repo_root" not in agents_text
+    assert "skills-codex,skills-codex-claude-review" in agents_text
+    assert "--with-claude-review-overlay --reconcile" in agents_text
 
     run(
         [
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(repo),
             "--uninstall",
@@ -247,6 +262,8 @@ def test_install_aris_codex_uninstall_uses_manifest_repo_root(tmp_path: Path) ->
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(original_repo),
             "--quiet",
@@ -262,6 +279,8 @@ def test_install_aris_codex_uninstall_uses_manifest_repo_root(tmp_path: Path) ->
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(other_repo),
             "--uninstall",
@@ -291,6 +310,8 @@ def test_install_aris_codex_reconcile_removes_stale_links_from_manifest_repo(tmp
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(original_repo),
             "--quiet",
@@ -307,6 +328,8 @@ def test_install_aris_codex_reconcile_removes_stale_links_from_manifest_repo(tmp
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(new_repo),
             "--reconcile",
@@ -338,6 +361,8 @@ def test_install_aris_codex_reconcile_accepts_already_deleted_stale_link(tmp_pat
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(original_repo),
             "--quiet",
@@ -353,6 +378,8 @@ def test_install_aris_codex_reconcile_accepts_already_deleted_stale_link(tmp_pat
             "bash",
             str(INSTALL_SCRIPT),
             str(project),
+            "--target",
+            "codex",
             "--aris-repo",
             str(new_repo),
             "--reconcile",
@@ -364,226 +391,90 @@ def test_install_aris_codex_reconcile_accepts_already_deleted_stale_link(tmp_pat
     assert "\talpha\t" not in manifest
 
 
-def test_smart_update_codex_copy_install_and_symlink_refusal(tmp_path: Path) -> None:
-    upstream = tmp_path / "upstream"
-    make_skill(upstream / "alpha", "# alpha-v2\n")
-    make_skill(upstream / "beta", "# beta\n")
-    make_skill(upstream / "gamma", "../shared-references/integration-contract.md\n")
-    (upstream / "shared-references").mkdir(parents=True, exist_ok=True)
-    (upstream / "shared-references" / "reviewer-routing.md").write_text("new\n")
-    (upstream / "shared-references" / "integration-contract.md").write_text("integration\n")
-
-    local = tmp_path / "local"
-    make_skill(local / "alpha", "# alpha-v1\n")
-    (local / "shared-references").mkdir(parents=True, exist_ok=True)
-    (local / "shared-references" / "reviewer-routing.md").write_text("old\n")
-    make_skill(local / "local-only", "# keep-me\n")
-
-    dry_run = run(
-        [
-            "bash",
-            str(UPDATE_SCRIPT),
-            "--upstream",
-            str(upstream),
-            "--local",
-            str(local),
-        ]
-    )
-    assert "Safe update: 0" in dry_run.stdout
-    assert "New: 2" in dry_run.stdout
-    assert "Needs merge: 2" in dry_run.stdout
-    assert "New shared references: 1" in dry_run.stdout
-    assert "shared-references/integration-contract.md" in dry_run.stdout
-    assert "Local only: 1" in dry_run.stdout
-    assert not (local / "shared-references" / "integration-contract.md").exists()
+def test_install_aris_codex_gemini_overlay_and_mutual_exclusion(tmp_path: Path) -> None:
+    repo = make_minimal_aris_repo(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
 
     run(
         [
             "bash",
-            str(UPDATE_SCRIPT),
-            "--upstream",
-            str(upstream),
-            "--local",
-            str(local),
-            "--apply",
+            str(INSTALL_SCRIPT),
+            str(project),
+            "--target",
+            "codex",
+            "--aris-repo",
+            str(repo),
+            "--with-gemini-review-overlay",
+            "--quiet",
         ]
     )
-    assert "# alpha-v1" in (local / "alpha" / "SKILL.md").read_text()
-    assert (local / "beta" / "SKILL.md").exists()
-    assert (local / "gamma" / "SKILL.md").exists()
-    assert (local / "shared-references" / "integration-contract.md").read_text() == "integration\n"
-    assert (local / "shared-references" / "reviewer-routing.md").read_text() == "old\n"
-    assert (local / "local-only" / "SKILL.md").exists()
 
-    managed_project = tmp_path / "managed-project"
-    (managed_project / ".agents" / "skills").mkdir(parents=True)
-    (managed_project / ".agents" / "skills" / "auto-review-loop").symlink_to(
-        REPO_ROOT / "skills" / "skills-codex" / "auto-review-loop"
-    )
+    assert (project / ".agents" / "skills" / "beta").resolve() == (
+        repo / "skills" / "skills-codex-gemini-review" / "beta"
+    ).resolve()
+
     refused = run(
-        ["bash", str(UPDATE_SCRIPT), "--project", str(managed_project)],
+        [
+            "bash",
+            str(INSTALL_SCRIPT),
+            str(project),
+            "--target",
+            "codex",
+            "--aris-repo",
+            str(repo),
+            "--with-claude-review-overlay",
+            "--with-gemini-review-overlay",
+            "--dry-run",
+        ],
         check=False,
     )
-    assert refused.returncode != 0
-    assert "install_aris_codex.sh" in refused.stderr
-
-
-def test_smart_update_codex_local_uses_default_upstream(tmp_path: Path) -> None:
-    local = tmp_path / "local"
-    local.mkdir()
-
-    dry_run = run(["bash", str(UPDATE_SCRIPT), "--local", str(local)])
-
-    assert dry_run.returncode == 0
-    assert f"Upstream: {REPO_ROOT / 'skills' / 'skills-codex'}" in dry_run.stdout
-    assert f"Local:    {local}" in dry_run.stdout
-
-
-def test_smart_update_codex_allows_unrelated_symlinked_skills(tmp_path: Path) -> None:
-    local = tmp_path / "local"
-    third_party = tmp_path / "third-party-skill"
-    local.mkdir()
-    make_skill(third_party, "# third-party\n")
-    (local / "third-party").symlink_to(third_party)
-
-    dry_run = run(["bash", str(UPDATE_SCRIPT), "--local", str(local)])
-
-    assert dry_run.returncode == 0
-    assert "third-party" in dry_run.stdout
-
-
-def test_smart_update_codex_refuses_aris_symlinked_skills(tmp_path: Path) -> None:
-    local = tmp_path / "local"
-    local.mkdir()
-    (local / "auto-review-loop").symlink_to(
-        REPO_ROOT / "skills" / "skills-codex" / "auto-review-loop"
-    )
-
-    refused = run(["bash", str(UPDATE_SCRIPT), "--local", str(local)], check=False)
 
     assert refused.returncode != 0
-    assert "symlink-managed ARIS entry 'auto-review-loop'" in refused.stderr
+    assert "mutually exclusive" in refused.stderr
 
 
-def test_smart_update_codex_ignores_local_only_shared_reference_failures(tmp_path: Path) -> None:
-    upstream = tmp_path / "upstream"
-    make_skill(upstream / "alpha", "# alpha\n")
-    (upstream / "shared-references").mkdir(parents=True, exist_ok=True)
-
-    local = tmp_path / "local"
-    local.mkdir()
-    make_skill(local / "local-only", "../shared-references/local-contract.md\n")
-
-    result = run(
-        [
-            "bash",
-            str(UPDATE_SCRIPT),
-            "--upstream",
-            str(upstream),
-            "--local",
-            str(local),
-            "--apply",
-        ]
-    )
-
-    assert result.returncode == 0
-    assert (local / "alpha" / "SKILL.md").exists()
-    assert (local / "local-only" / "SKILL.md").exists()
-
-
-def test_smart_update_codex_local_respects_overlay(tmp_path: Path) -> None:
-    local = tmp_path / "local"
-    local.mkdir()
+def test_install_aris_gemini_target_and_doc_block(tmp_path: Path) -> None:
+    repo = make_minimal_claude_aris_repo(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "GEMINI.md").write_text("# Gemini\n")
 
     run(
         [
             "bash",
-            str(UPDATE_SCRIPT),
-            "--local",
-            str(local),
-            "--overlay",
-            "claude-review",
-            "--apply",
+            str(INSTALL_SCRIPT),
+            str(project),
+            "--target",
+            "gemini",
+            "--aris-repo",
+            str(repo),
+            "--with-doc",
+            "--quiet",
         ]
     )
 
-    installed = (local / "auto-review-loop" / "SKILL.md").read_text()
-    overlay = (
-        REPO_ROOT
-        / "skills"
-        / "skills-codex-claude-review"
-        / "auto-review-loop"
-        / "SKILL.md"
-    ).read_text()
-    base = (REPO_ROOT / "skills" / "skills-codex" / "auto-review-loop" / "SKILL.md").read_text()
-
-    assert installed == overlay
-    assert installed != base
+    assert (project / ".gemini" / "skills" / "alpha").is_symlink()
+    assert (project / ".gemini" / "skills" / "alpha").resolve() == (
+        repo / "skills" / "alpha"
+    ).resolve()
+    manifest = project / ".aris" / "installed-skills-gemini.txt"
+    assert manifest.exists()
+    manifest_text = manifest.read_text()
+    assert "target\tgemini" in manifest_text
+    assert "\t.gemini/skills/alpha\t" in manifest_text
+    assert "ARIS Gemini Skill Scope" in (project / "GEMINI.md").read_text()
 
 
-def test_smart_update_codex_overlay_updates_existing_base_copy(tmp_path: Path) -> None:
-    local = tmp_path / "local"
-    local.mkdir()
-    base_skill = REPO_ROOT / "skills" / "skills-codex" / "auto-review-loop"
-    overlay_skill = (
-        REPO_ROOT
-        / "skills"
-        / "skills-codex-claude-review"
-        / "auto-review-loop"
-    )
+def test_obsolete_install_and_update_scripts_are_removed() -> None:
+    obsolete = {
+        "install_aris_codex.sh",
+        "install_claude_skills.sh",
+        "install_codex_skills.sh",
+        "smart_update.sh",
+        "smart_update_codex.sh",
+        "smart_update.ps1",
+    }
 
-    run(["cp", "-a", str(base_skill), str(local / "auto-review-loop")])
-
-    dry_run = run(
-        [
-            "bash",
-            str(UPDATE_SCRIPT),
-            "--local",
-            str(local),
-            "--overlay",
-            "claude-review",
-        ]
-    )
-    assert "Safe update: 1" in dry_run.stdout
-    assert "  auto-review-loop" in dry_run.stdout
-
-    run(
-        [
-            "bash",
-            str(UPDATE_SCRIPT),
-            "--local",
-            str(local),
-            "--overlay",
-            "claude-review",
-            "--apply",
-        ]
-    )
-
-    assert (local / "auto-review-loop" / "SKILL.md").read_text() == (
-        overlay_skill / "SKILL.md"
-    ).read_text()
-
-
-def test_smart_update_codex_overlay_preserves_custom_local_copy(tmp_path: Path) -> None:
-    local = tmp_path / "local"
-    local.mkdir()
-    base_skill = REPO_ROOT / "skills" / "skills-codex" / "auto-review-loop"
-
-    run(["cp", "-a", str(base_skill), str(local / "auto-review-loop")])
-    custom_text = (local / "auto-review-loop" / "SKILL.md").read_text() + "\n<!-- local customization -->\n"
-    (local / "auto-review-loop" / "SKILL.md").write_text(custom_text)
-
-    result = run(
-        [
-            "bash",
-            str(UPDATE_SCRIPT),
-            "--local",
-            str(local),
-            "--overlay",
-            "claude-review",
-            "--apply",
-        ]
-    )
-
-    assert "Needs merge: 1" in result.stdout
-    assert (local / "auto-review-loop" / "SKILL.md").read_text() == custom_text
+    for name in obsolete:
+        assert not (REPO_ROOT / "tools" / name).exists()

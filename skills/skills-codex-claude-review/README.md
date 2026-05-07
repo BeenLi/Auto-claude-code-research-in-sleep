@@ -31,12 +31,12 @@ Current overrides:
 # Clone ARIS once, then run this from each Codex project.
 git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~/aris_repo
 cd /path/to/your/project
-bash ~/aris_repo/tools/install_codex_skills.sh --reviewer claude
+bash ~/aris_repo/tools/install_aris.sh . --target codex --with-claude-review-overlay
 ```
 
 The installer links base skills from `skills/skills-codex/`, points the
-review-heavy overrides at this package, writes `.aris/codex-installed-skills.txt`,
-and registers `claude-review` MCP.
+review-heavy overrides at this package, and writes `.aris/installed-skills-codex.txt`.
+Register `claude-review` MCP separately when this overlay is used.
 
 If your Claude setup depends on a shell helper such as `claude-aws`, use the wrapper instead:
 

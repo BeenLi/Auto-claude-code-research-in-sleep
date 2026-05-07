@@ -57,7 +57,6 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
             "CLAUDE.md",
             "GEMINI.md",
             "templates/AGENT_MD_TEMPLATE.md",
-            "templates/CLAUDE_MD_TEMPLATE.md",
         ]:
             with self.subTest(path=path):
                 doc = read_doc(path)
@@ -185,7 +184,6 @@ class TestWorkflow1AIInfrastructureDocs(unittest.TestCase):
             "skills/auto-review-loop/SKILL.md",
             "skills/skills-codex/auto-review-loop/SKILL.md",
             "templates/AGENT_MD_TEMPLATE.md",
-            "templates/CLAUDE_MD_TEMPLATE.md",
             "templates/IDEA_CANDIDATES_TEMPLATE.md",
             "templates/IDEA_CANDIDATES_TEMPLATE_CN.md",
         ]

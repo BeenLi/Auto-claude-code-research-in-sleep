@@ -11,6 +11,8 @@ skills/shared-references/wiki-helper-resolution.md. This test runs the
 chain in three concrete scenarios and asserts the helper is reachable
 in each.
 """
+from __future__ import annotations
+
 import os
 import shutil
 import subprocess

@@ -18,7 +18,7 @@
 
 1. 先安装 `skills/skills-codex/*`
 2. 再安装 `skills/skills-codex-claude-review/*`
-3. 最后注册 `claude-review` MCP
+3. 最后单独注册 `claude-review` MCP
 
 ## 安装
 
@@ -28,13 +28,13 @@ git clone https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git ~
 
 # 在每个 Codex 项目中安装 base skills + Claude-review overlay。
 cd /path/to/your/project
-bash ~/aris_repo/tools/install_codex_skills.sh --reviewer claude
+bash ~/aris_repo/tools/install_aris.sh . --target codex --with-claude-review-overlay
 ```
 
 安装器会在 `.agents/skills/` 下创建扁平项目级 symlink，写入
-`.aris/codex-installed-skills.txt`，并注册 `claude-review` MCP bridge。
-之后更新 skill 内容只需要在 `~/aris_repo` 里 `git pull`；只有新增/删除 skill
-或切换 reviewer 时才需要重跑安装器。
+`.aris/installed-skills-codex.txt`，并选择 Claude-review overlay。
+`claude-review` MCP bridge 需要单独注册。之后更新 skill 内容只需要在
+`~/aris_repo` 里 `git pull`；只有新增/删除 skill 或切换 reviewer 时才需要重跑安装器。
 
 如果你的 Claude 登录依赖 `claude-aws` 之类的 shell helper，请改用 wrapper：
 
