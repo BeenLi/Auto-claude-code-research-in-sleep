@@ -4,18 +4,7 @@ This file provides guidance to AI agents when working in this repository.
 
 ## Research Domain
 
-This ARIS instance is configured for **Computer Architecture / AI Infrastructure for LLM** research with a hardware-leaning systems focus. The current active idea is shared DPU/NIC-side lossless communication compression service fairness for LLM infrastructure, but Workflow 1 should search across the full AI infrastructure stack rather than defaulting to network-only topics.
-
-### Domain Profile
-
-- **Field**: Computer Architecture / Systems / Networking / AI Infrastructure for LLM
-- **Target venues**: MICRO, ISCA, HPCA, ASPLOS, NSDI, OSDI, SIGCOMM, DAC, EuroSys, FCCM, IEEE TPDS, IEEE TC, IEEE TON, IEEE TVLSI, IEEE TCAD, ACM TACO
-- **AI infrastructure layers**: compute/accelerator, memory/storage/data movement, interconnect/network, runtime/system
-- **Evidence and validation**: Workflow 1 uses lightweight evidence for idea ranking: analytical models, small simulator runs, trace replay, microbenchmarks, RTL/HLS sketches, and gem5/htsim smoke runs. Full experiment execution is handled by Workflow 1.5.
-- **Current simulator-first anchor**: gem5 + Broadcom/csg-htsim + `cosim_gem5_htsim`, with window-level co-simulation for Rx decompression expansion pressure.
-- **Key metrics**: serving/system (tokens/s, requests/s, TTFT, TPOT, tail latency, completion time); data movement (HBM/CXL/PCIe/NIC/storage bandwidth, memory copy amplification, queue/buffer occupancy); network/RDMA (goodput, FCT, retransmitted bytes, drop/stall/congestion signals); compression (compression ratio, decompression expansion ratio, accepted/dropped compressed bytes); hardware cost (area, LUT/BRAM/DSP/SRAM footprint, timing/frequency, power/energy).
-- **Platform primitives**: accelerators, HBM/CXL memory systems, SmartNIC/DPU/RNIC datapaths, FPGA/ASIC prototypes, P4 programmable switches, storage datapaths, gem5, Broadcom/csg-htsim, ns-3, SystemC, RTL/HLS.
-- **Reviewer persona**: senior MICRO/ISCA/HPCA/ASPLOS program committee member; cares about microarchitecture detail, concrete bottleneck models, validation credibility, hardware cost, and generality across LLM infrastructure workloads.
+This ARIS instance is configured for **Computer Architecture / AI Infrastructure for LLM** research with a hardware-leaning systems focus. 
 
 ## Workflows
 
