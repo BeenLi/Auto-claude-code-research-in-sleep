@@ -25,6 +25,7 @@ CLAUDE.md
 .trae/
 # codex local config
 .agents/
+.worktrees/
 
 # Agent local logs & state
 .aris/meta/events.jsonl
