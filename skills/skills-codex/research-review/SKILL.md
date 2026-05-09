@@ -1,10 +1,9 @@
-***
-
+---
 name: research-review
 description: Get a deep critical review of research from GPT via Codex subagent. Use when user says "review my research", "help me review", "get external review", or wants critical feedback on research ideas, papers, or experimental results.
 argument-hint: \[topic-or-scope]
 allowed-tools: Bash(\*), Read, Grep, Glob, Write, Edit, Agent, mcp\_\_codex\_\_codex, mcp\_\_codex\_\_send_input
------------------------------------------------------------------------------------------------------------------
+---
 
 # Research Review via Codex subagent (xhigh reasoning)
 
