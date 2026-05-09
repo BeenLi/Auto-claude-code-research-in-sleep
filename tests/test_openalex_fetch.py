@@ -1,6 +1,9 @@
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -8,10 +11,15 @@ MODULE_PATH = ROOT / "tools" / "openalex_fetch.py"
 
 
 def load_module():
+    fake_requests = SimpleNamespace(
+        Session=lambda: SimpleNamespace(headers={}),
+        exceptions=SimpleNamespace(HTTPError=Exception),
+    )
     spec = importlib.util.spec_from_file_location("openalex_fetch", MODULE_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    spec.loader.exec_module(module)
+    with patch.dict(sys.modules, {"requests": fake_requests}):
+        spec.loader.exec_module(module)
     return module
 
 

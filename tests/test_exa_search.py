@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -42,6 +43,14 @@ def test_get_client_raises_when_exa_py_not_installed(monkeypatch):
 
 def test_get_client_raises_when_api_key_missing(monkeypatch):
     exa_search = load_module()
+
+    class FakeExa:
+        headers = {}
+
+        def __init__(self, api_key):
+            self.api_key = api_key
+
+    monkeypatch.setitem(sys.modules, "exa_py", SimpleNamespace(Exa=FakeExa))
     monkeypatch.delenv("EXA_API_KEY", raising=False)
 
     with pytest.raises(RuntimeError, match="EXA_API_KEY"):
