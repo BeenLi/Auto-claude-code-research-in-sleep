@@ -63,3 +63,6 @@ patent/
 
 # Research wiki
 research-wiki/
+
+# codex local config
+.codex/
