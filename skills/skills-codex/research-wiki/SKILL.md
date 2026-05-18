@@ -21,7 +21,7 @@ Inspired by [Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6
 
 | Entity | Directory | Node ID format | What it represents |
 |--------|-----------|---------------|--------------------|
-| **Paper** | `papers/` | `paper:<slug>` | A published or preprint research paper |
+| **Paper** | `papers/` | `paper:<slug>` | Agent-facing projection of a paper; full paper notes stay in Obsidian when synced |
 | **Idea** | `ideas/` | `idea:<id>` | A research idea (proposed, tested, or failed) |
 | **Experiment** | `experiments/` | `exp:<id>` | A concrete experiment run with results |
 | **Claim** | `claims/` | `claim:<id>` | A testable scientific claim with evidence status |
@@ -178,14 +178,17 @@ This is the recommended **manual repair** step (see integration
 contract §5 Backfill). `sync` does not scan session traces — callers
 declare the ids explicitly.
 
-**Paper page schema** (exactly what `ingest_paper` emits — do not
-handwrite alternative fields; `lint` will flag drift):
+**Paper page schema** (exactly what `ingest_paper` and `sync-obsidian`
+emit — do not handwrite alternative generated fields):
 
 ```markdown
 ---
 type: paper
 node_id: paper:<slug>
+source: obsidian
+obsidian_path: "001-input/PaperRead/PaperNotes/<note>.md"
 title: "<full title>"
+method_name: "<method>"
 authors: ["First A. Author", "Second B. Author"]
 year: 2025
 venue: "arXiv"
@@ -193,50 +196,78 @@ external_ids:
   arxiv: "2501.12345"
   doi: null
   s2: null
+zotero:
+  item_id: null
+  item_key: null
+  collection: null
 tags: ["tag1", "tag2"]
-added: 2026-04-07T10:12:00Z
+projection_updated: 2026-04-07T10:12:00Z
 ---
 
 # <full title>
 
-## One-line thesis
+<!-- BEGIN OBSIDIAN PROJECTION -->
+## Agent Summary
 
-[Single sentence capturing the paper's core contribution]
+- One-line:
+- Core problem:
+- Key insight:
+- System bottleneck:
+- Method:
+- Key results:
+- Limitations:
+- Reusable lessons:
 
-## Problem / Gap
+## Evaluation Hints
 
-## Method
+- Workloads:
+- Baselines:
+- Metrics:
+- Artifacts / code:
+- Repro risk:
 
-## Key Results
+## Related Papers
 
-## Assumptions
+- paper_ref:
+<!-- END OBSIDIAN PROJECTION -->
 
-## Limitations / Failure Modes
+<!-- BEGIN PROJECT NOTES -->
+## Relevance to Current ARIS Project
 
-## Reusable Ingredients
+Manual ARIS notes go here.
 
-[Techniques, datasets, or insights that could be repurposed]
+## Local Claim / Gap Notes
 
-## Open Questions
-
-## Claims
-
-[Reference claim pages: claim:C1, claim:C2, etc.]
-
-## Connections
-
-[AUTO-GENERATED from graph/edges.jsonl — do not edit manually]
-
-## Relevance to This Project
-
-[Why this paper matters for our specific research direction]
+Manual ARIS notes go here.
+<!-- END PROJECT NOTES -->
 ```
 
-_Additionally, when the paper was ingested via `--arxiv-id` and the arXiv
-API returned an abstract, the helper appends an `## Abstract (original)`
-section after `Relevance to This Project` containing the raw abstract
-text as a blockquote. Manual ingests (no `--arxiv-id`) do not include
-this section._
+`sync-obsidian` rewrites only the `OBSIDIAN PROJECTION` region and generated
+frontmatter. It preserves the `PROJECT NOTES` region byte-for-byte where
+practical. `ingest_paper` emits the same markers, with an empty Obsidian
+projection and manual ingest notes in `PROJECT NOTES`.
+
+### `/research-wiki sync-obsidian --paper-notes-dir <dir>`
+
+Project Obsidian paper notes into `research-wiki/papers/*.md` while keeping
+Obsidian as the source of truth for full paper knowledge. This command does
+not read Obsidian concept notes and does not write back to Obsidian or Zotero.
+
+```bash
+python3 "$WIKI_SCRIPT" sync-obsidian research-wiki/ \
+    --paper-notes-dir "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/ob-career/001-input/PaperRead/PaperNotes" \
+    --zotero-db "$HOME/Zotero/zotero.sqlite" \
+    --dry-run \
+    --report obsidian-sync-report.md
+```
+
+Rules:
+
+- Matching defaults to strong IDs only: Zotero item id/key, legacy Zotero key, DOI, arXiv id.
+- `--match-loose` is required for normalized-title or `method_name` fallback matching.
+- `--limit N` processes the newest N notes by mtime descending.
+- Zotero is read-only enrichment only; Obsidian values win and conflicts are reported.
+- Historical pages without markers are migrated lazily only when touched by this sync.
 
 ### `/research-wiki query "<topic>"`
 
@@ -250,13 +281,15 @@ Generate `query_pack.md` — a compressed, context-window-friendly summary:
 | Top 5 gaps | 1200 chars | From gap_map.md, ranked by: unresolved + linked ideas + failed experiments |
 | Paper clusters | 1600 chars | 3-5 clusters by tag overlap, 2-3 sentences each |
 | Failed ideas | 1400 chars | **Always included** — highest anti-repetition value |
-| Top papers | 1800 chars | 8-12 pages ranked by: linked gaps, linked ideas, centrality, relevance flag |
-| Active chains | 900 chars | limitation → opportunity relationship chains |
+| Top papers | 1800 chars | 8-12 generated paper projections, including Obsidian path and compact agent fields |
+| Claims | 1200 chars | Claim status and short evidence summary |
+| Experiments | 1400 chars | Setup, result, and linked claim/idea when available |
+| Active chains | 900 chars | Recent relationship chains |
 | Open unknowns | 500 chars | Unresolved questions across the wiki |
 
 **Pruning priority** (when over budget): low-ranked papers > cluster detail > chain detail. **Never prune** failed ideas or top gaps first.
 
-**Key rule:** Read from short fields only (frontmatter, one-line thesis, gap summary, failure note). Do not summarize full page bodies every time.
+**Key rule:** Read from short fields only: generated paper projection, frontmatter, gap summary, failure note, claim summary, experiment setup/result. Do not expand full Obsidian paper notes or concept notes.
 
 ### `/research-wiki update <node_id> — <field>: <value>`
 
@@ -398,6 +431,8 @@ The system suggests but does not auto-trigger. User decides.
 ## Key Rules
 
 - **One source of truth for relationships**: `graph/edges.jsonl`. Page `Connections` sections are auto-generated views.
+- **Obsidian owns full paper notes**: wiki paper pages are compact ARIS projections plus local project notes.
+- **Wiki does not manage concepts**: do not create `research-wiki/concepts/` or parse Obsidian concept notes.
 - **Canonical node IDs everywhere**: `paper:<slug>`, `idea:<id>`, `exp:<id>`, `claim:<id>`, `gap:<id>`. Never use raw titles or inconsistent shorthands.
 - **Failed ideas are the most valuable memory.** Never prune them from query_pack.
 - **query_pack.md is hard-budgeted** at 8000 chars. Deterministic generation, not open-ended summarization.
