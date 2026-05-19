@@ -28,15 +28,10 @@ For this repository, the default domain is **AI infrastructure for LLM** with a 
 
 ## AI Infrastructure Layer Taxonomy
 
-Use this taxonomy to organize ideas and keep the brainstorm diverse. It is not a requirement that every run cover every layer, and ideas may be single-layer or multi-layer.
-
-| Layer | Examples | Likely validation styles | Key metrics |
-|-------|----------|--------------------------|-------------|
-| `compute/accelerator` | attention/KV kernels, sparsity datapaths, inference accelerators, near-data compute | analytical_model, simulator_evaluation, prototype_measurement | TOPS/W, utilization, latency, SRAM pressure, area/power |
-| `memory/storage/data movement` | KV cache hierarchy, CXL memory, HBM pressure, compression, prefetch | analytical_model, simulator_evaluation, prototype_measurement | GB/s, tail latency, cache miss rate, write amplification |
-| `interconnect/network` | collectives, congestion, packet/flow scheduling, transport offload, programmable datapaths | analytical_model, simulator_evaluation, prototype_measurement | goodput, FCT, tail latency, retransmitted bytes, bandwidth utilization |
-| `storage/checkpointing/data pipeline` | checkpoint bursts, object store, SSD pipeline, data loading | analytical_model, simulator_evaluation, prototype_measurement | checkpoint time, recovery time, IOPS, bandwidth, endurance |
-| `runtime/system` | batching, admission, prefill/decode split, KV placement | analytical_model or simulator_evaluation, only when tied to a hardware/system bottleneck | HBM capacity, accelerator utilization, PCIe/network/storage traffic, tail latency |
+Use AI infrastructure for LLM as a broad systems scope: compute/accelerator,
+memory and data movement, interconnect/network, storage/checkpointing/data
+pipeline, runtime/system, and multi-layer topics. Treat these as loose
+brainstorming labels, not hard gates.
 
 ## Scoring and Filtering Rubric
 
@@ -156,7 +151,7 @@ spawn_agent:
     You are a senior computer architecture / systems researcher (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level) brainstorming research ideas.
 
     Research direction: [user's direction]
-    Domain context: AI infrastructure for LLM. Valid layers include compute/accelerator, memory/storage/data movement, interconnect/network, storage/checkpointing/data pipeline, runtime/system, and multi-layer topics. Runtime/serving ideas are only valid if they expose or control a concrete hardware or system bottleneck.
+    Domain context: AI infrastructure for LLM, including compute/accelerator, memory and data movement, interconnect/network, storage/checkpointing/data pipeline, runtime/system, and multi-layer topics.
 
     Here is the current landscape (from /research-lit Section 2):
     [paste landscape map — sub-direction clusters]
@@ -424,7 +419,7 @@ if research-wiki/ exists:
 - Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up should get low `evaluation_target_feasibility` or a `designed_not_run` handoff; that is not the same as scientific rejection.
 - "Apply X to Y" is the lowest form of research idea. Push for deeper questions.
 - Include eliminated ideas in the report — they save future time by documenting dead ends.
-- **If the user's direction is too broad (e.g., "AI infrastructure" with no bottleneck, workload, or layer), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the LLM infrastructure problem, hardware/system bottleneck, and validation constraint — e.g., "KV cache placement under CXL memory bandwidth limits" or "LLM checkpoint recovery under storage bandwidth and metadata pressure".
+- **If the user's direction is too broad (e.g., "AI infrastructure" with no workload, mechanism, or validation target), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the LLM infrastructure problem, workload or mechanism focus, and validation constraint — e.g., "KV cache placement under CXL memory bandwidth limits" or "LLM checkpoint recovery under storage bandwidth and metadata pressure".
 
 ## Composing with Other Skills
 
