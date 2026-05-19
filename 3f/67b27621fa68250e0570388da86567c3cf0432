@@ -1,0 +1,23 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "3f67b27621fa68250e0570388da86567c3cf0432",
+  "prompts": {
+    "a2d3d38539fb7c1e": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-9ab70207-4806-4fa8-a998-daabe16420a2",
+        "model": "default"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
