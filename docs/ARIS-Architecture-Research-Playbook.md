@@ -1,6 +1,6 @@
-https://github.com/BeenLi/Auto-claude-code-research-in-sleep/blob/myMain/docs/WORKFLOW_WANLI.md
+[GitHub 原文](https://github.com/BeenLi/Auto-claude-code-research-in-sleep/blob/myMain/docs/ARIS-Architecture-Research-Playbook.md)
 本文档把当前仓库的 ARIS 工作流展开到 skill、reviewer、状态文件和中间产物级别。
-## 总览
+## 0.1 总览
 **Workflow 1 -- Idea Discovery** (`/idea-discovery "topic"`): `research-lit` -> `idea-creator` -> `novelty-check` -> `research-review` -> `research-refine` -> `experiment-plan`
 
 **Workflow 1.5 -- Experiment Bridge** (`/experiment-bridge`): Reads `refine-logs/EXPERIMENT_PLAN.md` -> implements code -> deploys experiments -> collects initial results in `EXPERIMENT_LOG.md`
@@ -18,7 +18,7 @@ https://github.com/BeenLi/Auto-claude-code-research-in-sleep/blob/myMain/docs/WO
 - 产物追踪：`MANIFEST.md`、timestamped artifact、latest copy。
 - 横向记忆与优化：`research-wiki`、`.aris/meta/events.jsonl`、`meta-optimize`。
 
-## End-to-End Diagram
+## 0.2 End-to-End Diagram
 
 图源文件：
 
@@ -96,7 +96,7 @@ flowchart TB
     style W4 fill:#F8FAFC,stroke:#BFDBFE,stroke-width:1px
 ```
 
-## Reviewer Interaction Diagram
+## 0.3 Reviewer Interaction Diagram
 
 图源文件：
 
@@ -132,9 +132,9 @@ sequenceDiagram
     end
 ```
 
-## Workflow Details
+## 0.4 Workflow Details
 
-### Workflow 1: Idea Discovery
+### 0.4.1 Workflow 1: Idea Discovery
 
 Command:
 
@@ -185,7 +185,7 @@ Important outputs:
 - `MANIFEST.md` rows for every durable artifact.
 - Optional `research-wiki/` updates.
 - Reviewer traces under `.aris/traces/` for `research-review`, `research-refine`, novelty or idea critiques.
-#### Workflow 1 Sub-Skill Details
+#### 0.4.1.1 Workflow 1 Sub-Skill Details
 
 Compact dataflow:
 
@@ -205,6 +205,189 @@ topic / RESEARCH_BRIEF.md / RefPaper
 - Outputs: `idea-stage/LITERATURE_REVIEW_{YYYYMMDD_HHmmssZ}.md`, latest copy `idea-stage/LITERATURE_REVIEW.md`, optional downloaded PDFs or wiki updates, and `MANIFEST.md` rows.
 - Handoff: Section 5 `Landscape Pack` is the machine-readable contract for `/idea-creator`; it must preserve `Evaluation Canon`, `Core Baseline Candidates`, simulator/prototype readiness, and `Gap Seeds`.
 - Stop or degrade: missing sources are recorded in Source Audit and the skill continues with available sources; software-only topics without concrete hardware bottlenecks should be marked out-of-scope unless explicitly requested.
+
+##### 0.4.1.1.1 research-lit 处理流程详解
+
+`research-lit` 是 Workflow 1 的证据入口,把一个 topic 字符串变成一份"可被 `/idea-creator` 机器读取的研究地形图"。整体由 8 个阶段构成:Step 0/0a/0b/0c 加载已知资料、Step 1 外部检索、Step 1.5 全文可用性检查、Step 2 单篇结构化抽取、Step 3 跨论文综合、Step 4 整理输出、Step 5 写文件、Step 6 写 wiki。
+
+**关键 Constants(决定行为面)**
+
+| Constant           | 默认值                       | 作用                                                             |
+| ------------------ | ------------------------- | -------------------------------------------------------------- |
+| `REVIEWER_BACKEND` | `codex` (xhigh)           | reviewer 走 Codex MCP;`-- reviewer: oracle-pro` 切换到 GPT-5.5 Pro |
+| `PAPER_LIBRARY`    | `papers/` 或 `literature/` | 本地 PDF 路径,支持 `-- paper library:` 内联覆盖                          |
+| `MAX_LOCAL_PAPERS` | 20                        | 本地 PDF 扫描上限                                                    |
+| `ARXIV_DOWNLOAD`   | `false`                   | 默认只取 metadata;`true` 时下载 top 3-5 PDF                           |
+| `EXTENDED_TOPICS`  | `[]`                      | 相邻领域 topic 列表,结果进 Section 1b 而不污染主表                            |
+
+**Step 0 系列 — 加载先验与本地源**
+
+- **Step 0(载入历史)**:先读 `idea-stage/LITERATURE_REVIEW.md`,如存在则把其中论文表当成基线,后续只补"日期更新或不在表内"的新论文,并在输出里用 🆕 标记。
+- **Step 0a(Zotero)**:三阶段——Phase A 通过 `zotero_get_collections` 拿全集合树,按主题关键词片段(case-insensitive)匹配任意深度集合,并补一遍 `zotero_search_items` 文本搜索;Phase B 仅当 `EXTENDED_TOPICS` 非空时做跨域扩展,且只保留 MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM/OSDI/ATC/EuroSys/FCCM/DAC 等 top-tier venue 论文,打 `[cross-domain]` 标签;Phase C 抽用户的高亮、笔记、tag 与集合路径。
+- **Step 0b(Obsidian)**:搜索 vault 与 tag,跟 wikilink 抓出用户已"加工过"的笔记摘要(比 raw PDF 更有价值)。
+- **Step 0c(本地 PDF)**:Glob 扫 PAPER_LIBRARY,与 Zotero 结果去重(按文件名/标题),每篇读前 3 页提取 title/authors/year/contribution/relevance,最多 `MAX_LOCAL_PAPERS` 篇。
+
+任何 MCP 不可用都**静默 skip**——绝不因 MCP 缺失而失败,只在 Section 0 Source Audit 中记录降级。
+
+**Step 1 — 外部检索(多源并行 + 优先级)**
+
+按可靠性优先级:
+
+| 优先级 | 源 | 用法 | 关键经验 |
+|---|---|---|---|
+| **S1** | DBLP 会议页 (`dblp.org/db/conf/{venue}/{venue}{year}.html`) | 拉完整论文列表后按相关性筛选 | 最可靠,无 keyword 限制,无 rate-limit;**当前年 + 上一年**都要抓 |
+| **S2** | 会议 program 主页 | 只在会议结束 < 8 周且 DBLP 未索引时用 | URL 模式见 SKILL.md 表格(ASPLOS/MICRO/ISCA/HPCA/SIGCOMM/NSDI/OSDI/ATC/EuroSys/FCCM) |
+| **S3** | Semantic Scholar API | keyword 搜索 + 补 IEEE/ACM journal | 频繁 HTTP 429,**不要当主源**,只覆盖 EXTENDED_TOPICS |
+| **S3b** | IEEE Xplore API | 需要免费 API key | 可选,S3 限流时用 |
+| **S4** | WebSearch | 兜底找 arXiv 镜像 | `"title" site:arxiv.org` 风格,不要做 venue 主搜 |
+| arXiv | arXiv API (`tools/arxiv_fetch.py`) | **总是运行**,结构化拉 title/abstract/authors/categories/dates | 与 WebSearch 合并去重 |
+
+可选源(必须显式 `-- sources:` 启用,默认 `all` 不含):`semantic-scholar`、`deepxiv`(渐进式 paper-brief/head/section)、`exa`(broad web + content extraction)、`gemini`(MCP 优先、CLI 兜底,主题分解 + 别名扩展)、`openalex`(开放引文图 + 机构 + 资助)。
+
+**去重链**:arXiv ID → DOI → 标准化 title 三级匹配;同一篇在 arXiv + S2 都命中时,优先 S2 venue/citation 但保留 arXiv PDF 链接;OpenAlex 的机构与资助信息单独保留为唯一价值字段。
+
+**Step 1.5 — 全文可用性检查**
+
+对每篇 web-only 来源的论文,先匹配本地库 → 标 ✅ local;若都拿不到全文则进入"⚠️ NO FULL TEXT 清单",**不暂停**流水线、不阻塞,Step 2 退化为只读 title+abstract,并在输出中提示用户后续手动下载。
+
+**Step 2 — 单篇结构化抽取(11 字段)**
+
+每篇论文产 1 行结构化记录:
+
+`Problem` / `Method` / `Results` / `Relevance` / `Source` / `Evaluation Platform` / `Workload` / `Compared Baselines` / `Metrics` / `Artifact Availability` / `Evaluation Limitations`
+
+Artifact 走 `official_artifact` / `open_source_system` / `config_reproducible` / `paper_only` / `unavailable` / `not_reported` 枚举——这套枚举直接喂给 Step 3e 的 Landscape Pack。
+
+**Step 3 — 综合(产出地形图,5 子步)**
+
+- **3a Landscape Map**:把所有论文分 3-6 个 sub-direction cluster,每个 cluster 给 1 句话定义 + 论文列表 + "已经做到哪 / 卡在哪"。
+- **3b Consensus & Disagreements**:点出共识(如 "100Gbps 硬件 LZ4 已被解决")与活跃争议(冲突结论或对立设计哲学);若 Obsidian 有用户笔记,在此融合用户视角。
+- **3c Structural Gaps**(idea-creator 直接消费):5 个 lens——cross-domain transfer / contradictory findings / untested assumptions / unexplored regimes / unasked diagnostic questions。每个 gap 必须 ground 到具体论文或显式 negative evidence。
+- **3d Competitive Landscape**:top 3 最直接竞争者的"claim vs leave-open + 是否同方向 + 是否 peer-reviewed"。
+- **3e Landscape Pack**:固定 7 块表的机器契约,见下节。
+
+**Landscape Pack 七块表(下游 `/idea-creator` 的契约)**
+
+| 块                               | 内容                                                                                                                                                             | 稳定 ID                               |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Topic Scope                     | original_topic                                            | —                                   |
+| Bottleneck Evidence             | bottleneck + supporting_papers + decisive_metrics                                                                                     | `bottleneck_id`                     |
+| Mechanism Clusters              | mechanism_family + representative_papers + plateau_or_missing_piece                                                                                            | cluster name                        |
+| **Evaluation Canon**            | item + supporting_papers + adoption_strength + artifact_or_access + limitations                                                       | **`EC-P*`(平台) / `EC-W*`(workload)** |
+| **Core Baseline Candidates**    | baseline_name + paper_or_system + scenario + evaluation_platform_used + workload_used + metrics_used + artifact_status                                         | **`CB*`**                           |
+| Simulator / Prototype Readiness | backend + readiness(ready/partial/future) + what_it_can_validate + blocker                                                                       | —                                   |
+| **Gap Seeds**                   | gap_type + bottleneck + supporting_papers + possible_mechanism_hint + minimum_validation_backend + decisive_metric + main_risk_or_kill_reason | **`gap_id`**                        |
+
+下游 `/idea-creator` 通过 `canon_mapping: platform=[EC-P*]; workload=[EC-W*]` 引用 Canon;`core_baseline` 从 `CB*` 池中选;Gap Seeds 是 ideation 起点。**禁止跨主题复用** Canon/baseline——每个 topic 现搜现填。
+
+**Step 4 — 输出(7 个 Section)**
+
+`LITERATURE_REVIEW.md` 固定结构:Section 0 Source Audit / Section 1 Paper Table(主) / Section 1b Cross-domain References / Section 2 Landscape Map / Section 3 Structural Gaps / Section 4 Competitive Landscape / **Section 5 Landscape Pack**(机器契约)。Zotero 来源论文加 📚 + 集合路径,新增论文加 🆕。
+
+**Step 5 — 文件落盘**
+
+- 时间戳历史副本:`idea-stage/LITERATURE_REVIEW_{YYYYMMDD_HHmmssZ}.md`(UTC,`date -u +%Y%m%d_%H%M%SZ`)
+- 固定 latest 副本:`idea-stage/LITERATURE_REVIEW.md`(下游永远读这份)
+- 两份都进 `MANIFEST.md`,stage 标 `idea-discovery`
+- 若 Zotero 导出过 BibTeX,追加 `references.bib`
+
+**Step 6 — Research Wiki Ingest(条件)**
+
+只在 `research-wiki/` 目录存在时运行,走 `tools/research_wiki.py` ingest_paper 子命令(优先 `.aris/tools/`,然后项目 `tools/`,最后 `ARIS_REPO`)。对 top 8-12 篇论文用 arXiv ID 调用一次,helper 内部完成 slug 生成 / metadata 抓取 / 去重 / 页面渲染 / index 重建 / query_pack 重建 / log append。helper 不可用时**只 warn 不 fail**,可由 `/research-wiki sync --arxiv-ids …` 后补。
+
+**端到端流程图**
+
+```mermaid
+%%{init: {"theme": "base", "flowchart": {"curve": "basis", "nodeSpacing": 38, "rankSpacing": 56}, "themeVariables": {"background": "#FFFFFF", "primaryColor": "#E8F1FF", "primaryBorderColor": "#2563EB", "primaryTextColor": "#0F172A", "lineColor": "#475569", "clusterBkg": "#F8FAFC", "clusterBorder": "#CBD5E1"}}}%%
+flowchart TB
+    topic["User topic<br/>+ optional RESEARCH_BRIEF.md / REF_PAPER"]
+
+    subgraph priorAndLocal["Step 0 / 0a / 0b / 0c: 加载先验 + 本地源"]
+        direction LR
+        prevReview["Step 0<br/>读 idea-stage/<br/>LITERATURE_REVIEW.md"]
+        zotero["Step 0a Zotero MCP<br/>集合 + tag + 标注"]
+        obsidian["Step 0b Obsidian<br/>笔记 + wikilink"]
+        localPdf["Step 0c 本地 PDF<br/>papers/, literature/"]
+    end
+
+    subgraph externalSearch["Step 1: 外部检索 (S1-S4 + arXiv)"]
+        direction LR
+        dblp["DBLP 会议页 S1<br/>(最可靠)"]
+        confProg["会议 program 页 S2"]
+        s2api["Semantic Scholar S3<br/>(限流)"]
+        arxivApi["arXiv API<br/>(始终运行)"]
+    end
+
+    fulltext["Step 1.5<br/>全文可用性检查<br/>(NO FULL TEXT 降级)"]
+    analyze["Step 2<br/>每篇 11 字段抽取"]
+    synthesis["Step 3<br/>Landscape 综合<br/>(3a-3e)"]
+    writeOut["Step 4-5<br/>写 LITERATURE_REVIEW.md<br/>+ 时间戳副本 + MANIFEST"]
+    wikiIngest["Step 6<br/>research-wiki ingest<br/>(可选, helper 缺失只 warn)"]
+
+    topic -->|"topic + sources flags"| priorAndLocal
+    priorAndLocal -->|"去重后已知集合"| externalSearch
+    externalSearch -->|"候选论文 (含 cross-domain 标记)"| fulltext
+    fulltext -->|"可读论文 + degrade 标记"| analyze
+    analyze -->|"论文结构化表"| synthesis
+    synthesis -->|"7 块 Landscape Pack"| writeOut
+    writeOut -->|"top 8-12 arXiv IDs"| wikiIngest
+
+    classDef inputCls fill:#10B981,color:#fff,stroke:#047857,stroke-width:1.5px
+    classDef searchCls fill:#3B82F6,color:#fff,stroke:#1D4ED8,stroke-width:1.4px
+    classDef processCls fill:#8B5CF6,color:#fff,stroke:#6D28D9,stroke-width:1.4px
+    classDef outCls fill:#F97316,color:#fff,stroke:#C2410C,stroke-width:1.4px
+
+    class topic inputCls
+    class prevReview,zotero,obsidian,localPdf,dblp,confProg,s2api,arxivApi searchCls
+    class fulltext,analyze,synthesis processCls
+    class writeOut,wikiIngest outCls
+```
+
+**Step 3 综合子流程图(Landscape Pack 生成)**
+
+```mermaid
+%%{init: {"theme": "base", "flowchart": {"curve": "basis", "nodeSpacing": 32, "rankSpacing": 50}, "themeVariables": {"background": "#FFFFFF", "primaryColor": "#E8F1FF", "primaryBorderColor": "#2563EB", "primaryTextColor": "#0F172A", "lineColor": "#475569", "clusterBkg": "#F8FAFC", "clusterBorder": "#CBD5E1"}}}%%
+flowchart TB
+    papers["Step 2 输出:<br/>已抽取 11 字段的论文集合"]
+    map3a["3a Landscape Map<br/>3-6 个 sub-direction cluster"]
+    consensus["3b Consensus 与 Disagreement<br/>+ Obsidian 用户视角"]
+    gaps["3c Structural Gaps<br/>5 lens 分析<br/>(cross-domain / contradiction /<br/>untested / unexplored / unasked)"]
+    competing["3d Competitive Landscape<br/>top 3 直接竞争者定位"]
+    pack["3e Landscape Pack<br/>Section 5 机器契约"]
+
+    subgraph packBlocks["Landscape Pack 七块"]
+        direction TB
+        topicScope["Topic Scope"]
+        bnEvidence["Bottleneck Evidence<br/>(bottleneck_id)"]
+        mechClusters["Mechanism Clusters"]
+        evalCanon["Evaluation Canon<br/>EC-P* 平台 / EC-W* workload"]
+        coreBaseline["Core Baseline Candidates<br/>CB* 池"]
+        simReadiness["Simulator / Prototype<br/>Readiness"]
+        gapSeeds["Gap Seeds<br/>(gap_id, ground to paper)"]
+    end
+
+    papers -->|"按 method 聚类"| map3a
+    map3a -->|"sub-direction 视图"| consensus
+    consensus -->|"共识 + 争议"| gaps
+    gaps -->|"5 lens gap 候选"| competing
+    competing -->|"竞争定位 + 风险"| pack
+    pack -->|"落 7 块表"| packBlocks
+
+    classDef synthCls fill:#3B82F6,color:#fff,stroke:#1D4ED8,stroke-width:1.4px
+    classDef contractCls fill:#8B5CF6,color:#fff,stroke:#6D28D9,stroke-width:1.4px
+    classDef inputCls fill:#10B981,color:#fff,stroke:#047857,stroke-width:1.5px
+
+    class papers inputCls
+    class map3a,consensus,gaps,competing synthCls
+    class pack,topicScope,bnEvidence,mechClusters,evalCanon,coreBaseline,simReadiness,gapSeeds contractCls
+```
+
+**降级与红线**
+
+- **MCP 缺失零失败**:Zotero / Obsidian / Gemini MCP / Exa / DeepXiv / OpenAlex 任一不可用都静默 skip,只在 Source Audit 留记录。
+- **rate-limit**:Semantic Scholar 重试一次仍 429 就放弃,改回 S1/S2/S4;DBLP keyword API 直接禁用,只用 DBLP 直链。
+- **ACM DL / IEEE Xplore**:返回 403,**绝不**声称搜过这两个站点。
+- **Section 5 缺则 Workflow 1 死**:Landscape Pack 七块表缺任意一块,下游 `/idea-creator` 会在 `canon_mapping` 处出 `unclear_canon_mapping`,导致 idea 全部进 `needs_canon_clarification`。
 
 `/idea-creator` turns the landscape into ranked, evaluable ideas.
 
@@ -244,7 +427,7 @@ Wrapper boundary:
 - `experiment-plan` owns the Claim Map, paper storyline, Evaluation Inputs, experiment blocks, run order, validation budget, tracker, and Workflow 1.5 handoff fields.
 - `research-refine-pipeline` coordinates the two and writes the integrated summary; it does not make `research-refine` or `experiment-plan` obsolete.
 
-#### Workflow 1 Output Templates
+#### 0.4.1.2 Workflow 1 Output Templates
 
 These are compact template summaries for auditing output shape. The detailed canonical templates live in the child skill files.
 
@@ -327,7 +510,7 @@ These are compact template summaries for auditing output shape. The detailed can
 - It points to `refine-logs/EXPERIMENT_PLAN.md` for execution details and to result logs for factual evidence.
 - It must not copy full experiment blocks, raw logs, ordinary code TODOs, or unsupported claims phrased as paper-ready evidence.
 
-### Workflow 1.5: Experiment Bridge
+### 0.4.2 Workflow 1.5: Experiment Bridge
 
 Command:
 
@@ -372,7 +555,7 @@ Important outputs:
 
 Missing detail in the original diagram: `experiment-bridge` is not only "implement\_code"; it must lock the evaluation contract before implementation, preserve claim boundaries, prove baseline status honestly, run sanity checks, and produce machine-readable evidence for later audits.
 
-### Workflow 2: Auto Review Loop
+### 0.4.3 Workflow 2: Auto Review Loop
 
 Command:
 
@@ -421,7 +604,7 @@ Important outputs:
 
 Missing detail in the original diagram: Workflow 2 is not just review/fix. It owns reviewer memory, debate, state recovery, raw response preservation, Feishu notifications when configured, and the bridge to claims for paper writing.
 
-### Workflow 3: Paper Writing
+### 0.4.4 Workflow 3: Paper Writing
 
 Command:
 
@@ -469,7 +652,7 @@ Important outputs:
 
 Missing detail in the original diagram: Workflow 3 has multiple assurance gates. A paper can compile and still fail submission readiness if claim, proof, or citation audits fail.
 
-### Workflow 4: Rebuttal
+### 0.4.5 Workflow 4: Rebuttal
 
 Command:
 
@@ -504,7 +687,7 @@ Safety gates:
 
 Missing detail in the original diagram: rebuttal is a first-class workflow, not an afterthought after paper writing.
 
-## Skill Input / Output Matrix
+## 0.5 Skill Input / Output Matrix
 
 | Skill                          | Main input                                           | Reviewer interaction                          | Main output                                                   |
 | ------------------------------ | ---------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
@@ -538,7 +721,7 @@ Missing detail in the original diagram: rebuttal is a first-class workflow, not 
 | `/research-wiki`               | papers, ideas, experiments, claims                   | no reviewer by default                        | persistent memory pages, graph edges, query pack              |
 | `/meta-optimize`               | `.aris/meta/events.jsonl`, traces                    | reviewer-gated harness optimization           | proposed skill/routing improvements                           |
 
-## Reviewer and Trace Contract
+## 0.6 Reviewer and Trace Contract
 
 Default reviewer behavior:
 
@@ -565,7 +748,7 @@ Trace metadata should preserve:
 - prompt snapshot;
 - raw reviewer response.
 
-## Artifact and State Map
+## 0.7 Artifact and State Map
 
 ```text
 project/
@@ -614,7 +797,7 @@ project/
     REBUTTAL_STATE.md
 ```
 
-## Practical Checklist
+## 0.8 Practical Checklist
 
 Before calling a workflow "complete", check:
 
@@ -627,7 +810,7 @@ Before calling a workflow "complete", check:
 - Did `AGENTS.md` Pipeline Status get updated on stage transition or handoff?
 
 
-# skills同步
+# 1 skills同步
 > 参考：tools/SKILL_SYNC_AND_INSTALL.md
 
 ```bash
