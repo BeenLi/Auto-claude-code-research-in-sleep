@@ -125,7 +125,7 @@ If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracef
 - Infer the AI infrastructure layer and expand the topic within the same layer
 - Plus Gemini-driven broad discovery (sub-problem decomposition, naming variants, alias coverage) when `gemini-cli` is available
 - Build a landscape map: sub-directions, approaches, open problems
-- Identify structural gaps, bottleneck evidence, and `Gap Seeds`
+- Identify structural gaps, `B*` bottlenecks, `S*` solution attempts, and `G*` residual-gap seeds
 - Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon` and `Core Baseline Candidates`
 - Output a literature summary (saved to working notes)
 
@@ -135,9 +135,10 @@ If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracef
 📚 Literature survey complete. Here's what I found:
 - Inferred AI infra layer: [layer]
 - Key bottlenecks: [2-3 bullets]
+- Bottleneck Evidence: B* bottlenecks and S* solution attempts
 - Evaluation Canon: platforms=[EC-P* summary], workloads=[EC-W* summary]
 - Core Baseline Candidates: [CB* summary]
-- Gap Seeds: [top 3]
+- Gap Seeds: [top G* residual-gap seeds]
 
 Does this match your understanding? Should I adjust the scope before generating ideas?
 (If no response, I'll proceed with the top-ranked direction.)

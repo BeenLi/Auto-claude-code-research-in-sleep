@@ -67,8 +67,9 @@ For weighted ranking, map feasibility as `high=4`, `medium=3`, `low=2`, `unknown
 Before brainstorming, extract the current topic's evaluation canon from `idea-stage/LITERATURE_REVIEW.md`. This canon anchors idea quality without hard-coding any previous topic's assumptions.
 
 From the literature review, identify:
-- **Evaluation Canon**: item-level `evaluation_platform` and `benchmark_workload` rows with stable `EC-P*` / `EC-W*` IDs, supporting evidence, access status, and limitations.
-- **Core Baseline Candidates**: baseline candidates with stable `CB*` IDs, original evaluation platform/workload/metrics, artifact status, and notes.
+- **Bottleneck Evidence**: `Bottlenecks` rows with stable `B*` IDs and `Solution Attempts` rows with stable `S*` IDs. Use `Solution Attempts` as the mechanism source.
+- **Evaluation Canon**: `Platforms` rows with stable `EC-P*` IDs and `Workloads` rows with stable `EC-W*` IDs, readiness, artifact/access status, and limitations.
+- **Core Baseline Candidates**: baseline candidates with stable `CB*` IDs, addressed `B*` or `S*` IDs, `canon_mapping`, decisive metrics, and artifact status.
 
 Use the canon in filtering and reviewer prompts as provenance for platform/workload choices. `canon_mapping` must only contain `platform=[EC-P*]; workload=[EC-W*]`. Baseline, metrics, and target validation style are idea-specific decisions: choose them from Core Baseline Candidates and the idea's hypothesis, not from a fixed canon menu. If the platform/workload canon is missing, mark `handoff_to_workflow_1_5: needs_canon_clarification` or `main_blocker: unclear_canon_mapping`; do not invent a platform requirement from a different topic.
 
@@ -126,11 +127,12 @@ Read: idea-stage/LITERATURE_REVIEW.md
 - **Section 2** (landscape map) → sub-direction clusters, what's been tried
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
 - **Section 4** (competitive landscape) → top competing papers and positioning
-- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence, Evaluation Canon, Core Baseline Candidates, simulator/prototype readiness, and `Gap Seeds`
-- **Evaluation Canon** → platform/workload rows commonly used by papers in this topic
-- **Core Baseline Candidates** → baseline candidates and their original platform/workload/metrics/artifact status
+- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence (`Bottlenecks` and `Solution Attempts`), Evaluation Canon (`Platforms` and `Workloads`), Core Baseline Candidates, simulator/prototype readiness, and `Gap Seeds`
+- **Bottleneck Evidence** → `B*` bottlenecks plus `S*` solution attempts; use `Solution Attempts` as the mechanism source
+- **Evaluation Canon** → `EC-P*` platform rows and `EC-W*` workload rows commonly used by papers in this topic
+- **Core Baseline Candidates** → `CB*` baseline candidates with addressed `B*`/`S*` IDs, canon mapping, metrics, and artifact status
 
-Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {M} structural gaps, {K} Gap Seeds, {P} Evaluation Canon items, and {B} Core Baseline Candidates for {topic} identified."_
+Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {M} structural gaps, {K} Gap Seeds, {P} platforms, {W} workloads, and {B} Core Baseline Candidates for {topic} identified."_
 
 **If not found**: Warn the user:
 > ⚠️ No `idea-stage/LITERATURE_REVIEW.md` found. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
@@ -164,12 +166,14 @@ mcp__codex__codex:
 
     Landscape Pack (from /research-lit Section 5):
     [paste Topic Scope, Bottleneck Evidence, Evaluation Canon, Core Baseline Candidates, Simulator / Prototype Readiness, and Gap Seeds]
+    `Bottleneck Evidence` contains `Bottlenecks` and `Solution Attempts`; use `Solution Attempts` as the mechanism source.
+    `Evaluation Canon` contains `Platforms` and `Workloads`.
 
     Evaluation canon extracted from the literature:
-    [paste item-level Evaluation Canon rows: evaluation_platform and benchmark_workload only, with EC-P*/EC-W* IDs, access status, and limitations]
+    [paste Evaluation Canon > Platforms and Evaluation Canon > Workloads rows, with EC-P*/EC-W* IDs, readiness, access status, and limitations]
 
     Core baseline candidates extracted from the literature:
-    [paste Core Baseline Candidates rows with CB* IDs, original platform/workload/metrics, and artifact status]
+    [paste Core Baseline Candidates rows with CB* IDs, addressed B*/S* IDs, canon_mapping, metrics, and artifact status]
 
     Generate 8-12 concrete research ideas. Phase 2 is divergent: do not assign final ranking, feasibility, handoff, or Workflow 1.5 contract fields yet. For each idea:
     1. idea_id: stable short ID
