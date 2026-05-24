@@ -54,8 +54,8 @@ After `idea-stage/IDEA_REPORT.md` is generated, **pause and present the top idea
 ```
 📋 Idea Discovery complete. Top ideas:
 
-1. [Idea 1 title] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [CB*], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: clear, handoff: ready
-2. [Idea 2 title] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [CB* or new_baseline_with_rationale], canon_mapping: [mapping], target_validation_style: [style], clarity: partial, handoff: needs_canon_clarification
+1. [Idea 1 title] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record], baseline_evaluability_score: [2|1], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: clear, handoff: ready
+2. [Idea 2 title] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record or new baseline with rationale], baseline_evaluability_score: [2|1|0], canon_mapping: [mapping], target_validation_style: [style], clarity: partial, handoff: needs_canon_clarification
 3. [Idea 3 title] — merit: [1-4], feasibility: [low], handoff: designed_not_run, blocker: [main_blocker]
 
 Recommended: Idea 1. Shall I proceed to Workflow 1.5 evaluation contract and implementation bridge?
@@ -80,7 +80,8 @@ Once the user confirms which idea to pursue:
 
 2. **Run the Workflow 1 → 1.5 Handoff Gate**:
    - Read the selected idea from `idea-stage/IDEA_REPORT.md` and the Evaluation Inputs from `refine-logs/EXPERIMENT_PLAN.md`.
-   - `core_baseline` must be a `CB*` candidate or `new baseline with rationale`.
+   - `core_baseline` must be an idea-local baseline record with baseline ID, paper/system, verification status, addressed `B*`/`S*`, canon mapping, metrics, artifact status, and reproducibility.
+   - `baseline_evaluability_score: 0` blocks `handoff_to_workflow_1_5: ready`; return to baseline verification, downrank, or defer the idea.
    - `canon_mapping.platform` must reference `EC-P*`, and `canon_mapping.workload` must reference `EC-W*`.
    - `metrics` must include a decisive metric and explain why it decides the idea.
    - `target_validation_style` must be `analytical_model`, `simulator_evaluation`, or `prototype_measurement`.

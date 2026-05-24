@@ -62,16 +62,88 @@ For weighted ranking, convert it with `overall_merit_points = 5 - overall_merit_
 
 For weighted ranking, map feasibility as `high=4`, `medium=3`, `low=2`, `unknown=1`.
 
-## Evaluation Canon Extraction
+## Evaluation Canon And Baseline Extraction
 
-Before brainstorming, extract the current topic's evaluation canon from `idea-stage/LITERATURE_REVIEW.md`. This canon anchors idea quality without hard-coding any previous topic's assumptions.
+Before brainstorming, extract the current topic's evidence canon from
+`idea-stage/LITERATURE_REVIEW.md`. This canon anchors idea quality without
+hard-coding any previous topic's assumptions.
 
 From the literature review, identify:
 - **Bottleneck Evidence**: `Bottlenecks` rows with stable `B*` IDs and `Solution Attempts` rows with stable `S*` IDs. Use `Solution Attempts` as the mechanism source.
-- **Evaluation Canon**: `Platforms` rows with stable `EC-P*` IDs and `Workloads` rows with stable `EC-W*` IDs, readiness, artifact/access status, and limitations.
-- **Core Baseline Candidates**: baseline candidates with stable `CB*` IDs, addressed `B*` or `S*` IDs, `canon_mapping`, decisive metrics, and artifact status.
+- **Evaluation Canon**: `Platforms` rows with stable `EC-P*` IDs and
+  `Workloads` rows with stable `EC-W*` IDs, backend/prototype readiness,
+  artifact/access path, blockers, and limitations.
+- **Verified paper/system evidence**: Section 1 paper rows with
+  `Verification: verified`, Section 4 competitors, and any explicit system or
+  artifact notes tied to `B*` or `S*` evidence.
 
-Use the canon in filtering and reviewer prompts as provenance for platform/workload choices. `canon_mapping` must only contain `platform=[EC-P*]; workload=[EC-W*]`. Baseline, metrics, and target validation style are idea-specific decisions: choose them from Core Baseline Candidates and the idea's hypothesis, not from a fixed canon menu. If the platform/workload canon is missing, mark `handoff_to_workflow_1_5: needs_canon_clarification` or `main_blocker: unclear_canon_mapping`; do not invent a platform requirement from a different topic.
+If the loaded Landscape Pack still contains the legacy global baseline pool or
+legacy simulator/prototype readiness heading, stop and ask to re-run
+`/research-lit`; do not try to parse the old schema.
+
+Use the canon in filtering and reviewer prompts as provenance for
+platform/workload choices. `canon_mapping` must only contain
+`platform=[EC-P*]; workload=[EC-W*]`. Baseline, metrics, and target validation
+style are idea-specific decisions: build an idea-local baseline record for each
+surviving idea, not a global baseline pool. If the platform/workload canon is
+missing, mark `handoff_to_workflow_1_5: needs_canon_clarification` or
+`main_blocker: unclear_canon_mapping`; do not invent a platform requirement
+from a different topic.
+
+Each idea-local baseline record must include:
+
+```markdown
+- baseline_id:
+- paper_or_system:
+- verification_status: verified | unverified | verify_pending | error
+- addresses: [B* and/or S*]
+- canon_mapping: platform=[EC-P*]; workload=[EC-W*]
+- metrics:
+- artifact_status: yes | partial | no | unknown
+- baseline_reproducibility: official_artifact | open_source_system | config_reproducible | paper_only | proprietary_or_unavailable | unknown
+```
+
+Baseline source rules:
+- Prefer a verified paper/system from Section 1 or a verified competitor from
+  Section 4.
+- If a good idea needs a better comparison target, run a narrow quick baseline
+  lookup and send the resulting candidate through `verify_papers.py` before it
+  can be used as `ready` evidence.
+- A baseline backed only by `unverified`, `verify_pending`, or `error` evidence
+  may be discussed but cannot make the idea ready.
+
+Resolve `verify_papers.py` with the canonical chain (same pattern as
+`/research-lit` Step 2.5; see also
+`../shared-references/integration-contract.md` row "Candidate paper
+verification"):
+
+```bash
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null)}"
+VERIFY_SCRIPT=".aris/tools/verify_papers.py"
+[ -f "$VERIFY_SCRIPT" ] || VERIFY_SCRIPT="tools/verify_papers.py"
+[ -f "$VERIFY_SCRIPT" ] || { [ -n "${ARIS_REPO:-}" ] && VERIFY_SCRIPT="$ARIS_REPO/tools/verify_papers.py"; }
+[ -f "$VERIFY_SCRIPT" ] || { echo "WARN: verify_papers.py unresolved; treat new baseline candidates as unverified." >&2; VERIFY_SCRIPT=""; }
+
+# Then, per candidate batch:
+mkdir -p .aris/verify-papers
+[ -n "$VERIFY_SCRIPT" ] && python3 "$VERIFY_SCRIPT" \
+  --input .aris/verify-papers/idea-creator_baseline_candidates.json \
+  --output .aris/verify-papers/idea-creator_verified_baselines.json
+```
+
+When `$VERIFY_SCRIPT` is empty, mark the new candidate as
+`verification_status: unverified` and treat the affected idea as
+`designed_not_run` or set `main_blocker: unclear_comparison_target` rather
+than `ready`.
+
+`baseline_evaluability_score` is the baseline feasibility subscore:
+- `2 = official/open-source/config reproducible`
+- `1 = paper-only/unknown`
+- `0 = proprietary/unavailable/unverified-only`
+
+`baseline_evaluability_score: 0` must not be marked `handoff_to_workflow_1_5: ready`;
+downrank, defer, or set `main_blocker` instead.
 
 ## Workflow
 
@@ -127,19 +199,24 @@ Read: idea-stage/LITERATURE_REVIEW.md
 - **Section 2** (landscape map) → sub-direction clusters, what's been tried
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
 - **Section 4** (competitive landscape) → top competing papers and positioning
-- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence (`Bottlenecks` and `Solution Attempts`), Evaluation Canon (`Platforms` and `Workloads`), Core Baseline Candidates, simulator/prototype readiness, and `Gap Seeds`
+- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence (`Bottlenecks` and `Solution Attempts`), Evaluation Canon (`Platforms` and `Workloads`), and `Gap Seeds`
 - **Bottleneck Evidence** → `B*` bottlenecks plus `S*` solution attempts; use `Solution Attempts` as the mechanism source
 - **Evaluation Canon** → `EC-P*` platform rows and `EC-W*` workload rows commonly used by papers in this topic
-- **Core Baseline Candidates** → `CB*` baseline candidates with addressed `B*`/`S*` IDs, canon mapping, metrics, and artifact status
+- **Verified evidence for baselines** → verified Section 1 papers/systems and Section 4 competitors that can seed idea-local baseline records
 
-Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {M} structural gaps, {K} Gap Seeds, {P} platforms, {W} workloads, and {B} Core Baseline Candidates for {topic} identified."_
+Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {V} verified papers, {M} structural gaps, {K} Gap Seeds, {P} platforms, and {W} workloads for {topic} identified."_
 
 **If not found**: Warn the user:
 > ⚠️ No `idea-stage/LITERATURE_REVIEW.md` found. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
 
 Then run a condensed version: WebSearch across MICRO/ISCA/HPCA/NSDI/SIGCOMM for top 10 papers, build a basic landscape map, and identify gaps as best as possible.
 
-> **All literature search and landscape work (including incremental web search) is done by `/research-lit`.** If the loaded output is stale or incomplete, re-run `/research-lit` first rather than searching here. idea-creator does not search for papers. Use `Gap Seeds` from the Landscape Pack as the main idea-generation substrate.
+> **All landscape search is done by `/research-lit`.** If the loaded output is
+> stale or incomplete, re-run `/research-lit` first rather than rebuilding the
+> landscape here. `idea-creator` may run only narrow quick baseline lookup for a
+> specific idea, and those candidates must pass through `verify_papers.py` before
+> they can support `handoff_to_workflow_1_5: ready`. Use `Gap Seeds` from the
+> Landscape Pack as the main idea-generation substrate.
 
 ### Phase 2: Idea Generation (brainstorm with external LLM)
 
@@ -165,15 +242,15 @@ mcp__codex__codex:
     [paste competitive landscape — top 3 papers and what they leave open]
 
     Landscape Pack (from /research-lit Section 5):
-    [paste Topic Scope, Bottleneck Evidence, Evaluation Canon, Core Baseline Candidates, Simulator / Prototype Readiness, and Gap Seeds]
+    [paste Topic Scope, Bottleneck Evidence, Evaluation Canon, and Gap Seeds]
     `Bottleneck Evidence` contains `Bottlenecks` and `Solution Attempts`; use `Solution Attempts` as the mechanism source.
     `Evaluation Canon` contains `Platforms` and `Workloads`.
 
     Evaluation canon extracted from the literature:
     [paste Evaluation Canon > Platforms and Evaluation Canon > Workloads rows, with EC-P*/EC-W* IDs, readiness, access status, and limitations]
 
-    Core baseline candidates extracted from the literature:
-    [paste Core Baseline Candidates rows with CB* IDs, addressed B*/S* IDs, canon_mapping, metrics, and artifact status]
+    Verified baseline evidence extracted from the literature:
+    [paste verified paper/system and competitor rows that could become idea-local baseline records]
 
     Generate 8-12 concrete research ideas. Phase 2 is divergent: do not assign final ranking, feasibility, handoff, or Workflow 1.5 contract fields yet. For each idea:
     1. idea_id: stable short ID
@@ -181,7 +258,7 @@ mcp__codex__codex:
     3. idea_shape: one compact paragraph describing the idea, the gap it targets, the proposed mechanism/study, and why the answer may matter
     4. canon_platform_candidates: EC-P* candidates or missing
     5. canon_workload_candidates: EC-W* candidates or missing
-    6. baseline_candidate_hint: CB* candidate or new_baseline_hint
+    6. baseline_candidate_hint: verified paper/system candidate, quick_lookup_needed, or missing
     7. validation_route_hint: analytical_model | simulator_evaluation | prototype_measurement | unknown
     8. early_risk_notes
     9. estimated_effort: hours | days | weeks | platform_bringup
@@ -215,13 +292,15 @@ For each generated idea, convert the Phase 2 hints into authoritative ranking an
 
 3. **Evaluation target definition**:
    - Assign `canon_mapping`: `platform=[EC-P*]; workload=[EC-W*]`. Do not place baseline or metrics inside `canon_mapping`.
-   - Select `core_baseline` from Core Baseline Candidates, or use `new_baseline_with_rationale` when the comparison target is new.
+   - Create `core_baseline` as an idea-local baseline record. Prefer a verified Section 1 paper/system or Section 4 competitor; if the best comparison target is absent, run narrow quick baseline lookup and verify it with `verify_papers.py` before treating it as ready.
+   - Populate baseline record fields: `baseline_id`, `paper_or_system`, `verification_status`, `addresses`, `canon_mapping`, `metrics`, `artifact_status`, and `baseline_reproducibility`.
    - Assign `metrics`: decisive metric first, secondary metrics only when needed.
    - Assign `target_validation_style`: `analytical_model`, `simulator_evaluation`, or `prototype_measurement`.
    - Assign `evaluation_target_clarity`: `clear`, `partial`, or `missing`.
 
 4. **Evaluation target feasibility assessment**:
    - Assign `baseline_reproducibility`: `official_artifact`, `open_source_system`, `config_reproducible`, `paper_only`, `proprietary_or_unavailable`, or `unknown`.
+   - Assign `baseline_evaluability_score`: `2` for official/open-source/config reproducible; `1` for paper-only/unknown; `0` for proprietary/unavailable/unverified-only.
    - Assign `evaluation_environment_access`: `ready`, `small_adapter_needed`, `major_bringup_needed`, `unavailable`, or `unknown`.
    - Assign `idea_adapter_cost`: `parameter_or_config_only`, `small_local_patch`, `moderate_adapter`, `major_system_change`, or `new_platform_or_prototype`.
    - Assign `pilot_runtime_cost`: `minutes_to_hours`, `one_to_two_days`, `multi_day_to_two_weeks`, `long_running_or_large_scale`, or `unknown`.
@@ -232,6 +311,7 @@ For each generated idea, convert the Phase 2 hints into authoritative ranking an
    - Mark high-merit but low-feasibility ideas as `handoff_to_workflow_1_5: designed_not_run`, not eliminated.
    - Mark missing EC-P/EC-W evidence as `needs_canon_clarification` or `main_blocker: unclear_canon_mapping`.
    - Mark unclear comparison targets as `main_blocker: unclear_comparison_target`.
+   - Mark `baseline_evaluability_score: 0` ideas as `designed_not_run`, `needs_canon_clarification`, or blocked by `main_blocker`; they must not be marked `handoff_to_workflow_1_5: ready`.
    - Mark ideas with no credible analytical, simulation, artifact, benchmark, trace/workload, or prototype route as `main_blocker: no_credible_evaluation_path` and eliminate or defer based on merit.
    - Rank surviving ideas with `overall_merit` 60% and `evaluation_target_feasibility` 40%. Typically 8-12 ideas reduce to 4-6.
 
@@ -273,12 +353,13 @@ For each top 4-6 idea, write an `evaluation_handoff_plan`:
 ```markdown
 ### Evaluation Handoff Plan
 
-- **core_baseline**: [CB* candidate, or new baseline with rationale]
+- **core_baseline**: [idea-local baseline record with baseline_id, paper_or_system, verification_status, addresses, canon_mapping, metrics, artifact_status, and baseline_reproducibility]
 - **canon_mapping**: platform=[EC-P*]; workload=[EC-W*]
 - **metrics**: [decisive metric first, secondary metrics if needed]
 - **target_validation_style**: analytical_model | simulator_evaluation | prototype_measurement
 - **evaluation_target_clarity**: clear | partial | missing
 - **evaluation_target_feasibility**: high | medium | low | unknown
+- **baseline_evaluability_score**: 2 | 1 | 0
 - **baseline_reproducibility**: official_artifact | open_source_system | config_reproducible | paper_only | proprietary_or_unavailable | unknown
 - **evaluation_environment_access**: ready | small_adapter_needed | major_bringup_needed | unavailable | unknown
 - **idea_adapter_cost**: parameter_or_config_only | small_local_patch | moderate_adapter | major_system_change | new_platform_or_prototype
@@ -290,6 +371,7 @@ For each top 4-6 idea, write an `evaluation_handoff_plan`:
 
 Handoff rules:
 - `ready`: core baseline, workload, metrics, and platform access are clear enough to enter the Workflow 1.5 handoff gate; this is not unconditional permission to execute.
+- `ready` additionally requires `baseline_evaluability_score: 1|2`; score `0` blocks ready handoff.
 - `needs_canon_clarification`: the idea is promising, but `canon_mapping` lacks clear EC-P*/EC-W* support or platform/workload evidence must be clarified before Workflow 1.5.
 - `designed_not_run`: the idea is high-upside but currently blocked by unavailable platform, trace, artifact, or major adapter work. Treat it as deferred, not eliminated.
 
@@ -312,12 +394,13 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 ### Idea 1: [title]
 - **Idea shape**: [compact summary of the idea, target gap, proposed mechanism/study, and why the answer matters]
 - **Overall merit**: [1-4] — [overall_merit_rationale]
-- **core_baseline**: [CB* candidate or new baseline with rationale]
+- **core_baseline**: [idea-local baseline record]
 - **canon_mapping**: platform=[EC-P*]; workload=[EC-W*]
 - **metrics**: [decisive metric first, secondary metrics if needed]
 - **target_validation_style**: analytical_model | simulator_evaluation | prototype_measurement
 - **evaluation_target_clarity**: clear | partial | missing
 - **evaluation_target_feasibility**: high | medium | low | unknown
+- **baseline_evaluability_score**: 2 | 1 | 0
 - **baseline_reproducibility**: official_artifact | open_source_system | config_reproducible | paper_only | proprietary_or_unavailable | unknown
 - **evaluation_environment_access**: ready | small_adapter_needed | major_bringup_needed | unavailable | unknown
 - **idea_adapter_cost**: parameter_or_config_only | small_local_patch | moderate_adapter | major_system_change | new_platform_or_prototype
@@ -351,10 +434,10 @@ Write a structured report to `idea-stage/IDEA_REPORT.md`:
 | ... | missing_artifact / trace_unavailable / backend_adapter / platform_bringup / unclear_canon_mapping / unclear_comparison_target / no_credible_evaluation_path / other | [what must become available before Workflow 1.5] |
 
 ## Evaluation Handoff Summary
-| Idea | overall_merit_score | evaluation_target_feasibility | baseline_reproducibility | evaluation_environment_access | idea_adapter_cost | pilot_runtime_cost | core_baseline | canon_mapping | metrics | target_validation_style | evaluation_target_clarity | handoff_to_workflow_1_5 | main_blocker |
-|------|---------------------|-------------------------------|--------------------------|-------------------------------|-------------------|--------------------|---------------|---------------|---------|-------------------------|---------------------------|-------------------------|--------------|
-| Idea 1 | 1 | high | open_source_system | ready | small_local_patch | minutes_to_hours | CB1 | platform=[EC-P1]; workload=[EC-W1] | p99 latency, bandwidth utilization | simulator_evaluation | clear | ready | none |
-| Idea 2 | 2 | medium | config_reproducible | small_adapter_needed | moderate_adapter | one_to_two_days | CB2 | platform=[EC-P2]; workload=[EC-W3] | FCT, utilization, tail latency | simulator_evaluation | partial | needs_canon_clarification | backend_adapter |
+| Idea | overall_merit_score | evaluation_target_feasibility | baseline_evaluability_score | baseline_reproducibility | evaluation_environment_access | idea_adapter_cost | pilot_runtime_cost | core_baseline | canon_mapping | metrics | target_validation_style | evaluation_target_clarity | handoff_to_workflow_1_5 | main_blocker |
+|------|---------------------|-------------------------------|----------------------------|--------------------------|-------------------------------|-------------------|--------------------|---------------|---------------|---------|-------------------------|---------------------------|-------------------------|--------------|
+| Idea 1 | 1 | high | 2 | open_source_system | ready | small_local_patch | minutes_to_hours | IB1: verified system | platform=[EC-P1]; workload=[EC-W1] | p99 latency, bandwidth utilization | simulator_evaluation | clear | ready | none |
+| Idea 2 | 2 | medium | 1 | config_reproducible | small_adapter_needed | moderate_adapter | one_to_two_days | IB2: verified paper config | platform=[EC-P2]; workload=[EC-W3] | FCT, utilization, tail latency | simulator_evaluation | partial | needs_canon_clarification | backend_adapter |
 
 ## Suggested Execution Order
 1. Start with Idea 1 (highest overall merit and feasible first-signal path)

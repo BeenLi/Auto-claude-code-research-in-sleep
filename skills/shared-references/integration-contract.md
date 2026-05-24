@@ -162,9 +162,49 @@ When reviewing a new integration proposal, reject any of:
 |---|---|---|---|---|---|---|
 | Submission audits (`max`/`beast`) | `paper/.aris/assurance.txt = submission` | `verify_paper_audits.sh` + 3 audit skills emit JSON | `paper/PROOF_AUDIT.json`, `PAPER_CLAIM_AUDIT.json`, `CITATION_AUDIT.json` + `paper/.aris/audit-verifier-report.json` | Phase 6.0 pre-flight checklist | Rerun the failed audit | `verify_paper_audits.sh` (exit 1 blocks) |
 | Research wiki ingest | `research-wiki/` exists | `research_wiki.py ingest_paper` | `research-wiki/papers/<slug>.md` + `log.md` entry | Step in each paper-reading skill | `research_wiki.py sync --arxiv-ids …` | `verify_wiki_coverage.sh` (diagnostic) |
+| Candidate paper verification | `/research-lit` collects candidate papers or `/idea-creator` performs narrow baseline lookup | `verify_papers.py` resolved via `.aris/tools/`, `tools/`, then `$ARIS_REPO/tools/` | `.aris/verify-papers/candidate_papers.json` + `.aris/verify-papers/verified_papers.json` | `/research-lit` Step 2.5 verification gate | Re-run `verify_papers.py --input .aris/verify-papers/candidate_papers.json --output .aris/verify-papers/verified_papers.json` | `verify_papers.py` verdict (`BLOCKED` blocks durable review save; `WARN` degrades handoff readiness) |
 
 When adding a new cross-skill integration, add a row to the table above
 and confirm all six columns are populated.
+
+## Workflow 1 → 1.5 idea handoff schema
+
+The idea handoff from `/idea-creator` (Workflow 1) to `/experiment-bridge`
+(Workflow 1.5) is also under this contract. Schema fields below are the
+machine-readable surface; `/idea-discovery`, `/research-pipeline`,
+`/experiment-bridge`, and `/experiment-plan` must all agree on names,
+domains, and semantics. Adding or renaming a field requires updating every
+listed skill in the same change.
+
+### Idea-local baseline record (`core_baseline`)
+
+Each surviving idea owns one `core_baseline` record (not a global pool):
+
+| field | domain | notes |
+|---|---|---|
+| `baseline_id` | stable short string | scoped to the idea; reused if the same baseline backs multiple ideas |
+| `paper_or_system` | string | title or system name; should match Section 1 Paper Table or Section 4 competitor when applicable |
+| `verification_status` | `verified` \| `unverified` \| `verify_pending` \| `error` | from `verified_papers.json` |
+| `addresses` | list of `B*` and/or `S*` IDs | must resolve against the loaded Landscape Pack |
+| `canon_mapping` | `platform=[EC-P*]; workload=[EC-W*]` | EC-P*/EC-W* must resolve against the loaded Landscape Pack |
+| `metrics` | list | decisive metric first |
+| `artifact_status` | `yes` \| `partial` \| `no` \| `unknown` | code/data availability |
+| `baseline_reproducibility` | `official_artifact` \| `open_source_system` \| `config_reproducible` \| `paper_only` \| `proprietary_or_unavailable` \| `unknown` | feeds `baseline_evaluability_score` |
+
+### Idea-level handoff fields
+
+| field | domain | semantics |
+|---|---|---|
+| `baseline_evaluability_score` | `0` \| `1` \| `2` | hard gate. `2` = official/open-source/config reproducible. `1` = paper-only or unknown. `0` = proprietary/unavailable or unverified-only. `0` must not be marked `handoff_to_workflow_1_5: ready`. |
+| `evaluation_target_feasibility` | `high` \| `medium` \| `low` \| `unknown` | aggregate of `baseline_reproducibility`, `evaluation_environment_access`, `idea_adapter_cost`, `pilot_runtime_cost` per the rubric in `idea-creator` |
+| `handoff_to_workflow_1_5` | `ready` \| `needs_canon_clarification` \| `designed_not_run` | `ready` requires `baseline_evaluability_score >= 1` and clear `canon_mapping`, `core_baseline`, `metrics`, `target_validation_style` |
+| `main_blocker` | enum (see `idea-creator` Phase 5) | when `handoff_to_workflow_1_5 != ready`, name the blocker |
+
+Verification: `tests/test_landscape_pack_contract.py::test_idea_creator_requires_idea_local_verified_baselines`
+greps for these field names in `idea-creator/SKILL.md`. If you rename a
+field, that test and the corresponding `idea-discovery`, `research-pipeline`,
+`experiment-bridge`, and `experiment-plan` references all need to move
+together.
 
 ## See Also
 

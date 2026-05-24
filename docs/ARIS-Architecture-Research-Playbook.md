@@ -203,7 +203,7 @@ topic / RESEARCH_BRIEF.md / RefPaper
 - Inputs: user topic or `RESEARCH_BRIEF.md`, prior `idea-stage/LITERATURE_REVIEW.md` if any, optional `research-wiki/`, Zotero, Obsidian notes, local paper library, web/arXiv/Semantic Scholar/OpenAlex/Gemini sources depending on availability and source selection.
 - Process: audit source availability, infer the AI infrastructure layer, search primary and adjacent literature, analyze papers, synthesize mechanism clusters and structural gaps.
 - Outputs: `idea-stage/LITERATURE_REVIEW_{YYYYMMDD_HHmmssZ}.md`, latest copy `idea-stage/LITERATURE_REVIEW.md`, optional downloaded PDFs or wiki updates, and `MANIFEST.md` rows.
-- Handoff: Section 5 `Landscape Pack` is the machine-readable contract for `/idea-creator`; it must preserve `Evaluation Canon`, `Core Baseline Candidates`, simulator/prototype readiness, and `Gap Seeds`.
+- Handoff: Section 5 `Landscape Pack` is the machine-readable contract for `/idea-creator`; it must preserve `Bottleneck Evidence`, `Evaluation Canon` with platform/backend readiness, and `Gap Seeds`. Baselines are derived per idea from verified paper/system evidence.
 - Stop or degrade: missing sources are recorded in Source Audit and the skill continues with available sources; software-only topics without concrete hardware bottlenecks should be marked out-of-scope unless explicitly requested.
 
 ##### 0.4.1.1.1 research-lit 处理流程详解
@@ -440,13 +440,13 @@ These are compact template summaries for auditing output shape. The detailed can
 - Section 2 `Landscape Map`: 3-5 paragraphs by sub-direction cluster.
 - Section 3 `Structural Gaps`: cross-domain transfer, contradictions, untested assumptions, unexplored regimes, unasked questions.
 - Section 4 `Competitive Landscape`: top competing papers and positioning notes.
-- Section 5 `Landscape Pack`: topic scope, bottleneck evidence, mechanism clusters, `Evaluation Canon`, `Core Baseline Candidates`, simulator/prototype readiness, `Gap Seeds`.
+- Section 5 `Landscape Pack`: topic scope, bottleneck evidence, solution attempts, `Evaluation Canon` with platform/backend readiness and artifact access paths, `Gap Seeds`.
 
 `idea-stage/IDEA_REPORT.md`:
 
 - Header: direction, UTC generation time, generated/survived/handoff/recommended counts.
 - `Landscape Summary`: concise synthesis from the literature review.
-- `Recommended Ideas`: ranked ideas with idea shape, merit, `core_baseline`, `canon_mapping`, metrics, validation style, feasibility fields, platform path, blocker, reviewer objection, and rationale.
+- `Recommended Ideas`: ranked ideas with idea shape, merit, idea-local `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, metrics, validation style, feasibility fields, platform path, blocker, reviewer objection, and rationale.
 - `Eliminated Ideas`: idea, category, reason, revisit condition.
 - `Deferred / Designed-Not-Run Ideas`: why deferred and what must become available.
 - `Evaluation Handoff Summary`: compact table of ranking, feasibility, baseline, canon, metrics, validation style, handoff status, blocker.
@@ -488,7 +488,7 @@ These are compact template summaries for auditing output shape. The detailed can
 - Header: problem, method thesis, date.
 - `Claim Map`: claim, why it matters, minimum convincing evidence, linked blocks.
 - `Paper Storyline`: main-paper proof, appendix support, intentionally cut experiments.
-- `Evaluation Inputs`: `core_baseline`, `canon_mapping`, metrics, validation style, clarity, feasibility, baseline reproducibility, environment access, adapter cost, pilot runtime cost.
+- `Evaluation Inputs`: idea-local `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, metrics, validation style, clarity, feasibility, baseline reproducibility, environment access, adapter cost, pilot runtime cost.
 - `Experiment Blocks`: claim tested, purpose, referenced Evaluation Inputs, workload/configuration, compared systems, decisive metrics, setup, success criterion, failure interpretation, table/figure target, priority.
 - `Run Order and Milestones`, `Validation Budget`, `Risks and Mitigations`, `Final Checklist`.
 
@@ -524,7 +524,7 @@ Inputs:
 - Optional `refine-logs/EXPERIMENT_TRACKER.md`.
 - Optional `refine-logs/FINAL_PROPOSAL.md`.
 - `idea-stage/IDEA_REPORT.md` and `idea-stage/docs/research_contract.md` when available.
-- Evaluation handoff fields from Workflow 1: `core_baseline`, `canon_mapping`, `metrics`, `target_validation_style`, feasibility, environment access, adapter cost, pilot runtime cost, and `handoff_to_workflow_1_5`.
+- Evaluation handoff fields from Workflow 1: idea-local `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, `metrics`, `target_validation_style`, feasibility, environment access, adapter cost, pilot runtime cost, and `handoff_to_workflow_1_5`.
 
 Internal stages:
 

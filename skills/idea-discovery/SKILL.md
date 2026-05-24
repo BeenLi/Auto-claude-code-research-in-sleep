@@ -126,7 +126,7 @@ If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracef
 - Plus Gemini-driven broad discovery (sub-problem decomposition, naming variants, alias coverage) when `gemini-cli` is available
 - Build a landscape map: sub-directions, approaches, open problems
 - Identify structural gaps, `B*` bottlenecks, `S*` solution attempts, and `G*` residual-gap seeds
-- Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon` and `Core Baseline Candidates`
+- Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon`, verified paper status, and `Gap Seeds`
 - Output a literature summary (saved to working notes)
 
 **Literature scope summary:** Present the landscape summary to the user. Ask:
@@ -137,7 +137,7 @@ If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracef
 - Key bottlenecks: [2-3 bullets]
 - Bottleneck Evidence: B* bottlenecks and S* solution attempts
 - Evaluation Canon: platforms=[EC-P* summary], workloads=[EC-W* summary]
-- Core Baseline Candidates: [CB* summary]
+- Idea-local baselines: derived per idea from verified papers/systems or verified quick lookup
 - Gap Seeds: [top G* residual-gap seeds]
 
 Does this match your understanding? Should I adjust the scope before generating ideas?
@@ -170,8 +170,8 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 ```
 💡 Generated X ideas, filtered to Y, wrote Z evaluation handoff plans. Top results:
 
-1. [Idea 1] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [CB*], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: [clear], handoff: ready
-2. [Idea 2] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [CB* or new_baseline_with_rationale], canon_mapping: [mapping], target_validation_style: [style], clarity: [partial], handoff: needs_canon_clarification
+1. [Idea 1] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record], baseline_evaluability_score: [2|1], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: [clear], handoff: ready
+2. [Idea 2] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record or new baseline with rationale], baseline_evaluability_score: [2|1|0], canon_mapping: [mapping], target_validation_style: [style], clarity: [partial], handoff: needs_canon_clarification
 3. [Idea 3] — merit: [1-4], feasibility: [low], handoff: designed_not_run, blocker: [main_blocker]
 
 Which ideas should I validate further? Or should I regenerate with different constraints?
@@ -281,7 +281,7 @@ Present the final report summary before writing the latest copy. Then finalize `
 - evaluation_environment_access: ready | small_adapter_needed | major_bringup_needed | unavailable | unknown
 - idea_adapter_cost: parameter_or_config_only | small_local_patch | moderate_adapter | major_system_change | new_platform_or_prototype
 - pilot_runtime_cost: minutes_to_hours | one_to_two_days | multi_day_to_two_weeks | long_running_or_large_scale | unknown
-- core_baseline: [CB* candidate or new baseline with rationale]
+- core_baseline: [idea-local baseline record or new baseline with rationale]
 - canon_mapping: platform=[EC-P*]; workload=[EC-W*]
 - metrics: [decisive metric first, secondary metrics if needed]
 - target_validation_style: analytical_model | simulator_evaluation | prototype_measurement
@@ -318,15 +318,16 @@ Write `idea-stage/IDEA_CANDIDATES.md` — a lean summary of the top 3-5 survivin
 ```markdown
 # Idea Candidates
 
-| # | Idea | Overall Merit | Feasibility | Core Baseline | Handoff | Reviewer Score | Status |
+| # | Idea | Overall Merit | Feasibility | Baseline Record | Handoff | Reviewer Score | Status |
 |---|------|---------------|-------------|---------------|---------|----------------|--------|
-| 1 | [title] | 1 | high | CB1 | ready | X/10 | RECOMMENDED |
-| 2 | [title] | 2 | medium | CB2 | needs_canon_clarification | X/10 | BACKUP |
+| 1 | [title] | 1 | high | IB1 | ready | X/10 | RECOMMENDED |
+| 2 | [title] | 2 | medium | IB2 | needs_canon_clarification | X/10 | BACKUP |
 | 3 | [title] | 1 | low | new_baseline_with_rationale | designed_not_run | — | DEFERRED |
 
 ## Active Idea: #1 — [title]
 - Idea shape:
 - core_baseline:
+- baseline_evaluability_score:
 - canon_mapping:
 - metrics:
 - target_validation_style:

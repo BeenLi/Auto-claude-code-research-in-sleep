@@ -136,7 +136,7 @@ def test_synthesize_landscape_projects_prose_into_landscape_pack_ids() -> None:
 
     assert "ID-backed projection" in synthesize
     assert "Sections 2-4" in synthesize
-    for id_family in ("`B*`", "`S*`", "`EC-P*`", "`EC-W*`", "`CB*`", "`G*`"):
+    for id_family in ("`B*`", "`S*`", "`EC-P*`", "`EC-W*`", "`G*`"):
         assert id_family in synthesize
 
     assert "Section 2" in synthesize

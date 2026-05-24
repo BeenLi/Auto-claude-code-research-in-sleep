@@ -55,19 +55,24 @@ def test_research_lit_landscape_pack_contract_uses_revised_schema() -> None:
         "| solution_id | bottleneck_ids | mechanism_family | representative_papers | best_outcome | missing_piece |",
         "### Evaluation Canon",
         "#### Platforms",
-        "| platform_id | platform | readiness | workloads | validates | artifacts | limitations |",
+        "| platform_id | platform_or_backend | backend_readiness | workloads | validates | artifact_access_path | blockers_or_limitations |",
         "#### Workloads",
         "| workload_id | workload | bottlenecks | metrics | representative_papers | limitations |",
-        "### Core Baseline Candidates",
-        "| baseline_id | paper_or_system | addresses | canon_mapping | metrics | artifact_status |",
-        "### Simulator / Prototype Readiness",
-        "| backend | platform_id | readiness | validates | blocker |",
         "### Gap Seeds",
         "| gap_id | bottleneck_id | source_residual | mechanism_hint | validation_target | decisive_metric | kill_reason |",
     ]
 
     for fragment in required_fragments:
         assert fragment in contract
+
+    forbidden_fragments = [
+        "### Core Baseline Candidates",
+        "### Simulator / Prototype Readiness",
+        "| baseline_id | paper_or_system | addresses | canon_mapping | metrics | artifact_status |",
+        "| backend | platform_id | readiness | validates | blocker |",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in contract
 
     assert "### Mechanism Clusters" not in contract
     assert "| canon_id | category | item |" not in contract
@@ -81,8 +86,6 @@ def test_research_lit_contract_declares_reference_resolution_rules() -> None:
     required_rules = [
         "`S*.bottleneck_ids` is a comma-separated list of `B*` IDs",
         "Every entry must resolve to a `B*`.",
-        "Every `CB*.addresses` must reference a valid `B*`, `S*`, or `none_found`.",
-        "Every `CB*.canon_mapping` must use `platform=[EC-P*]; workload=[EC-W*]`, or explicit `none_found`.",
         "Every `EC-P*.validates` entry must resolve to `B*` or `S*`.",
         "Every `EC-W*.bottlenecks` entry must resolve to `B*`.",
         "Every `G*.bottleneck_id` must resolve to `B*`.",
@@ -105,16 +108,22 @@ def test_downstream_skill_wording_matches_nested_landscape_pack() -> None:
     assert "category=evaluation_platform" not in idea_creator
     assert "category=benchmark_workload" not in idea_creator
     assert "item-level Evaluation Canon rows: evaluation_platform and benchmark_workload" not in idea_creator
+    assert "Core Baseline Candidates" not in idea_creator
+    assert "Simulator / Prototype Readiness" not in idea_creator
+    assert "idea-local baseline record" in idea_creator
+    assert "baseline_evaluability_score" in idea_creator
 
     assert "Bottleneck Evidence: B* bottlenecks and S* solution attempts" in idea_discovery
     assert "Evaluation Canon: platforms=[EC-P* summary], workloads=[EC-W* summary]" in idea_discovery
+    assert "Idea-local baselines: derived per idea" in idea_discovery
     assert "Gap Seeds: [top G* residual-gap seeds]" in idea_discovery
 
 
 def test_research_pipeline_still_preserves_handoff_contract_ids() -> None:
     research_pipeline = read("skills/research-pipeline/SKILL.md")
 
-    assert "`core_baseline` must be a `CB*` candidate or `new baseline with rationale`." in research_pipeline
+    assert "`core_baseline` must be an idea-local baseline record" in research_pipeline
+    assert "`baseline_evaluability_score: 0` blocks `handoff_to_workflow_1_5: ready`" in research_pipeline
     assert "`canon_mapping.platform` must reference `EC-P*`" in research_pipeline
     assert "`canon_mapping.workload` must reference `EC-W*`" in research_pipeline
 
@@ -125,12 +134,6 @@ def test_mock_landscape_pack_reference_rules_resolve() -> None:
         "solutions": {"S1": ["B1", "B2"]},
         "platforms": {"EC-P1": ["B1", "S1"]},
         "workloads": {"EC-W1": ["B1"]},
-        "baselines": {
-            "CB1": {
-                "addresses": ["B1", "S1"],
-                "canon_mapping": "platform=[EC-P1]; workload=[EC-W1]",
-            }
-        },
         "gaps": {
             "G1": {
                 "bottleneck_id": "B1",
@@ -156,13 +159,56 @@ def test_mock_landscape_pack_reference_rules_resolve() -> None:
         for item in characterized:
             assert item in bottlenecks
 
-    for baseline in mock_pack["baselines"].values():
-        assert all(item in bottlenecks or item in solutions or item == "none_found" for item in baseline["addresses"])
-        assert re.fullmatch(r"platform=\[EC-P\d+\]; workload=\[EC-W\d+\]", baseline["canon_mapping"])
-
     for gap in mock_pack["gaps"].values():
         assert gap["bottleneck_id"] in bottlenecks
         source_id, source_field = gap["source_residual"].split(".")
         assert (source_id in bottlenecks and source_field == "residual_gap") or (
             source_id in solutions and source_field == "missing_piece"
         )
+
+
+def test_research_lit_declares_mandatory_paper_verification_gate() -> None:
+    text = read("skills/research-lit/SKILL.md")
+
+    required_fragments = [
+        "### 2.5. Verify Candidate Papers",
+        ".aris/tools/verify_papers.py",
+        "tools/verify_papers.py",
+        "$ARIS_REPO/tools/verify_papers.py",
+        ".aris/verify-papers/candidate_papers.json",
+        ".aris/verify-papers/verified_papers.json",
+        "`verified`, `unverified`, `verify_pending`, and `error`",
+        "`PASS`, `WARN`, `BLOCKED`, and `ERROR`",
+        "`BLOCKED` prevents saving the literature review",
+        "`WARN` continues with degraded output",
+        "zero verified papers",
+        "command -v python3",
+        "verifier_missing",
+    ]
+    for fragment in required_fragments:
+        assert fragment in text
+
+    assert "| Paper | Venue | Year | Method | Key Result | Relevance | Source | Verification | Preprint | Full Text | Artifact |" in text
+
+
+def test_idea_creator_requires_idea_local_verified_baselines() -> None:
+    idea_creator = read("skills/idea-creator/SKILL.md")
+
+    required_fragments = [
+        "idea-local baseline record",
+        "baseline_id",
+        "paper_or_system",
+        "verification_status",
+        "addresses",
+        "canon_mapping",
+        "metrics",
+        "artifact_status",
+        "baseline_reproducibility",
+        "baseline_evaluability_score",
+        "2 = official/open-source/config reproducible",
+        "1 = paper-only/unknown",
+        "0 = proprietary/unavailable/unverified-only",
+        "`baseline_evaluability_score: 0` must not be marked `handoff_to_workflow_1_5: ready`",
+    ]
+    for fragment in required_fragments:
+        assert fragment in idea_creator

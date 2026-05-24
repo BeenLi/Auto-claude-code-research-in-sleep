@@ -24,6 +24,7 @@ Extract:
 - claims and success criteria
 - claim boundary and unsupported claims that must not be implied by results
 - `core_baseline`
+- `baseline_evaluability_score`
 - `canon_mapping`
 - `metrics`
 - `target_validation_style`
@@ -62,6 +63,7 @@ Write this file before changing experiment code:
 # Evaluation Contract
 
 - **core_baseline**:
+- **baseline_evaluability_score**: 2 | 1 | 0
 - **baseline_source**:
 - **baseline_evaluation_platform**:
 - **baseline_workload**:
@@ -89,7 +91,8 @@ Write this file before changing experiment code:
 
 Workflow 1 → 1.5 handoff gate:
 
-- `core_baseline` must be a `CB*` candidate, or `new baseline with rationale`.
+- `core_baseline` must be an idea-local baseline record with baseline ID, paper/system, verification status, addressed `B*`/`S*`, canon mapping, metrics, artifact status, and reproducibility.
+- `baseline_evaluability_score: 0` blocks `handoff_gate_status: pass` and prevents immediate execution.
 - `canon_mapping.platform` must cite `EC-P*`; `canon_mapping.workload` must cite `EC-W*`.
 - `metrics` must name the decisive metric and why it decides the idea.
 - `target_validation_style` must be `analytical_model`, `simulator_evaluation`, or `prototype_measurement`.
@@ -101,7 +104,7 @@ Handoff/readiness mapping:
 
 - `handoff_to_workflow_1_5: ready` plus `evaluation_target_feasibility: high|medium` and `evaluation_environment_access: ready` maps to `idea_execution_readiness: ready`.
 - `handoff_to_workflow_1_5: ready` plus `evaluation_target_feasibility: high|medium` and `evaluation_environment_access: small_adapter_needed` maps to `idea_execution_readiness: adapter_needed`.
-- `handoff_to_workflow_1_5: needs_canon_clarification` stops execution and returns to `/research-lit` or to an explicit Evaluation Canon / Core Baseline Candidates clarification step.
+- `handoff_to_workflow_1_5: needs_canon_clarification` stops execution and returns to `/research-lit` or to explicit Evaluation Canon / baseline clarification.
 - `handoff_to_workflow_1_5: designed_not_run`, `evaluation_target_feasibility: low`, or `evaluation_environment_access: major_bringup_needed` maps to `idea_execution_readiness: platform_bringup` unless the artifact/workload path is unavailable.
 - `handoff_to_workflow_1_5: designed_not_run` plus an unavailable environment, missing artifact, or proprietary artifact maps to `idea_execution_readiness: blocked`.
 - `evaluation_target_feasibility: low` should not enter immediate execution unless the user explicitly chooses a long-horizon platform bring-up.
