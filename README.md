@@ -320,7 +320,7 @@ See [full setup guide](#%EF%B8%8F-setup) for details and [alternative model comb
 
 - 📊 **31 composable skills** — mix and match, or chain into full pipelines (`/idea-discovery`, `/auto-review-loop`, `/paper-writing`, `/research-pipeline`)
 - 🔍 **Literature & novelty** — multi-source paper search (**[Zotero](#-zotero-integration-optional)** + **[Obsidian](#-obsidian-integration-optional)** + **local PDFs** + arXiv/Scholar) + cross-model novelty verification
-- 💡 **Idea discovery** — literature survey → brainstorm 8-12 ideas → novelty check → GPU pilot experiments → ranked report
+- 💡 **Idea discovery** — literature survey → brainstorm 8-12 ideas → novelty check → critical review → selected idea proposal and experiment plan
 - 🔄 **Auto review loop** — 4-round autonomous review, 5/10 → 7.5/10 overnight with 20+ GPU experiments
 - 📝 **Paper writing** — narrative → outline → figures → LaTeX → PDF → auto-review (4/10 → 8.5/10), one command. Anti-hallucination citations via [DBLP](https://dblp.org)/[CrossRef](https://www.crossref.org)
 - 🤖 **Cross-model collaboration** — Claude Code executes, GPT-5.5 xhigh reviews. Adversarial, not self-play. Optional upgrade: `— reviewer: oracle-pro` for **GPT-5.5 Pro** (strongest reasoning) via [Oracle](https://github.com/steipete/oracle)
@@ -451,9 +451,9 @@ These skills compose into a full research lifecycle. The four workflows can be u
 ### Full Pipeline 🚀
 
 ```
-/research-lit → /idea-creator → /novelty-check → /research-refine → /experiment-bridge → /auto-review-loop → /paper-writing → submit → /rebuttal → accept! 🎉
-  (survey)      (brainstorm)    (verify novel)   (refine method)   (implement+deploy)  (review & fix)      (write paper)   (send)   (reply to reviewers)
-  ├────────────── Workflow 1: Idea Discovery ──────────────┤ ├ Workflow 1.5 ─┤ ├── Workflow 2 ──┤ ├── Workflow 3 ──┤         ├── Workflow 4 ──┤
+/research-lit → /idea-creator → /novelty-check → /research-review → /research-refine-pipeline → /experiment-bridge → /auto-review-loop → /paper-writing → submit → /rebuttal → accept! 🎉
+  (survey)      (brainstorm)    (verify novel)   (critical review)   (refine + plan)              (implement+deploy)  (review & fix)      (write paper)   (send)   (reply to reviewers)
+  ├────────────────────────────── Workflow 1: Idea Discovery ──────────────────────────────┤ ├ Workflow 1.5 ─┤ ├── Workflow 2 ──┤ ├── Workflow 3 ──┤         ├── Workflow 4 ──┤
 
                                      📚 research-wiki (persistent memory — papers, ideas, experiments, claims)
                                         ↕ reads before ideation, writes after every stage, failed ideas = anti-repetition memory
@@ -470,16 +470,17 @@ These skills compose into a full research lifecycle. The four workflows can be u
 
 Don't have a concrete idea yet? Just give a research direction — `/idea-discovery` handles the rest:
 
+Canonical chain: `/research-lit -> /idea-creator -> /novelty-check -> /research-review -> /research-refine-pipeline`.
+Workflow 1 does not run pilots or baseline reproduction; Workflow 1.5 owns execution through `/experiment-bridge`.
+
 1. 📚 **Survey** the landscape (recent papers, open problems, recurring limitations)
 2. 🧠 **Brainstorm** 8-12 concrete ideas via GPT-5.5 xhigh
 3. 🔍 **Filter** by feasibility, compute cost, and quick novelty search
 4. 🛡️ **Validate** top ideas with deep novelty check + devil's advocate review
-5. 🧪 **Pilot** top 2-3 ideas in parallel on different GPUs (30 min - 2 hr each)
-6. 🏆 **Rank** by empirical signal — ideas with positive pilot results rise to the top
-7. 🔬 **Refine** the top idea into a problem-anchored proposal via iterative GPT-5.5 review
-8. 🧪 **Plan** claim-driven experiments with ablations, budgets, and run order
+5. 🔬 **Refine** only the selected top idea into a problem-anchored proposal via iterative GPT-5.5 review
+6. 🧪 **Plan** claim-driven experiments with ablations, budgets, and run order
 
-The output is a ranked `IDEA_REPORT.md` plus a refined proposal (`refine-logs/FINAL_PROPOSAL.md`) and experiment plan (`refine-logs/EXPERIMENT_PLAN.md`) for the top idea. Dead-end ideas are documented too, saving future exploration.
+The output is `idea-stage/IDEA_REPORT.md`, optional `idea-stage/IDEA_CANDIDATES.md`, a refined proposal (`refine-logs/FINAL_PROPOSAL.md`), an experiment plan (`refine-logs/EXPERIMENT_PLAN.md`), and `idea-stage/docs/research_contract.md` for the selected top idea. Backup and deferred ideas stay documented in `IDEA_REPORT.md`; they are not refined by default.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -503,7 +504,7 @@ The output is a ranked `IDEA_REPORT.md` plus a refined proposal (`refine-logs/FI
 │                   │ novelty  │     │ evaluates│                │
 │                   └──────────┘     └──────────┘                │
 │                                          │                       │
-│                   /research-refine       ▼                       │
+│                   /research-refine-pipeline                      │
 │                   (refine method)   ┌──────────┐                │
 │                         │          │ Freeze   │                │
 │                         ▼          │ problem  │                │
@@ -513,23 +514,24 @@ The output is a ranked `IDEA_REPORT.md` plus a refined proposal (`refine-logs/FI
 │                   │ score≥9  │     └──────────┘                │
 │                   └──────────┘          │                       │
 │                         │               ▼                       │
-│                   /experiment-plan  ┌──────────┐                │
-│                         │          │ Claim-   │                │
-│                         ▼          │ driven   │                │
-│                   ┌──────────┐     │ experiment│               │
-│                   │ Plan     │────▶│ roadmap  │                │
-│                   │ runs     │     └──────────┘                │
+│                   includes          ┌──────────┐                │
+│                   /experiment-plan  │ Claim-   │                │
+│                         │          │ driven   │                │
+│                         ▼          │ experiment│               │
+│                   ┌──────────┐     │ roadmap  │                │
+│                   │ Plan     │────▶│          │                │
+│                   │ stage    │     └──────────┘                │
 │                   └──────────┘                                  │
 │                                                                  │
 │   Typical flow:                                                  │
 │   1. /research-lit "discrete diffusion models"                   │
 │   2. /idea-creator "DLLMs post training"                         │
-│   3. Review ranked ideas, pick top 2-3                           │
+│   3. Review ranked ideas, select the top idea                     │
 │   4. /novelty-check "top idea" (deep verification)               │
 │   5. /research-review "top idea" (critical feedback)             │
-│   6. /research-refine "top idea" (problem anchor + method)       │
-│   7. /experiment-plan (claim-driven roadmap)                     │
-│   8. /run-experiment → /auto-review-loop                         │
+│   6. /research-refine-pipeline "top idea" (method + plan)        │
+│   7. tools/workflow1_exit_gate.sh                                │
+│   8. Workflow 1.5: /experiment-bridge                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -539,7 +541,7 @@ The output is a ranked `IDEA_REPORT.md` plus a refined proposal (`refine-logs/FI
 
 > 🔄 **Human-in-the-loop:** Each phase presents results and waits for your feedback. Not happy? Tell it what's missing — it refines the prompt and regenerates. Trust the defaults? It auto-proceeds with the top-ranked option. You decide how hands-on to be.
 
-> ⚙️ Pilot experiment budgets (max hours, timeout, GPU budget) are configurable — see [Customization](#%EF%B8%8F-customization).
+> ⚙️ Execution budgets (max hours, timeout, GPU budget) are configured for Workflow 1.5 and later — see [Customization](#%EF%B8%8F-customization).
 
 📝 **Blog post:** [Claude Code 两月 NeurIPS 指北](http://xhslink.com/o/7IvAJQ41IBA)
 
@@ -999,7 +1001,7 @@ claude   # hooks active immediately
 |-------|-----------|:----:|:--------:|:---:|:-----:|
 | research-lit | papers | 6-8 | 10-15 | 18-25 | 40-50 |
 | idea-creator | ideas | 4-6 | 8-12 | 12-16 | 20-30 |
-| idea-creator | pilots | 1-2 | 2-3 | 3-4 | 5-6 |
+| idea-creator | handoff plans | 2-3 | 4-6 | 6-8 | 8-10 |
 | novelty-check | claims | 2-3 | 3-4 | 4-6 | all |
 | research-refine | rounds | 3 | 5 | 7 | 10+ |
 | experiment-plan | experiments | 3 | 5 | 7 | 10+ |
@@ -1115,7 +1117,7 @@ export OPENAI_API_KEY="your-key"
 |-------|-------------|:---:|
 | 🔭 **[`idea-discovery`](skills/idea-discovery/SKILL.md)** | **Pipeline orchestrator** — runs all skills below in sequence | Yes |
 | ├ 📚 [`research-lit`](skills/research-lit/SKILL.md) | Multi-source literature search ([Zotero](#-zotero-integration-optional) + [Obsidian](#-obsidian-integration-optional) + local PDFs + [arXiv API](#arxiv-integration) + web) | No |
-| ├ 💡 [`idea-creator`](skills/idea-creator/SKILL.md) | Brainstorm 8-12 ideas, filter by feasibility, pilot on GPU, rank by signal | Yes |
+| ├ 💡 [`idea-creator`](skills/idea-creator/SKILL.md) | Brainstorm 8-12 ideas, filter by merit and evaluation feasibility, write handoff plans | Yes |
 | ├ 🔍 [`novelty-check`](skills/novelty-check/SKILL.md) | Verify idea novelty against recent literature (multi-source + GPT-5.5 cross-check) | Yes |
 | ├ 🔬 [`research-review`](skills/research-review/SKILL.md) | Single-round deep review from external LLM (xhigh reasoning) | Yes |
 | └ 🧭 **[`research-refine-pipeline`](skills/research-refine-pipeline/SKILL.md)** | Refine method + plan experiments in one chain | Yes |
@@ -1924,7 +1926,7 @@ claude
 
 - [x] **Configurable REVIEWER_MODEL** — all Codex-dependent skills support custom reviewer model (default `gpt-5.5`, also works with `gpt-5.3-codex`, `gpt-5.2-codex`, `o3`, etc.)
 - [x] **Local paper library scanning** — `/research-lit` scans local `papers/` and `literature/` directories before external search, leveraging papers you've already read
-- [x] **Idea Discovery pipeline** — `/idea-discovery` orchestrates research-lit → idea-creator → novelty-check → research-review in one command, with pilot experiments on GPU
+- [x] **Idea Discovery pipeline** — `/idea-discovery` orchestrates research-lit → idea-creator → novelty-check → research-review → research-refine-pipeline in one command, with execution deferred to Workflow 1.5
 - [x] **Full research pipeline** — `/research-pipeline` chains Workflow 1 (idea discovery) → implementation → Workflow 2 (auto-review-loop) end-to-end
 - [x] **Peer review skill** — `/peer-review` for reviewing others' papers as a conference reviewer, with GPT-5.5 meta-review (planned; currently use `/research-review` with a paper PDF)
 - [x] **Cross-model collaboration** — Claude Code (executor) × Codex GPT-5.5 xhigh (reviewer) architecture, avoiding single-model self-play local minima

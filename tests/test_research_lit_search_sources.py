@@ -165,8 +165,8 @@ def test_synthesize_landscape_map_uses_topic_specific_unresolved_bottlenecks() -
 
     assert "concrete unresolved problems or bottlenecks specific to the current topic" in landscape_flat
     assert "solution attempts already tried" in landscape_flat
-    assert "EC-P*.limitations" in landscape_flat
-    assert "EC-W*.limitations" in landscape_flat
+    assert "EC-P*.platform_limitations" in landscape_flat
+    assert "EC-W*.representativeness_limits" in landscape_flat
     assert "KV cache CXL" in landscape_flat
     assert "Section 5 `B*` bottlenecks and `S*` solution attempts" in landscape_flat
     assert not re.search(

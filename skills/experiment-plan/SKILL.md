@@ -19,6 +19,9 @@ The goal is not to generate a giant benchmark wishlist. The goal is to turn a pr
 3. the method is elegant enough that extra complexity is unnecessary
 4. any modern platform primitive is genuinely useful, not decorative
 
+Workflow 1 handoff fields used by the selected idea are defined in
+`../shared-references/idea-handoff-schema.md`.
+
 ## Constants
 
 - **OUTPUT_DIR = `refine-logs/`** — Default destination for experiment planning artifacts.
@@ -46,18 +49,7 @@ Extract:
 - **Critical reviewer concerns**
 - **Workload / simulator / prototype / timeline constraints**
 - **Which platform primitive is central, if any**
-- **Evaluation Inputs** from the selected idea:
-  - `core_baseline`
-  - `baseline_evaluability_score`
-  - `canon_mapping`
-  - `metrics`
-  - `target_validation_style`
-  - `evaluation_target_clarity`
-  - `evaluation_target_feasibility`
-  - `baseline_reproducibility`
-  - `evaluation_environment_access`
-  - `idea_adapter_cost`
-  - `pilot_runtime_cost`
+- **Evaluation Inputs** from the selected idea, following `../shared-references/idea-handoff-schema.md`
 
 If these files do not exist, derive the same information from the user's prompt.
 

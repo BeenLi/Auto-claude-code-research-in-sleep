@@ -20,6 +20,12 @@ This skill chains sub-skills into a single automated pipeline for **AI infrastru
 
 Each phase builds on the previous one's output. The final deliverables are a validated `idea-stage/IDEA_REPORT.md` with ranked ideas, plus a refined proposal (`refine-logs/FINAL_PROPOSAL.md`) and experiment plan (`refine-logs/EXPERIMENT_PLAN.md`) for the top idea. The default scope covers compute/accelerator, memory/storage/data movement, interconnect/network, and runtime/system when runtime has a concrete hardware bottleneck.
 
+Shared references:
+- Handoff fields and Workflow 1 exit gate: `../shared-references/idea-handoff-schema.md`
+- Phase checkpoint summaries: `../shared-references/workflow1-checkpoints.md`
+- Report shape: `templates/IDEA_REPORT_TEMPLATE.md`
+- Compact candidate shape: `templates/IDEA_CANDIDATES_TEMPLATE.md`
+
 ## Constants
 
 - **MAX\_HANDOFF\_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not run pilots.
@@ -106,15 +112,11 @@ Phase 1 and Phase 2 will use `idea-stage/REF_PAPER_SUMMARY.md` as additional con
 
 ### Phase 1: Literature Survey
 
-Invoke `/research-lit` to map the research landscape. Idea discovery is exactly the place where Gemini's AI-driven broad coverage adds value, so include `gemini` as a source by default unless the user already specified an explicit `— sources:` directive in their idea-discovery invocation:
+Invoke `/research-lit` to map the research landscape. Idea discovery is exactly the place where Gemini's AI-driven broad coverage adds value, so include `gemini` as a source by default unless the user already specified an explicit `— sources:` directive in their idea-discovery invocation.
 
 ```
-# If $ARGUMENTS already contains "— sources:", pass through unchanged
-# (the user is in control of source selection):
-/research-lit "$ARGUMENTS"
-
-# Otherwise (the common case), include gemini explicitly for broader discovery:
-/research-lit "$ARGUMENTS" — sources: all, gemini
+NORMALIZED_ARGS="$(tools/inject_default_sources.sh "$ARGUMENTS")"
+/research-lit "$NORMALIZED_ARGS"
 ```
 
 If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracefully with a warning — no break to the pipeline. Users who want to force-disable Gemini in idea-discovery can pass `/idea-discovery "topic" — sources: all` explicitly (which becomes the literal source list, no auto-injection).
@@ -127,16 +129,21 @@ If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracef
 - Build a landscape map: sub-directions, approaches, open problems
 - Identify structural gaps, `B*` bottlenecks, `S*` solution attempts, and `G*` residual-gap seeds
 - Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon`, verified paper status, and `Gap Seeds`
+- In `Evaluation Canon`, expect platform rows to carry `evaluation_platform`,
+  `access_readiness`, `validates_refs`, and `platform_limitations`; expect
+  workload rows to carry `workload_characteristics` and
+  `representativeness_limits`. Treat metrics as idea-specific, not part of the
+  workload row.
 - Output a literature summary (saved to working notes)
 
-**Literature scope summary:** Present the landscape summary to the user. Ask:
+**Literature scope summary:** Present the `Literature scope` checkpoint from `../shared-references/workflow1-checkpoints.md`. Ask:
 
 ```
 📚 Literature survey complete. Here's what I found:
 - Inferred AI infra layer: [layer]
 - Key bottlenecks: [2-3 bullets]
 - Bottleneck Evidence: B* bottlenecks and S* solution attempts
-- Evaluation Canon: platforms=[EC-P* summary], workloads=[EC-W* summary]
+- Evaluation Canon: platforms=[EC-P* evaluation_platform/access_readiness summary], workloads=[EC-W* workload_characteristics summary]
 - Idea-local baselines: derived per idea from verified papers/systems or verified quick lookup
 - Gap Seeds: [top G* residual-gap seeds]
 
@@ -163,9 +170,10 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 - Run quick novelty checks, overall merit scoring, and evaluation target feasibility assessment
 - Write evaluation handoff plans for the top 4-6 ideas
 - Rank by overall merit and evaluation target feasibility
-- Output `idea-stage/IDEA_REPORT.md`
+- Output `idea-stage/IDEA_REPORT.md` using `templates/IDEA_REPORT_TEMPLATE.md`
+- Optionally output `idea-stage/IDEA_CANDIDATES.md` using `templates/IDEA_CANDIDATES_TEMPLATE.md`
 
-**Idea selection summary:** Present `idea-stage/IDEA_REPORT.md` ranked ideas to the user. Ask:
+**Idea selection summary:** Present the `Idea selection` checkpoint from `../shared-references/workflow1-checkpoints.md`. Use field names and domains from `../shared-references/idea-handoff-schema.md`. Ask:
 
 ```
 💡 Generated X ideas, filtered to Y, wrote Z evaluation handoff plans. Top results:
@@ -178,7 +186,7 @@ Which ideas should I validate further? Or should I regenerate with different con
 (If no response, I'll proceed with the top-ranked ideas.)
 ```
 
-- **User picks ideas** (or `AUTO_PROCEED=true` behavior) → proceed to Phase 3 with top-ranked ideas.
+- **User picks an idea** (or `AUTO_PROCEED=true` behavior) → proceed to Phase 3 with the selected top idea; keep other ready ideas as backups in `IDEA_REPORT.md`.
 - **User unhappy with all ideas** → collect feedback ("what's missing?", "what direction do you prefer?"), update the prompt with user's constraints, and re-run Phase 2 (idea generation). Repeat until the user selects at least 1 idea.
 - **User wants to adjust scope** → go back to Phase 1 with refined direction.
 
@@ -218,7 +226,7 @@ For the surviving top idea(s), get brutal feedback:
 
 ### Phase 4.5: Method Refinement + Experiment Planning
 
-After review, refine the top idea into a concrete proposal and plan experiments. Present a pre-refine summary with the selected idea, novelty result, review summary, evaluation handoff summary, and known blockers before invoking the refinement pipeline:
+After review, refine only the selected top idea into a concrete proposal and plan experiments. Present a pre-refine summary with the selected idea, novelty result, review summary, evaluation handoff summary, and known blockers before invoking the refinement pipeline:
 
 ```
 /research-refine-pipeline "[top idea description + evaluation handoff plan + reviewer feedback]"
@@ -238,6 +246,8 @@ This is only a workflow-exit gate; experiment-plan is the semantic owner of `ref
 
 #### Checkpoint: Present the refined proposal summary
 
+Use the `Refined proposal ready` checkpoint from `../shared-references/workflow1-checkpoints.md`.
+
 ```
 🔬 Method refined and experiment plan ready:
 - Problem anchor: [anchored problem]
@@ -255,90 +265,21 @@ Proceed to implementation? Or adjust the proposal?
 
 ### Phase 5: Final Report
 
-Present the final report summary before writing the latest copy. Then finalize `idea-stage/IDEA_REPORT.md` with all accumulated information:
+Present the final report summary before writing the latest copy. Then finalize `idea-stage/IDEA_REPORT.md` with all accumulated information using `templates/IDEA_REPORT_TEMPLATE.md`.
 
-```markdown
-# Idea Discovery Report
+The report must make the selected idea explicit, keep backup/deferred ideas documented, and link:
+- `refine-logs/FINAL_PROPOSAL.md`
+- `refine-logs/EXPERIMENT_PLAN.md`
+- `idea-stage/docs/research_contract.md`
+- `../shared-references/idea-handoff-schema.md`
 
-**Direction**: $ARGUMENTS
-**Date**: [today]
-**Pipeline**: research-lit → idea-creator → novelty-check → research-review → research-refine-pipeline
-
-## Executive Summary
-[2-3 sentences: best idea, key evidence, recommended next step]
-
-## Literature Landscape
-[from Phase 1]
-
-## Ranked Ideas
-[from Phase 2, updated with Phase 3-4 results]
-
-### 🏆 Idea 1: [title] — RECOMMENDED
-- Idea shape: [compact summary of the idea, target gap, proposed mechanism/study, and why the answer matters]
-- Overall merit: [1-4] — [rationale]
-- evaluation_target_feasibility: high | medium | low | unknown
-- baseline_reproducibility: official_artifact | open_source_system | config_reproducible | paper_only | proprietary_or_unavailable | unknown
-- evaluation_environment_access: ready | small_adapter_needed | major_bringup_needed | unavailable | unknown
-- idea_adapter_cost: parameter_or_config_only | small_local_patch | moderate_adapter | major_system_change | new_platform_or_prototype
-- pilot_runtime_cost: minutes_to_hours | one_to_two_days | multi_day_to_two_weeks | long_running_or_large_scale | unknown
-- core_baseline: [idea-local baseline record or new baseline with rationale]
-- canon_mapping: platform=[EC-P*]; workload=[EC-W*]
-- metrics: [decisive metric first, secondary metrics if needed]
-- target_validation_style: analytical_model | simulator_evaluation | prototype_measurement
-- evaluation_target_clarity: clear | partial | missing
-- handoff_to_workflow_1_5: ready | needs_canon_clarification | designed_not_run
-- Novelty check: CONFIRMED (closest: [paper], differentiation: [what's different]; use this to update overall merit)
-- Reviewer score: X/10
-- Next step: /experiment-bridge → implement full experiment → /auto-review-loop
-
-### Idea 2: [title] — BACKUP
-...
-
-## Eliminated Ideas
-[ideas killed at each phase, with reasons]
-
-## Refined Proposal
-- Proposal: `refine-logs/FINAL_PROPOSAL.md`
-- Experiment plan: `refine-logs/EXPERIMENT_PLAN.md`
-- Tracker: `refine-logs/EXPERIMENT_TRACKER.md`
-
-## Next Steps
-- [ ] /experiment-bridge to create `refine-logs/EVALUATION_CONTRACT.md`
-- [ ] /run-experiment to deploy experiments selected by Workflow 1.5
-- [ ] /auto-review-loop to iterate until submission-ready
-- [ ] Or invoke /research-pipeline for the complete end-to-end flow
-```
+Do not restate a second handoff schema in this orchestrator.
 
 ### Phase 5.5: Write Compact Files (when COMPACT = true)
 
 **Skip entirely if** **`COMPACT`** **is** **`false`.**
 
-Write `idea-stage/IDEA_CANDIDATES.md` — a lean summary of the top 3-5 surviving ideas:
-
-```markdown
-# Idea Candidates
-
-| # | Idea | Overall Merit | Feasibility | Baseline Record | Handoff | Reviewer Score | Status |
-|---|------|---------------|-------------|---------------|---------|----------------|--------|
-| 1 | [title] | 1 | high | IB1 | ready | X/10 | RECOMMENDED |
-| 2 | [title] | 2 | medium | IB2 | needs_canon_clarification | X/10 | BACKUP |
-| 3 | [title] | 1 | low | new_baseline_with_rationale | designed_not_run | — | DEFERRED |
-
-## Active Idea: #1 — [title]
-- Idea shape:
-- core_baseline:
-- baseline_evaluability_score:
-- canon_mapping:
-- metrics:
-- target_validation_style:
-- evaluation_target_clarity:
-- evaluation_target_feasibility:
-- baseline_reproducibility:
-- evaluation_environment_access:
-- idea_adapter_cost:
-- pilot_runtime_cost:
-- Next step: /experiment-bridge or /research-refine
-```
+Write `idea-stage/IDEA_CANDIDATES.md` from `templates/IDEA_CANDIDATES_TEMPLATE.md` — a lean summary of the top 3-5 surviving ideas.
 
 This file is intentionally small (\~30 lines) so downstream skills and session recovery can read it without loading the full `idea-stage/IDEA_REPORT.md` (\~200+ lines).
 

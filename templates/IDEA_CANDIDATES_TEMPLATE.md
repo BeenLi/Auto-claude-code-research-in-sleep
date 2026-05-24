@@ -1,8 +1,7 @@
 # Idea Candidates
 
-> **Curated pool of viable ideas that survived novelty check and review.** Unlike `IDEA_REPORT.md` (raw brainstorm output with all 8-12 ideas), this file only contains ideas that are worth pursuing — filtered, scored, and ready to be selected.
->
-> When the current idea fails (result-to-claim negative, or pivot needed), pick the next candidate from here instead of re-running the entire idea discovery pipeline.
+> Compact backup list derived from `IDEA_REPORT.md`. Only the selected top idea
+> enters `/research-refine-pipeline`; ready backups stay here for later runs.
 
 ## Active Idea
 
@@ -10,34 +9,38 @@
 
 ## Candidates
 
-### Candidate 1: [Idea Name]
-- **One-line**: [What it does]
-- **AI infra layer**: [compute/accelerator | memory/storage/data movement | interconnect/network | runtime/system]
-- **Hardware bottleneck**: [Concrete resource pressure or timing path]
-- **Validation backend**: [analytical_model | gem5 | htsim | cosim_gem5_htsim | trace_replay | RTL/HLS | FPGA/DPU_microbench]
-- **Novelty score**: X/10
-- **Reviewer assessment**: [Key strength + key risk]
-- **Pilot result**: [POSITIVE/NEGATIVE/NOT TESTED — one-line metric]
-- **Estimated effort**: [simulator/prototype hours, implementation complexity]
-- **Why not selected first**: [Reason — e.g., higher risk, needs more data, less novel]
+| # | Idea | Overall Merit | Feasibility | Baseline Record | Canon Mapping | Handoff | Status |
+|---|------|---------------|-------------|-----------------|---------------|---------|--------|
+| 1 | [title] | 1 | high | IB1 | platform=[EC-P1]; workload=[EC-W1] | ready | selected |
+| 2 | [title] | 2 | medium | IB2 | platform=[EC-P2]; workload=[EC-W2] | ready | backup |
+| 3 | [title] | 1 | low | IB3 | platform=[EC-P3]; workload=[EC-W3] | designed_not_run | deferred |
 
-### Candidate 2: [Idea Name]
-- **One-line**: [What it does]
-- **Novelty score**: X/10
-- **Reviewer assessment**: [Key strength + key risk]
-- **Pilot result**: [POSITIVE/NEGATIVE/NOT TESTED]
-- **Estimated effort**: [simulator/prototype hours, implementation complexity]
-- **Why not selected first**: [Reason]
+## Active Idea: #1 -- [title]
 
-### Candidate 3: [Idea Name]
-...
+Use `skills/shared-references/idea-handoff-schema.md` for field domains.
+
+- **Idea shape**:
+- **core_baseline**:
+- **baseline_evaluability_score**:
+- **canon_mapping**:
+- **metrics**:
+- **target_validation_style**:
+- **evaluation_target_clarity**:
+- **evaluation_target_feasibility**:
+- **baseline_reproducibility**:
+- **evaluation_environment_access**:
+- **idea_adapter_cost**:
+- **pilot_runtime_cost**:
+- **handoff_to_workflow_1_5**:
+- **main_blocker**:
+- **Next step**: `/research-refine-pipeline`
 
 ## Killed Ideas
 
 > Ideas that were evaluated and explicitly rejected. Kept here to avoid re-exploring dead ends.
 
 ### [Killed Idea Name]
-- **Kill reason**: [Why — e.g., not novel (found prior work X), infeasible (needs Y data), pilot negative]
+- **Kill reason**: [Why -- e.g., not novel (found prior work X), infeasible (needs Y data), no credible evaluation path]
 - **Kill date**: YYYY-MM-DD
 - **Source**: IDEA_REPORT.md, Idea #N
 

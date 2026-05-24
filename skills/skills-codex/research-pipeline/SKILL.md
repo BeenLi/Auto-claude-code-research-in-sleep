@@ -31,6 +31,10 @@ This skill chains the entire research lifecycle into a single pipeline:
 
 It orchestrates up to three major workflows plus the implementation bridge between them. Workflow 3 (paper writing) is optional and controlled by `AUTO_WRITE`.
 
+Shared references:
+- Workflow 1 handoff fields and exit gate: `../shared-references/idea-handoff-schema.md`
+- Workflow 1 checkpoint summaries: `../shared-references/workflow1-checkpoints.md`
+
 ## Pipeline
 
 ### Stage 1: Idea Discovery (Workflow 1)
@@ -43,19 +47,19 @@ Invoke the idea discovery pipeline:
 /idea-discovery "$ARGUMENTS"
 ```
 
-This internally runs: `/research-lit` → `/idea-creator` → `/novelty-check` → `/research-review`
+This internally runs: `/research-lit` -> `/idea-creator` -> `/novelty-check` -> `/research-review` -> `/research-refine-pipeline`
 
-**Output:** `idea-stage/IDEA_REPORT.md` with ranked ideas, `overall_merit_score`, `evaluation_target_feasibility`, feasibility subfields, `core_baseline`, `canon_mapping`, metrics, target validation style, evaluation target clarity, and Workflow 1.5 handoff status.
+**Output:** `idea-stage/IDEA_REPORT.md`, optional `idea-stage/IDEA_CANDIDATES.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md`, and `idea-stage/docs/research_contract.md`. Handoff fields must follow `../shared-references/idea-handoff-schema.md`.
 
 **🚦 Gate 1 — Human Checkpoint:**
 
-After `idea-stage/IDEA_REPORT.md` is generated, **pause and present the top ideas to the user**:
+After Workflow 1 generates the report, proposal, and experiment plan, **pause and present the top ideas to the user** using the `Idea selection` checkpoint from `../shared-references/workflow1-checkpoints.md`:
 
 ```
 📋 Idea Discovery complete. Top ideas:
 
-1. [Idea 1 title] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record], baseline_evaluability_score: [2|1], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: clear, handoff: ready
-2. [Idea 2 title] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record or new baseline with rationale], baseline_evaluability_score: [2|1|0], canon_mapping: [mapping], target_validation_style: [style], clarity: partial, handoff: needs_canon_clarification
+1. [Idea 1 title] — merit: [1-4], feasibility: [high/medium/low/unknown], handoff: ready, schema: `idea-handoff-schema.md`
+2. [Idea 2 title] — merit: [1-4], feasibility: [high/medium/low/unknown], handoff: needs_canon_clarification, schema: `idea-handoff-schema.md`
 3. [Idea 3 title] — merit: [1-4], feasibility: [low], handoff: designed_not_run, blocker: [main_blocker]
 
 Recommended: Idea 1. Shall I proceed to Workflow 1.5 evaluation contract and implementation bridge?
@@ -74,20 +78,14 @@ Recommended: Idea 1. Shall I proceed to Workflow 1.5 evaluation contract and imp
 
 Once the user confirms which idea to pursue:
 
-1. **Confirm Workflow 1 completed the experiment plan**:
+1. **Confirm Workflow 1 completed the selected idea package**:
    - `refine-logs/EXPERIMENT_PLAN.md` must exist before entering Workflow 1.5.
+   - `refine-logs/FINAL_PROPOSAL.md` and `idea-stage/docs/research_contract.md` should exist for the selected idea.
    - If it is missing, Workflow 1 has not completed the refinement/planning path. Continue `/idea-discovery` or run `/research-refine-pipeline` for the selected idea before invoking `/experiment-bridge`.
 
 2. **Run the Workflow 1 → 1.5 Handoff Gate**:
-   - Read the selected idea from `idea-stage/IDEA_REPORT.md` and the Evaluation Inputs from `refine-logs/EXPERIMENT_PLAN.md`.
-   - `core_baseline` must be an idea-local baseline record with baseline ID, paper/system, verification status, addressed `B*`/`S*`, canon mapping, metrics, artifact status, and reproducibility.
-   - `baseline_evaluability_score: 0` blocks `handoff_to_workflow_1_5: ready`; return to baseline verification, downrank, or defer the idea.
-   - `canon_mapping.platform` must reference `EC-P*`, and `canon_mapping.workload` must reference `EC-W*`.
-   - `metrics` must include a decisive metric and explain why it decides the idea.
-   - `target_validation_style` must be `analytical_model`, `simulator_evaluation`, or `prototype_measurement`.
-   - `evaluation_target_clarity` must be `clear` or an explicitly acceptable `partial`; `missing` blocks Workflow 1.5.
-   - `evaluation_target_feasibility` and its four subfields must be present.
-   - `evaluation_target_feasibility: unknown` or `evaluation_environment_access: unknown` blocks immediate Workflow 1.5 execution; first clarify the artifact, platform, workload, or comparison-target path.
+   - Run `tools/workflow1_exit_gate.sh --idea-report idea-stage/IDEA_REPORT.md --experiment-plan refine-logs/EXPERIMENT_PLAN.md --selected-idea "[title]"`.
+   - The gate enforces `../shared-references/idea-handoff-schema.md`: score `0` cannot be ready, canon mapping must cite `EC-P*` and `EC-W*`, and required handoff fields must be present.
    - If any gate item fails, do not invoke `/experiment-bridge`; return to `/research-lit`, `/idea-discovery`, or `/research-refine-pipeline` as appropriate.
 
 3. **Invoke `/experiment-bridge` before implementation**:
@@ -98,8 +96,8 @@ Once the user confirms which idea to pursue:
    This must generate `refine-logs/EVALUATION_CONTRACT.md` before any full implementation work.
 
 4. **Verify the evaluation contract**:
-   - `core_baseline`, baseline source, baseline platform/workload, and baseline metrics are explicit
-   - `evaluation_target_feasibility`, `baseline_reproducibility`, `evaluation_environment_access`, `idea_adapter_cost`, and `pilot_runtime_cost` are explicit
+   - baseline source, platform/workload, and metrics are explicit
+   - handoff feasibility and access assumptions are explicit
    - `handoff_gate_status`, `baseline_go_no_go`, `baseline_smoke_required`, and `baseline_evidence_strength` are recorded
    - selected evaluation backend follows the baseline/canon mapping
    - workload and metrics are decisive for the idea, not merely copied from prior work

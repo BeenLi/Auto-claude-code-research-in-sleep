@@ -124,95 +124,15 @@ Before analyzing or citing candidate papers, verify paper existence with the
 canonical helper. This step is mandatory even when the candidate came from an
 LLM, a user note, a stale prior review, or a search snippet.
 
-Papers loaded from a prior `idea-stage/LITERATURE_REVIEW.md` (Step 1) must also
-flow through this gate: if their `Verification` column is already `verified`,
-trust it and skip re-verification; otherwise re-emit them as candidate rows.
-Do not leave any Section 1 row without a `Verification` value.
+Follow `references/verify-candidate-papers.md` for the full operational flow:
+prior-review reuse rules, candidate JSON schema, helper resolution, degraded
+`BLOCKED` receipt creation, verifier invocation, status vocabulary, and
+verdict handling.
 
-Write candidate rows before verification:
+Required artifacts:
 
-```text
-.aris/verify-papers/candidate_papers.json
-```
-
-Use a list of objects with stable `id`, and best-known `arxiv_id`, `doi`, and
-`title` fields.
-
-Then resolve and invoke the helper. `python3` is a hard prerequisite — if
-missing, stop the workflow with a `BLOCKED` outcome. If the helper itself is
-missing on disk, write a degraded `BLOCKED` envelope so downstream skills
-always have a JSON receipt to read (per the [integration
-contract](../shared-references/integration-contract.md)):
-
-```bash
-mkdir -p .aris/verify-papers
-VERIFY_OUTPUT=".aris/verify-papers/verified_papers.json"
-
-command -v python3 >/dev/null 2>&1 || {
-  echo "BLOCKED: python3 is required for verify_papers.py" >&2
-  python3 - <<'PY' >"$VERIFY_OUTPUT" 2>/dev/null || cat >"$VERIFY_OUTPUT" <<'JSON'
-{
-  "verdict": "BLOCKED",
-  "hallucination_rate": 0.0,
-  "pending_rate": 0.0,
-  "warnings": ["python3_missing"],
-  "papers": [],
-  "error": "python3 not on PATH"
-}
-JSON
-  exit 1
-}
-
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null)}"
-VERIFY_SCRIPT=".aris/tools/verify_papers.py"
-[ -f "$VERIFY_SCRIPT" ] || VERIFY_SCRIPT="tools/verify_papers.py"
-[ -f "$VERIFY_SCRIPT" ] || { [ -n "${ARIS_REPO:-}" ] && VERIFY_SCRIPT="$ARIS_REPO/tools/verify_papers.py"; }
-if [ ! -f "$VERIFY_SCRIPT" ]; then
-  echo "BLOCKED: verify_papers.py not found at .aris/tools/, tools/, or \$ARIS_REPO/tools/." >&2
-  python3 - "$VERIFY_OUTPUT" .aris/verify-papers/candidate_papers.json <<'PY'
-import json, sys
-out_path, in_path = sys.argv[1], sys.argv[2]
-try:
-    candidates = json.loads(open(in_path).read())
-except Exception:
-    candidates = []
-papers = [
-    {
-        "id": (c.get("id") or f"row-{i}") if isinstance(c, dict) else f"row-{i}",
-        "status": "unverified",
-        "method": None,
-        "confidence": None,
-        "reason": "verifier_missing",
-        "identifiers": {},
-    }
-    for i, c in enumerate(candidates)
-]
-json.dump(
-    {
-        "verdict": "BLOCKED",
-        "hallucination_rate": 0.0,
-        "pending_rate": 0.0,
-        "warnings": ["verifier_missing"],
-        "papers": papers,
-        "error": "verify_papers.py not resolvable; rerun bash tools/install_aris.sh or set ARIS_REPO",
-    },
-    open(out_path, "w"),
-    indent=2,
-    ensure_ascii=False,
-)
-PY
-  # Treat as BLOCKED per the rules below.
-  exit 1
-fi
-
-python3 "$VERIFY_SCRIPT" \
-  --input .aris/verify-papers/candidate_papers.json \
-  --output "$VERIFY_OUTPUT"
-```
-
-The paper-level status vocabulary is `verified`, `unverified`, `verify_pending`, and `error`.
-The top-level verdict vocabulary is `PASS`, `WARN`, `BLOCKED`, and `ERROR`.
+- `.aris/verify-papers/candidate_papers.json`
+- `.aris/verify-papers/verified_papers.json`
 
 Handling rules:
 
@@ -237,7 +157,7 @@ For every relevant paper, extract:
 - Problem, method, key result, limitations, and relevance
 - Source labels and whether it was already known or newly added
 - Verification status from `.aris/verify-papers/verified_papers.json`.
-- Evaluation platform/backend, benchmark/workload/trace, comparison systems,
+- Evaluation platform/substrate, benchmark/workload/trace, comparison systems,
   metrics, artifact/code status, and evaluation limitations.
 
 ### 4. Synthesize Landscape
@@ -253,8 +173,8 @@ Produce:
   problem/bottleneck, solution attempts already tried, what those attempts
   achieved and where they plateau, scenario/evaluation limitations including
   workload coverage, hardware coverage, artifact maturity, and
-  `EC-P*.limitations` / `EC-W*.limitations` references where applicable, the
-  hardware generation or `hardware-agnostic` status, and the
+  `EC-P*.platform_limitations` / `EC-W*.representativeness_limits` references
+  where applicable, the hardware generation or `hardware-agnostic` status, and the
   workload/model-size class when evidence permits. These problem clusters
   should directly ground Section 5 `B*` bottlenecks and `S*` solution attempts.
 - Consensus and disagreements belong in Section 2: for each cluster, summarize
@@ -356,17 +276,35 @@ Keep these headings and field names stable.
 ### Evaluation Canon
 
 #### Platforms
-| platform_id | platform_or_backend | backend_readiness | workloads | validates | artifact_access_path | blockers_or_limitations |
+| platform_id | evaluation_platform | access_readiness | supported_workloads | validates_refs | artifact_access_path | platform_limitations |
 | --- | --- | --- | --- | --- | --- | --- |
 
 #### Workloads
-| workload_id | workload | bottlenecks | metrics | representative_papers | limitations |
+| workload_id | workload | bottlenecks | workload_characteristics | representative_papers | representativeness_limits |
 | --- | --- | --- | --- | --- | --- |
 
 ### Gap Seeds
-| gap_id | bottleneck_id | source_residual | mechanism_hint | validation_target | decisive_metric | kill_reason |
+| gap_id | bottleneck_id | source_gap_ref | mechanism_hint | validation_target | decisive_metric | kill_reason |
 | --- | --- | --- | --- | --- | --- | --- |
 ```
+
+Gap Seeds table meaning:
+
+- `Gap Seeds` is the idea-generation projection of the Landscape Pack. It does
+  not restate every residual gap. It converts one or more unresolved residuals
+  into an actionable research seed that `/idea-creator` can expand, rank, and
+  test.
+- `gap_id`: stable `G*` ID for downstream references.
+- `bottleneck_id`: primary `B*` bottleneck this seed targets.
+- `source_gap_ref`: evidence pointer for the seed, using `B*.residual_gap`,
+  `S*.missing_piece`, or explicit negative evidence.
+- `mechanism_hint`: compact hint for the possible mechanism, measurement, or
+  study direction. This is not a complete proposed method.
+- `validation_target`: platform, workload, trace, baseline, simulator,
+  prototype, or `EC-P*`/`EC-W*` target that would test the seed.
+- `decisive_metric`: first metric that would decide whether the seed has value.
+- `kill_reason`: concrete observation that would make the seed not worth
+  pursuing.
 
 Contract rules:
 
@@ -377,19 +315,40 @@ Contract rules:
 - `Evaluation Canon` contains `Platforms` and `Workloads`, not mixed rows
   selected by a category column. Use stable `EC-P*` IDs for platforms and
   `EC-W*` IDs for workloads. `Evaluation Canon > Platforms` must absorb
-  backend/prototype readiness, artifact/access path, and blocker information;
-  do not create a separate readiness heading.
+  platform access readiness, supported workload refs, artifact/access path, and
+  blocker information; do not create a separate readiness heading.
+- `evaluation_platform` is the concrete evaluation substrate: simulator, trace
+  harness, benchmark artifact, prototype, testbed, or open-source system.
+- `access_readiness` is one of `ready`, `small_adapter_needed`,
+  `major_bringup_needed`, `unavailable`, `unknown`.
+- `supported_workloads` lists matching `EC-W*` IDs when known, or a concise
+  workload family if no workload row exists yet.
+- `validates_refs` entries must resolve to `B*` or `S*`. They mean the platform
+  can measure a bottleneck or reproduce/compare a solution attempt.
+- `platform_limitations` records platform, access, or fidelity blockers such as
+  missing artifact, unsupported workload, weak simulator fidelity,
+  hardware/license access, scale limits, or required adapter work.
+- `workload_characteristics` records workload shape, not evaluation outcome:
+  model family, trace type, request pattern, sequence length regime,
+  traffic/topology, scale, dataset, or benchmark configuration.
+- `representativeness_limits` records workload-level caveats such as synthetic
+  traces, outdated benchmarks, small scale, missing multi-tenancy, no tail
+  behavior, unrealistic traffic, narrow model family, or unavailable real
+  traces.
 - `Gap Seeds` must be grounded in at least one source found during the search or
   explicit negative evidence from the search. Structural gap categories belong
   in Section 3 prose, not in the machine-readable `Gap Seeds` table.
+- `Bottlenecks.residual_gap` records the unresolved problem; `Gap Seeds`
+  converts one or more residuals into an actionable idea seed with a mechanism
+  hint, validation target, decisive metric, and kill criterion.
 - When a canon item is weak or missing, write `none_found` or `weak_or_missing`
-  and explain the gap in `blockers_or_limitations`.
+  and explain the gap in `platform_limitations` or
+  `representativeness_limits`.
 - `S*.bottleneck_ids` is a comma-separated list of `B*` IDs (one solution may
   address multiple bottlenecks). Every entry must resolve to a `B*`.
-- Every `EC-P*.validates` entry must resolve to `B*` or `S*`.
 - Every `EC-W*.bottlenecks` entry must resolve to `B*`.
 - Every `G*.bottleneck_id` must resolve to `B*`.
-- Every `G*.source_residual` must point to `B*.residual_gap`, `S*.missing_piece`, or explicit negative evidence.
+- Every `G*.source_gap_ref` must point to `B*.residual_gap`, `S*.missing_piece`, or explicit negative evidence.
 - No Landscape Pack table should exceed 7 columns.
 
 ## Key Rules

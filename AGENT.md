@@ -9,7 +9,14 @@ This ARIS instance is configured for **Computer Architecture / AI Infrastructure
 ## Workflows
 
 **Workflow 1 -- Idea Discovery** (`/idea-discovery "topic"`):
-`research-lit` -> `idea-creator` -> `novelty-check` -> `research-review` -> `research-refine` -> `experiment-plan`
+`research-lit` -> `idea-creator` -> `novelty-check` -> `research-review` -> `research-refine-pipeline`
+
+Canonical chain: research-lit -> idea-creator -> novelty-check -> research-review -> research-refine-pipeline
+
+`research-refine-pipeline` is the public Workflow 1 tail wrapper for
+`research-refine` -> `experiment-plan`. Workflow 1 prepares the selected idea,
+final proposal, and experiment plan; it does not execute pilots or baseline
+reproduction.
 
 **Workflow 1.5 -- Experiment Bridge** (`/experiment-bridge`):
 Reads `refine-logs/EXPERIMENT_PLAN.md` -> implements code -> deploys experiments -> collects initial results in `EXPERIMENT_LOG.md`

@@ -9,6 +9,9 @@ allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, spawn_agent
 
 Bridge a claim-driven architecture experiment plan into executable simulator, analytical, or prototype experiments. This workflow chooses the evaluation backend from the selected idea's `core_baseline` and `canon_mapping`; it does not use a global fixed simulator default.
 
+Workflow 1 handoff fields and the pre-bridge exit gate are defined in
+`../shared-references/idea-handoff-schema.md`.
+
 ## Inputs
 
 Prefer:
@@ -19,22 +22,11 @@ Prefer:
 4. `idea-stage/IDEA_REPORT.md`
 5. `idea-stage/docs/research_contract.md`
 
-Extract:
+Extract the canonical idea handoff fields from
+`../shared-references/idea-handoff-schema.md`, plus:
 
 - claims and success criteria
 - claim boundary and unsupported claims that must not be implied by results
-- `core_baseline`
-- `baseline_evaluability_score`
-- `canon_mapping`
-- `metrics`
-- `target_validation_style`
-- `evaluation_target_clarity`
-- `evaluation_target_feasibility`
-- `baseline_reproducibility`
-- `evaluation_environment_access`
-- `idea_adapter_cost`
-- `pilot_runtime_cost`
-- `handoff_to_workflow_1_5`
 - run order and milestones
 - baselines and ablations
 - required outputs and metrics

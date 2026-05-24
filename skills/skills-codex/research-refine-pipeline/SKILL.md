@@ -27,6 +27,10 @@ For stage-specific detail, read these sibling skills only when needed:
 - `../research-refine/SKILL.md`
 - `../experiment-plan/SKILL.md`
 
+Workflow 1 handoff fields and the exit gate are defined in
+`../shared-references/idea-handoff-schema.md`. The final user-facing checkpoint
+uses `../shared-references/workflow1-checkpoints.md`.
+
 ## Core Rule
 
 Do not plan a large experiment suite on top of an unstable method. First stabilize the thesis. Then turn the stable thesis into experiments.
@@ -141,8 +145,13 @@ Write `refine-logs/PIPELINE_SUMMARY.md`:
 
 At this workflow exit, apply `shared-references/research-contract-maintenance.md` to create or refresh `idea-stage/docs/research_contract.md`.
 This is only a workflow-exit gate; experiment-plan is the semantic owner of `refine-logs/EXPERIMENT_PLAN.md`.
+Run or report the equivalent of `tools/workflow1_exit_gate.sh` before handing
+off to Workflow 1.5.
 
 ### Phase 5: Present a Brief Summary to the User
+
+Use the `Refined proposal ready` checkpoint from
+`../shared-references/workflow1-checkpoints.md`.
 
 ```
 Pipeline complete.
