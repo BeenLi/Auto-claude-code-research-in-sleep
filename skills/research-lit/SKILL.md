@@ -181,12 +181,27 @@ Produce:
   field-level agreement, conflicting findings, quantifiable metrics when
   available, and user-note conflicts or qualifications from Zotero/Obsidian
   when available.
+- Negative evidence: identify 0-5 findings in the candidate set that either
+  (a) refute a field-wide hidden assumption shared by most `S*` solution
+  attempts, (b) report a structural failure mode shared by >=3 mainstream
+  baselines on a benchmark (e.g., near-zero accuracy where the field-standard
+  metric would predict success), or (c) expose a failure mode that aggregate
+  benchmark scores in this topic hide. Incremental "we beat SOTA by X%" results
+  do NOT qualify. Each finding becomes a `NE-*` row in Section 2.5 with
+  `claim`, `source` paper(s), `affected_methods` (list of `S*` IDs or paper
+  names), `affected_assumption`, `confidence` (`high` = independently reproduced
+  or multi-baseline at multiple budgets; `medium` = single-paper multi-baseline;
+  `low` = single-paper single-baseline), and `linked_gaps` (G* IDs that build
+  on this). If no qualifying evidence is present, write `none_identified` as a
+  single row with a one-line reason.
 - Structural gaps use five lenses: cross-domain transfer, contradictory
   findings, untested assumptions, unexplored regimes, and unasked diagnostic
   questions. Produce 1-2 grounded gaps per applicable lens and no more than 8
   total unless the user explicitly requests a broader survey. Every gap must be
-  anchored to a `B*` bottleneck, an `S*` solution attempt, or explicit negative
-  evidence from the search.
+  anchored to a `B*` bottleneck, an `S*` solution attempt, or a `NE-*` negative
+  evidence row from Section 2.5 (when Section 2.5 has `none_identified`, gaps
+  may still cite raw negative evidence from the search but cannot cite
+  `NE-*` IDs).
 - Competitive landscape: top 3 directly competing papers, or fewer when the
   field is sparse with a short reason. Treat directly competing as sharing the
   same `B*` bottleneck, comparable workload class, and comparable
@@ -246,12 +261,23 @@ The saved review must contain:
 - `## Section 0 -- Source Audit` with `Source | Status | Action Taken / Notes`.
 - `## Section 1 -- Paper Table` with `| Paper | Venue | Year | Method | Key Result | Relevance | Source | Verification | Preprint | Full Text | Artifact |`. `Verification` is `verified|unverified|verify_pending|error` from `verified_papers.json`. `Preprint` is `yes|no` (peer-reviewed = `no`). `Full Text` is `yes|no` (use `no` for `NO FULL TEXT` rows). `Artifact` is `yes|partial|no|unknown` (code/data availability, prefer artifact-evaluation badges when present).
 - `## Section 2 -- Landscape Map`.
+- `## Section 2.5 -- Negative Evidence`. Fixed table with columns
+  `| negative_id | claim | source | affected_methods | affected_assumption | confidence | linked_gaps |`.
+  `negative_id` is `NE-1`, `NE-2`, ... `confidence` is `high|medium|low` (see
+  Workflow Step 4 for the rule). `affected_methods` lists `S*` IDs or paper
+  names of methods refuted by the finding; `linked_gaps` lists `G*` IDs from
+  Section 5 Gap Seeds that build on this. If nothing in the candidate set
+  qualifies, the table contains exactly one row: `NE-NONE | none_identified | n/a | n/a | n/a | n/a | n/a` and a one-line reason below.
+  This section is a HARD GATE for `/idea-creator`: ideas whose hidden assumption
+  is listed in `affected_assumption` must either be eliminated or explicitly
+  declare how they evade or address that assumption.
 - `## Section 3 -- Structural Gaps`.
 - `## Section 4 -- Competitive Landscape`.
 - `## Section 5 -- Landscape Pack`.
 
-Section 3 is for human reading. Section 5 is the primary machine-readable handoff
-for `/idea-creator`.
+Section 3 is for human reading. Section 2.5 is a small, structured table read by
+`/idea-creator` as a hard gate. Section 5 is the primary machine-readable
+handoff for `/idea-creator`.
 
 ## Landscape Pack Contract
 
@@ -297,7 +323,8 @@ Gap Seeds table meaning:
 - `gap_id`: stable `G*` ID for downstream references.
 - `bottleneck_id`: primary `B*` bottleneck this seed targets.
 - `source_gap_ref`: evidence pointer for the seed, using `B*.residual_gap`,
-  `S*.missing_piece`, or explicit negative evidence.
+  `S*.missing_piece`, or `NE-*` from Section 2.5 (or raw negative-evidence text
+  when Section 2.5 is `none_identified`).
 - `mechanism_hint`: compact hint for the possible mechanism, measurement, or
   study direction. This is not a complete proposed method.
 - `validation_target`: platform, workload, trace, baseline, simulator,
@@ -335,9 +362,10 @@ Contract rules:
   traces, outdated benchmarks, small scale, missing multi-tenancy, no tail
   behavior, unrealistic traffic, narrow model family, or unavailable real
   traces.
-- `Gap Seeds` must be grounded in at least one source found during the search or
-  explicit negative evidence from the search. Structural gap categories belong
-  in Section 3 prose, not in the machine-readable `Gap Seeds` table.
+- `Gap Seeds` must be grounded in at least one source found during the search,
+  a `NE-*` row from Section 2.5, or raw negative evidence (when Section 2.5 is
+  `none_identified`). Structural gap categories belong in Section 3 prose, not
+  in the machine-readable `Gap Seeds` table.
 - `Bottlenecks.residual_gap` records the unresolved problem; `Gap Seeds`
   converts one or more residuals into an actionable idea seed with a mechanism
   hint, validation target, decisive metric, and kill criterion.
@@ -348,7 +376,7 @@ Contract rules:
   address multiple bottlenecks). Every entry must resolve to a `B*`.
 - Every `EC-W*.bottlenecks` entry must resolve to `B*`.
 - Every `G*.bottleneck_id` must resolve to `B*`.
-- Every `G*.source_gap_ref` must point to `B*.residual_gap`, `S*.missing_piece`, or explicit negative evidence.
+- Every `G*.source_gap_ref` must point to `B*.residual_gap`, `S*.missing_piece`, or a `NE-*` row from Section 2.5 (raw negative-evidence text is only accepted when Section 2.5 is `none_identified`).
 - No Landscape Pack table should exceed 7 columns.
 
 ## Key Rules

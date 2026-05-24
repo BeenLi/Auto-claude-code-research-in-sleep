@@ -193,6 +193,9 @@ Read: idea-stage/LITERATURE_REVIEW.md
 **If found**: Extract these sections:
 - **Section 1** (paper table) → known-papers set for deduplication
 - **Section 2** (landscape map) → sub-direction clusters, what's been tried
+- **Section 2.5** (negative evidence) → `NE-*` table of refuted assumptions and
+  multi-baseline failure modes; **this is a HARD GATE in Phase 3** — every
+  surviving idea must declare a `negative_evidence_response` (see Phase 3 below)
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
 - **Section 4** (competitive landscape) → top competing papers and positioning
 - **Section 5** (Landscape Pack) → topic scope, bottleneck evidence (`Bottlenecks` and `Solution Attempts`), Evaluation Canon (`Platforms` and `Workloads`), and `Gap Seeds`
@@ -200,7 +203,16 @@ Read: idea-stage/LITERATURE_REVIEW.md
 - **Evaluation Canon** → `EC-P*` platform rows and `EC-W*` workload rows commonly used by papers in this topic
 - **Verified evidence for baselines** → verified Section 1 papers/systems and Section 4 competitors that can seed idea-local baseline records
 
-Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {V} verified papers, {M} structural gaps, {K} Gap Seeds, {P} platforms, and {W} workloads for {topic} identified."_
+Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {V} verified papers, {NE} negative-evidence rows, {M} structural gaps, {K} Gap Seeds, {P} platforms, and {W} workloads for {topic} identified."_
+
+If Section 2.5 is absent (i.e., the literature review was produced by an older
+`/research-lit` version), warn:
+> ⚠️ `Section 2.5 -- Negative Evidence` not found. The current `/research-lit`
+> emits a hard-gate `NE-*` table. Re-run `/research-lit "{topic}"` to get the
+> Negative Evidence gate before Phase 3; proceeding without it disables the
+> hard gate and may surface ideas whose hidden assumptions have been refuted.
+Treat the negative-evidence set as empty (`NE-*` absent) but still record this
+in the final report under `idea_health.negative_evidence_gate: skipped`.
 
 **If not found**: Warn the user:
 > ⚠️ No `idea-stage/LITERATURE_REVIEW.md` found. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
@@ -231,6 +243,21 @@ mcp__codex__codex:
     Here is the current landscape (from /research-lit Section 2):
     [paste landscape map — sub-direction clusters]
 
+    Negative evidence (from /research-lit Section 2.5) -- HARD CONSTRAINT:
+    [paste the NE-* table verbatim, including claim, source, affected_methods, affected_assumption, confidence, linked_gaps]
+    Do NOT generate ideas whose hidden assumption matches any NE-*.affected_assumption
+    unless the idea explicitly describes a mechanism that evades or addresses that
+    assumption. For every idea you generate, populate a new field
+    `negative_evidence_response`:
+      - `n/a` if no NE-* affects this idea
+      - `evades: NE-X (reason)` if the idea's mechanism sidesteps the refuted
+        assumption
+      - `addresses: NE-X (mechanism)` if the idea explicitly targets the
+        refuted assumption with a corrective mechanism
+      - `conflicts: NE-X (rationale)` only if the idea proposes to re-test the
+        negative evidence itself (rare; must include why the original finding
+        may not generalize)
+
     Structural gaps identified (from /research-lit Section 3):
     [paste the 5-lens gap analysis: cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions]
 
@@ -258,6 +285,7 @@ mcp__codex__codex:
     7. validation_route_hint: analytical_model | simulator_evaluation | prototype_measurement | unknown
     8. early_risk_notes
     9. estimated_effort: hours | days | weeks | platform_bringup
+    10. negative_evidence_response: `n/a` | `evades: NE-X (reason)` | `addresses: NE-X (mechanism)` | `conflicts: NE-X (rationale)`
 
     Prioritize ideas that are:
     - Grounded in the topic's literature-derived platform/workload canon candidates
@@ -279,6 +307,26 @@ For each generated idea, convert the Phase 2 hints into authoritative ranking an
 1. **Apply hard gates from the rubric**:
    - Reject ideas outside the selected AI infrastructure topic.
    - Reject ideas without a concrete architecture, systems, measurement, benchmark, trace/workload, or mechanism question.
+   - **Negative-evidence hard gate** (when Section 2.5 has any `NE-*` rows):
+     - Reject ideas with `negative_evidence_response = n/a` whose hidden
+       assumption (extracted from `idea_shape` mechanism) matches any
+       `NE-*.affected_assumption`. Re-classify as `eliminated` with reason
+       `refuted_by_NE-X`; do not just downrank.
+     - Accept `evades: NE-X (reason)` only if the reason names a concrete
+       mechanism that does not rely on the refuted assumption. Vague evasions
+       (e.g., "we focus on a different metric") become `needs_canon_clarification`
+       with `main_blocker: unclear_negative_evidence_response`.
+     - Accept `addresses: NE-X (mechanism)` only if the mechanism is a concrete
+       architectural / measurement intervention, not a restatement of the gap.
+       Add `decisive_metric_must_include: NE-X failure mode` to the
+       evaluation_handoff_plan.
+     - Accept `conflicts: NE-X (rationale)` only when the idea is itself a
+       diagnostic re-test of the negative evidence; downrank `overall_merit`
+       by one step (1->2, 2->3) unless the rationale identifies a concrete
+       scope where the original NE-* finding may not generalize.
+     - When Section 2.5 is `none_identified` or absent, this gate is inactive;
+       record `idea_health.negative_evidence_gate: inactive` in the final
+       report rather than skipping silently.
 
 2. **Overall merit estimation**:
    - Run a quick novelty check with 2-3 targeted searches for closest work; full `/novelty-check` comes later for survivors.
@@ -318,6 +366,12 @@ For each surviving idea, run a deeper evaluation:
    For each, play devil's advocate:
    - What's the strongest objection a MICRO/ISCA/HPCA/ASPLOS/NSDI reviewer would raise?
    - What's the most likely failure mode (e.g., bottleneck too small, simulator abstraction too weak, area/power overhead dominates, workload not representative)?
+   - **Negative-evidence audit**: does this idea silently rely on any
+     assumption that Section 2.5's `NE-*` rows have refuted? Is the stated
+     `negative_evidence_response` concrete enough, or is it cosmetic? If
+     `addresses: NE-X`, does the proposed `decisive_metric` actually surface
+     the NE-X failure mode (e.g., credential retention rate, dormant-token
+     recall) and not just hide it behind LongBench/RULER aggregate scores?
    - What overall merit score would you assign, and why?
    - Does the proposed platform/workload mapping cite the right EC-P*/EC-W* items?
    - Is the selected core baseline credible for this idea, and are the chosen metrics decisive?
