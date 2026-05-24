@@ -66,3 +66,8 @@ research-wiki/
 
 # codex local config
 .codex/
+
+# CCB working directories
+.ccb/
+.ccb-requests/
+.ccb-plan-forge/
