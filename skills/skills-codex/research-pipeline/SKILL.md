@@ -14,7 +14,7 @@ End-to-end autonomous research workflow for: **$ARGUMENTS**
 - **AUTO_PROCEED = true** — Controls the full pipeline's Gate 1 idea selection behavior. When `false`, wait for explicit user confirmation before continuing from the ranked ideas to Workflow 1.5.
 - **ARXIV_DOWNLOAD = false** — When `true`, `/research-lit` downloads the top relevant arXiv PDFs during literature survey. When `false` (default), only fetches metadata via arXiv API. Passed through to `/idea-discovery` → `/research-lit`.
 - **HUMAN_CHECKPOINT = false** — When `true`, the auto-review loops (Stage 4) pause after each round's review to let you see the score and provide custom modification instructions before fixes are implemented. When `false` (default), loops run fully autonomously. Passed through to `/auto-review-loop`.
-- **REVIEWER_DIFFICULTY = medium** — How adversarial the reviewer is. `medium` (default): standard MCP review. `hard`: adds reviewer memory + debate protocol. `nightmare`: GPT reads repo directly via `codex exec` + memory + debate. Passed through to `/auto-review-loop`.
+- **REVIEWER_DIFFICULTY = medium** — How adversarial the reviewer is. `medium` (default): standard MCP review. `hard`: adds **Reviewer Memory** + **Debate Protocol**. `nightmare`: GPT reads repo directly via `codex exec` + memory + debate. Passed through to `/auto-review-loop`.
 - **AUTO_WRITE = false** — When `true`, automatically invoke Workflow 3 (`/paper-writing`) after Stage 5. Requires `VENUE` to be set. When `false` (default), Stage 5 generates `NARRATIVE_REPORT.md` and stops — user invokes `/paper-writing` manually.
 - **VENUE = ACM** — Target venue template family for paper writing (Stage 6). Only used when `AUTO_WRITE=true`. Options include `ACM`, `IEEE_CONF`, `IEEE_JOURNAL`, or any configured local venue template.
 
@@ -50,6 +50,8 @@ Invoke the idea discovery pipeline:
 This internally runs: `/research-lit` -> `/idea-creator` -> `/novelty-check` -> `/research-review` -> `/research-refine-pipeline`
 
 **Output:** `idea-stage/IDEA_REPORT.md`, optional `idea-stage/IDEA_CANDIDATES.md`, `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md`, and `idea-stage/docs/research_contract.md`. Handoff fields must follow `../shared-references/idea-handoff-schema.md`.
+
+**Review Tracing** follows the downstream review skills. Stage 1 and Stage 3 preserve reviewer prompts/responses through their own trace protocols so the final handoff can be audited.
 
 **🚦 Gate 1 — Human Checkpoint:**
 

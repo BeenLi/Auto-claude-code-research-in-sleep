@@ -32,6 +32,7 @@ Workflow-specific:
 — venue: ICLR | NeurIPS | ICML | ...        # target venue
 — sources: web, zotero, deepxiv, ...        # literature sources
 — gpu: local | remote | vast | modal         # GPU backend
+— reviewer: codex | oracle-pro | manual      # reviewer routing
 ```
 
 Parameters pass through workflow chains automatically.
