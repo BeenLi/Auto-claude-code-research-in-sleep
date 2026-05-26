@@ -39,7 +39,7 @@ Shared references:
 
 ### Stage 1: Idea Discovery (Workflow 1)
 
-If `RESEARCH_BRIEF.md` exists in the project root, it will be automatically loaded as detailed context (replaces one-line prompt). See `templates/RESEARCH_BRIEF_TEMPLATE.md`.
+To use a research brief, pass its `.md` path explicitly as `$ARGUMENTS`, e.g. `/research-pipeline "idea-stage/RESEARCH_BRIEF.md"`. A root `RESEARCH_BRIEF.md` is not auto-loaded. See `templates/RESEARCH_BRIEF_TEMPLATE.md`.
 
 Invoke the idea discovery pipeline:
 

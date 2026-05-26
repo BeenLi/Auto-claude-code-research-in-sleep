@@ -34,6 +34,15 @@ def run_tool(script: str, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def run_python_tool(script: str, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["python3", str(REPO_ROOT / "tools" / script), *args],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+
+
 def test_workflow1_chain_is_canonical_across_entrypoints() -> None:
     canonical = (
         "research-lit -> idea-creator -> novelty-check -> research-review -> "
@@ -99,6 +108,7 @@ def test_handoff_schema_is_single_shared_reference() -> None:
         "pilot_runtime_cost",
         "handoff_to_workflow_1_5",
         "main_blocker",
+        "negative_evidence_response",
     ]
     for field in required_fields:
         assert field in schema
@@ -158,6 +168,49 @@ def test_workflow1_checkpoint_reference_exists_and_is_used() -> None:
         assert "shared-references/workflow1-checkpoints.md" in read(relative_path)
 
 
+def test_research_lit_landscape_pack_section_matches_idea_creator_reader() -> None:
+    research_lit = read("skills/research-lit/SKILL.md")
+    idea_creator = read("skills/idea-creator/SKILL.md")
+
+    assert "`## Section 4 -- Landscape Pack`" in research_lit
+    assert "Section 4" in idea_creator
+    assert "Landscape Pack" in idea_creator
+    assert "Section 5" not in idea_creator
+
+
+def test_research_pipeline_requires_explicit_brief_path() -> None:
+    stage1 = research_pipeline_stage1()
+
+    assert "RESEARCH_BRIEF.md" in stage1
+    assert "explicit" in stage1
+    assert "automatically loaded" not in stage1
+    assert "If `RESEARCH_BRIEF.md` exists in the project root" not in stage1
+
+
+def test_reference_paper_extraction_has_single_owner() -> None:
+    idea_discovery = read("skills/idea-discovery/SKILL.md")
+    research_lit = read("skills/research-lit/SKILL.md")
+
+    assert "/research-lit` handles" in idea_discovery
+    assert "idea-stage/REF_PAPER_SUMMARY.md" in research_lit
+    assert "### Phase 0.5: Reference Paper Summary" not in idea_discovery
+    assert "Summarize the reference paper in full before searching" not in idea_discovery
+
+
+def test_codex_skill_mirror_is_fresh() -> None:
+    result = run_python_tool("sync_codex_skill_mirror.py", "--dry-run")
+
+    assert result.returncode == 0
+    assert "changes: 0" in result.stdout
+
+
+def test_aris_cache_is_ignored() -> None:
+    gitignore = read(".gitignore")
+
+    assert ".aris/cache/" in gitignore
+    assert ".aris/verify-papers/" in gitignore
+
+
 def test_inject_default_sources_preserves_explicit_sources() -> None:
     result = run_tool("inject_default_sources.sh", "KV cache — sources: zotero, arxiv")
 
@@ -178,13 +231,13 @@ READY_HANDOFF_HEADER = (
     "| Idea | baseline_evaluability_score | core_baseline | canon_mapping | metrics | "
     "target_validation_style | evaluation_target_clarity | evaluation_target_feasibility | "
     "evaluation_environment_access | idea_adapter_cost | pilot_runtime_cost | "
-    "handoff_to_workflow_1_5 | main_blocker |"
+    "negative_evidence_response | handoff_to_workflow_1_5 | main_blocker |"
 )
 READY_HANDOFF_DIVIDER = (
     "|------|-----------------------------|---------------|---------------|---------|"
     "-------------------------|---------------------------|-------------------------------|"
     "-------------------------------|-------------------|--------------------|"
-    "-------------------------|--------------|"
+    "----------------------------|-------------------------|--------------|"
 )
 
 
@@ -216,7 +269,7 @@ def test_workflow1_exit_gate_accepts_valid_ready_handoff(tmp_path: Path) -> None
             "| Idea 1 | 2 | IB1 verified system addresses B1/S1 | "
             "platform=[EC-P1]; workload=[EC-W1] | p99 latency | "
             "simulator_evaluation | clear | high | "
-            "ready | small_local_patch | minutes_to_hours | ready | none |"
+            "ready | small_local_patch | minutes_to_hours | n/a | ready | none |"
         )
     )
 
@@ -285,7 +338,7 @@ def test_workflow1_exit_gate_rejects_invalid_canon_ids(tmp_path: Path) -> None:
             "| Idea 1 | 2 | IB1 verified system addresses B1/S1 | "
             "platform=[GPU]; workload=[trace] | p99 latency | "
             "simulator_evaluation | clear | high | "
-            "ready | small_local_patch | minutes_to_hours | ready | none |"
+            "ready | small_local_patch | minutes_to_hours | n/a | ready | none |"
         )
     )
 
@@ -314,7 +367,7 @@ def test_workflow1_exit_gate_rejects_zero_score_ready_handoff(tmp_path: Path) ->
             "| Idea 1 | 0 | IB1 unavailable system addresses B1 | "
             "platform=[EC-P1]; workload=[EC-W1] | p99 latency | "
             "simulator_evaluation | clear | low | "
-            "ready | small_local_patch | minutes_to_hours | ready | none |"
+            "ready | small_local_patch | minutes_to_hours | n/a | ready | none |"
         )
     )
 
@@ -335,7 +388,7 @@ def test_workflow1_exit_gate_rejects_zero_score_ready_handoff(tmp_path: Path) ->
 
 
 def test_workflow1_exit_gate_rejects_missing_required_field(tmp_path: Path) -> None:
-    """All 8 schema-required fields must be present and non-empty."""
+    """All schema-required fields must be present and non-empty."""
     idea_report = tmp_path / "IDEA_REPORT.md"
     experiment_plan, final_proposal = _write_supporting_artifacts(tmp_path)
     # idea_adapter_cost left blank.
@@ -344,7 +397,7 @@ def test_workflow1_exit_gate_rejects_missing_required_field(tmp_path: Path) -> N
             "| Idea 1 | 2 | IB1 verified system | "
             "platform=[EC-P1]; workload=[EC-W1] | p99 latency | "
             "simulator_evaluation | clear | high | "
-            "ready |  | minutes_to_hours | ready | none |"
+            "ready |  | minutes_to_hours | n/a | ready | none |"
         )
     )
 
@@ -375,11 +428,11 @@ def test_workflow1_exit_gate_exact_label_match_avoids_idea_10_collision(
             "| Idea 10 | 2 | IB10 verified system | "
             "platform=[EC-P1]; workload=[EC-W1] | p99 latency | "
             "simulator_evaluation | clear | high | "
-            "ready | small_local_patch | minutes_to_hours | ready | none |\n"
+            "ready | small_local_patch | minutes_to_hours | n/a | ready | none |\n"
             "| Idea 1 | 2 | IB1 verified system | "
             "platform=[EC-P2]; workload=[EC-W2] | p99 latency | "
             "simulator_evaluation | clear | high | "
-            "ready | small_local_patch | minutes_to_hours | ready | none |"
+            "ready | small_local_patch | minutes_to_hours | n/a | ready | none |"
         )
     )
 
@@ -426,9 +479,40 @@ def test_idea_report_template_carries_gate_required_columns() -> None:
         "baseline_evaluability_score",
         "handoff_to_workflow_1_5",
         "main_blocker",
+        "negative_evidence_response",
     ]
     for column in required_columns:
         assert column in header_columns, (
             f"IDEA_REPORT_TEMPLATE.md handoff table is missing column {column!r}; "
             "downstream tools/workflow1_exit_gate.sh will fail on this template."
         )
+
+
+def test_idea_templates_preserve_negative_evidence_response() -> None:
+    for relative_path in [
+        "templates/IDEA_REPORT_TEMPLATE.md",
+        "templates/IDEA_CANDIDATES_TEMPLATE.md",
+    ]:
+        assert "negative_evidence_response" in read(relative_path)
+
+
+def test_workflow1_consumers_preserve_negative_evidence_response() -> None:
+    for relative_path in [
+        "tools/workflow1_exit_gate.sh",
+        "skills/experiment-plan/SKILL.md",
+        "skills/experiment-bridge/SKILL.md",
+        "skills/shared-references/integration-contract.md",
+    ]:
+        assert "negative_evidence_response" in read(relative_path)
+
+
+def test_research_playbook_matches_current_workflow1_sections() -> None:
+    playbook = read("docs/ARIS-Architecture-Research-Playbook.md")
+
+    assert "Section 2.5" in playbook
+    assert "Negative Evidence" in playbook
+    assert "NE-*" in playbook
+    assert "Section 4 `Landscape Pack`" in playbook
+    assert "Section 5 `Landscape Pack`" not in playbook
+    assert "Section 5 Landscape Pack" not in playbook
+    assert "Section 4 `Competitive Landscape`" not in playbook

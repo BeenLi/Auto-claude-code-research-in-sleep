@@ -17,6 +17,7 @@
 ### Idea 1: [title] -- RECOMMENDED
 
 - **Idea shape**: [compact summary of gap, mechanism/study, and why the answer matters]
+- **negative_evidence_response**: [n/a | evades: NE-* (...) | addresses: NE-* (...) | conflicts: NE-* (...)]
 - **Status**: selected
 - **Overall merit**: [1-4] -- [rationale]
 - **Evaluation handoff**: follow `skills/shared-references/idea-handoff-schema.md`
@@ -27,6 +28,7 @@
 ### Idea 2: [title] -- BACKUP
 
 - **Idea shape**:
+- **negative_evidence_response**:
 - **Status**: backup
 - **Overall merit**:
 - **Evaluation handoff**: follow `skills/shared-references/idea-handoff-schema.md`
@@ -49,9 +51,9 @@
 Use the canonical fields and domains in
 `skills/shared-references/idea-handoff-schema.md`.
 
-| Idea | overall_merit_score | evaluation_target_feasibility | baseline_evaluability_score | core_baseline | canon_mapping | metrics | target_validation_style | evaluation_target_clarity | evaluation_environment_access | idea_adapter_cost | pilot_runtime_cost | handoff_to_workflow_1_5 | main_blocker |
-|------|---------------------|-------------------------------|----------------------------|---------------|---------------|---------|-------------------------|---------------------------|-------------------------------|-------------------|--------------------|-------------------------|--------------|
-| Idea 1 | 1 | high | 2 | IB1: verified system | platform=[EC-P1]; workload=[EC-W1] | [metric] | simulator_evaluation | clear | ready | small_local_patch | minutes_to_hours | ready | none |
+| Idea | overall_merit_score | evaluation_target_feasibility | baseline_evaluability_score | core_baseline | canon_mapping | metrics | target_validation_style | evaluation_target_clarity | evaluation_environment_access | idea_adapter_cost | pilot_runtime_cost | negative_evidence_response | handoff_to_workflow_1_5 | main_blocker |
+|------|---------------------|-------------------------------|----------------------------|---------------|---------------|---------|-------------------------|---------------------------|-------------------------------|-------------------|--------------------|----------------------------|-------------------------|--------------|
+| Idea 1 | 1 | high | 2 | IB1: verified system | platform=[EC-P1]; workload=[EC-W1] | [metric] | simulator_evaluation | clear | ready | small_local_patch | minutes_to_hours | n/a | ready | none |
 
 ## Refined Proposal
 

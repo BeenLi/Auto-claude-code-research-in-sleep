@@ -227,7 +227,7 @@ def test_research_lit_declares_mandatory_paper_verification_gate() -> None:
     assert "command -v python3" not in text
     assert "verifier_missing" not in text
 
-    assert "| Paper | Venue | Year | Method | Key Result | Relevance | Source | Verification | Preprint | Full Text | Artifact |" in text
+    assert "| Paper | Venue | Year | Method | Key Result | Eval Platform | Workload | Baseline | Relevance | Source | Verification | Preprint | Full Text | Artifact |" in text
 
 
 def test_idea_creator_requires_idea_local_verified_baselines() -> None:

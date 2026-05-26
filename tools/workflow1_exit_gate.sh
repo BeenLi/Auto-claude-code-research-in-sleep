@@ -39,8 +39,8 @@ The gate enforces every required field listed in
 - `canon_mapping` references both `EC-P*` and `EC-W*`.
 - core_baseline, metrics, target_validation_style,
   evaluation_target_clarity, evaluation_target_feasibility,
-  evaluation_environment_access, idea_adapter_cost, pilot_runtime_cost
-  are all present and non-empty.
+  evaluation_environment_access, idea_adapter_cost, pilot_runtime_cost,
+  negative_evidence_response are all present and non-empty.
 
 Selected idea matching is case-insensitive exact match first; if that
 misses, the gate falls back to "selected value is a prefix of the row's
@@ -187,6 +187,7 @@ required_nonempty = [
     "evaluation_environment_access",
     "idea_adapter_cost",
     "pilot_runtime_cost",
+    "negative_evidence_response",
 ]
 for key in required_nonempty:
     if key not in record:

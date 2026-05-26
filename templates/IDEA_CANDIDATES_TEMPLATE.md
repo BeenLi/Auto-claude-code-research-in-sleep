@@ -9,11 +9,11 @@
 
 ## Candidates
 
-| # | Idea | Overall Merit | Feasibility | Baseline Record | Canon Mapping | Handoff | Status |
-|---|------|---------------|-------------|-----------------|---------------|---------|--------|
-| 1 | [title] | 1 | high | IB1 | platform=[EC-P1]; workload=[EC-W1] | ready | selected |
-| 2 | [title] | 2 | medium | IB2 | platform=[EC-P2]; workload=[EC-W2] | ready | backup |
-| 3 | [title] | 1 | low | IB3 | platform=[EC-P3]; workload=[EC-W3] | designed_not_run | deferred |
+| # | Idea | Overall Merit | Feasibility | Baseline Record | Canon Mapping | Negative Evidence | Handoff | Status |
+|---|------|---------------|-------------|-----------------|---------------|-------------------|---------|--------|
+| 1 | [title] | 1 | high | IB1 | platform=[EC-P1]; workload=[EC-W1] | n/a | ready | selected |
+| 2 | [title] | 2 | medium | IB2 | platform=[EC-P2]; workload=[EC-W2] | addresses: NE-* (...) | ready | backup |
+| 3 | [title] | 1 | low | IB3 | platform=[EC-P3]; workload=[EC-W3] | conflicts: NE-* (...) | designed_not_run | deferred |
 
 ## Active Idea: #1 -- [title]
 
@@ -23,6 +23,7 @@ Use `skills/shared-references/idea-handoff-schema.md` for field domains.
 - **core_baseline**:
 - **baseline_evaluability_score**:
 - **canon_mapping**:
+- **negative_evidence_response**:
 - **metrics**:
 - **target_validation_style**:
 - **evaluation_target_clarity**:

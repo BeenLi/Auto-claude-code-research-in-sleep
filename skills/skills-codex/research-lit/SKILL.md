@@ -7,7 +7,7 @@ allowed-tools: Bash(*), Read, Glob, Grep, WebSearch, WebFetch, Write, Agent, mcp
 
 # Research Literature Review
 
-Research topic: $ARGUMENTS
+Research topic: $ARGUMENTS  _(if $ARGUMENTS is a `.md` path, topic and context are extracted from the brief in Step 0)_
 
 ## Role In The Workflow
 
@@ -104,6 +104,100 @@ details, use `references/search-sources.md`.
 
 ## Workflow
 
+### 0. Detect Input Mode and Load Context
+
+Detect the input mode from `$ARGUMENTS` before any other step. Modes are
+mutually exclusive — do not combine a topic string with research brief or paper reference.
+Log one line after detection: `Input mode: <1|2|3> — <topic | brief path | paper title/URL>`
+
+| Mode | Detection rule | Search framing |
+| --- | --- | --- |
+| 1 — Topic | Plain string; does not match mode 2 or 3 rules | Broad exploration of the topic area |
+| 2 — Research Brief | Ends with `.md` and the file exists | Scoped, constrained search driven by stated intent |
+| 3 — Reference Paper | Matches `http(s)://`, bare arXiv ID (`\d{4}\.\d{4,5}`), DOI (`10\.\d{4,}/`), or ends with `.pdf` | "Can we improve this?" — treat paper as SOTA; search for competing/related work |
+
+Canonical examples:
+
+```text
+/research-lit "KV cache CXL"                                    (mode 1 — topic)
+/research-lit "idea-stage/RESEARCH_BRIEF.md"                    (mode 2 — brief)
+/research-lit "https://arxiv.org/abs/2406.04329"                (mode 3 — arXiv URL)
+/research-lit "2406.04329"                                      (mode 3 — bare arXiv ID)
+/research-lit "papers/baseline.pdf"                             (mode 3 — local PDF)
+/research-lit "10.1145/3725843.3756079"                         (mode 3 — DOI)
+```
+
+#### Mode 1 — Topic
+
+If `$ARGUMENTS` is a plain string, use it as the research topic. Broad exploration of the topic area.
+
+#### Mode 2 — Research Brief
+
+If `$ARGUMENTS` ends with `.md` and the file exists, read it and extract the
+following fields before any other step. These extracted values replace
+`$ARGUMENTS` as the effective research context for all subsequent steps.
+
+| Field | Source section in Brief | How it is used |
+| --- | --- | --- |
+| `topic` | Title line + `## Problem Statement` (first 2 sentences) | Replaces `$ARGUMENTS` as the search direction |
+| `known_papers` | `## Background` → `Key papers I've read` bullet list | Must be included in Step 3 Analyze Papers — treat as mandatory coverage; discovered through normal search flow |
+| `constraints` | `## Constraints` | Scope the search: honour venue/timeline focus, limit evaluation platforms to those listed |
+| `non_goals` | `## Non-Goals` | Exclude these directions from gap analysis and Gap Seeds |
+| `domain_knowledge` | `## Domain Knowledge` | Seed query variants and inform cluster framing in Section 2 |
+
+Extraction rules:
+- Parse with best effort; missing sections are silently skipped.
+- `known_papers`: extract each bullet's paper title (bold or plain) and any URL present.
+- `constraints.venue`: if listed, prefer papers and evaluation setups relevant to that venue's scope.
+- After extraction, log: `Brief loaded: topic="<topic>", known=<N> papers, non-goals=<N>`.
+- If the file does not exist or cannot be read, fall back to treating `$ARGUMENTS` as a plain topic string.
+
+#### Mode 3 — Reference Paper
+
+Fetch and read the **complete paper** — no page limit; this paper is the
+primary research input and must be fully understood before searching.
+
+- arXiv URL or bare ID: download PDF via the arxiv adapter or fetch full text via WebFetch.
+- Local PDF path (ends with `.pdf`): read the complete PDF.
+- DOI or other URL: fetch full content via WebFetch.
+
+Extract from the full paper: `title`, `authors`, `venue`, `year`, `problem`
+(primary problem the paper addresses), `method` (core technical approach),
+`key_results` (main quantitative findings), `limitations` (acknowledged or
+inferable weaknesses), `open_questions` (future work or unresolved issues).
+
+Write `idea-stage/REF_PAPER_SUMMARY.md` before continuing:
+
+```markdown
+# Reference Paper Summary
+
+**Title**: [paper title]
+**Authors**: [authors]
+**Venue**: [venue, year]
+
+## What They Did
+[2-3 sentences: core method and contribution]
+
+## Key Results
+[Main quantitative findings]
+
+## Limitations & Open Questions
+[What the paper did not solve, acknowledged weaknesses, future work suggestions]
+
+## Potential Improvement Directions
+[Directions implied by the limitations and open questions]
+```
+
+Derive `topic` from `problem`. Add this paper to `known_papers` as mandatory
+coverage. Apply this framing to all subsequent steps:
+
+> **SOTA baseline framing**: this paper is the current best-known solution.
+> Search for competing and related work. Section 2 clusters ask "where does
+> this paper plateau?" Gap Seeds ask "what does this paper leave unsolved,
+> and how could it be improved or extended?"
+
+Log: `Ref paper loaded: title="<title>", topic derived="<topic>", venue="<venue> <year>"`.
+
 ### 1. Load Prior Review
 
 If `idea-stage/LITERATURE_REVIEW.md` exists, load it first. Treat existing
@@ -152,55 +246,95 @@ Handling rules:
 
 ### 3. Analyze Papers
 
-For every relevant paper, extract:
+For every relevant paper, extract and write into Section 1:
 
-- Problem, method, key result, limitations, and relevance
-- Source labels and whether it was already known or newly added
+- Problem, method, key result, limitations, and relevance.
+- Source labels and whether it was already known or newly added.
 - Verification status from `.aris/verify-papers/verified_papers.json`.
-- Evaluation platform/substrate, benchmark/workload/trace, comparison systems,
-  metrics, artifact/code status, and evaluation limitations.
+- Evaluation platform/substrate → `Eval Platform` column (e.g., `BF3 DPU`, `A100 cluster`, `LLMServingSim`); use `none/NA` when not reported.
+- Benchmark/workload/trace → `Workload` column (e.g., `NCCL AllReduce`, `GPT-3 175B prefill`); use `none/NA` when not reported.
+- Comparison systems → `Baseline` column (e.g., `raw RDMA`, `PEDAL`, `vLLM 0.4`); use `none/NA` when not reported.
+- Metrics, artifact/code status, and evaluation limitations (these feed Section 4 Evaluation Canon `EC-P*`/`EC-W*` rows).
 
 ### 4. Synthesize Landscape
 
-Produce:
+Mint `B*`/`S*`/`C*`/`EC-P*`/`EC-W*`/`G*` IDs while drafting Section 4 first, then
+backfill those IDs into Sections 2-3 prose; if any Section 2-3 paragraph was drafted
+before the ID existed, backfill the citation before saving.
 
-- Landscape map: 3-6 clusters keyed by concrete unresolved problems or
-  bottlenecks specific to the current topic, not generic systems-domain
-  headings. For a topic such as `KV cache CXL`, prefer clusters like
-  "page-granular CXL migration still causes tail-latency spikes" over a broad
-  resource label. For broad topics, still phrase each cluster as one primary
-  unresolved problem or bottleneck. For each cluster, state the unresolved
-  problem/bottleneck, solution attempts already tried, what those attempts
-  achieved and where they plateau, scenario/evaluation limitations including
-  workload coverage, hardware coverage, artifact maturity, and
-  `EC-P*.platform_limitations` / `EC-W*.representativeness_limits` references
-  where applicable, the hardware generation or `hardware-agnostic` status, and the
-  workload/model-size class when evidence permits. These problem clusters
-  should directly ground Section 5 `B*` bottlenecks and `S*` solution attempts.
-- Consensus and disagreements belong in Section 2: for each cluster, summarize
-  field-level agreement, conflicting findings, quantifiable metrics when
-  available, and user-note conflicts or qualifications from Zotero/Obsidian
-  when available.
-- Structural gaps use five lenses: cross-domain transfer, contradictory
-  findings, untested assumptions, unexplored regimes, and unasked diagnostic
-  questions. Produce 1-2 grounded gaps per applicable lens and no more than 8
-  total unless the user explicitly requests a broader survey. Every gap must be
-  anchored to a `B*` bottleneck, an `S*` solution attempt, or explicit negative
-  evidence from the search.
-- Competitive landscape: top 3 directly competing papers, or fewer when the
-  field is sparse with a short reason. Treat directly competing as sharing the
-  same `B*` bottleneck, comparable workload class, and comparable
-  hardware/system tier when possible. Identify what each competitor solves and
-  where it leaves residual evaluation or mechanism gaps; do not mint global
-  baseline candidates here.
-- `Landscape Pack`: the fixed handoff schema below. Treat Section 5 as the
-  ID-backed projection of Sections 2-4, not as a parallel summary. Mint
-  `B*`/`S*`/`EC-P*`/`EC-W*`/`G*` IDs while drafting the Landscape Pack schema
-  first, then cite those same IDs in Sections 2-4 prose; if any Section 2-4
-  paragraph was drafted before the ID existed, backfill the citation before
-  saving. Section 3 carries lens-shaped narrative; `Gap Seeds` carries
-  actionable `G*` rows derived from `B*.residual_gap`,
-  `S*.missing_piece`, or explicit negative evidence.
+#### Section 2 -- Problem-Anchored Clusters
+
+Produce 3-6 clusters keyed by concrete unresolved problems or bottlenecks specific to
+the current topic, not generic systems-domain headings. For a topic such as `KV cache
+CXL`, prefer clusters like "page-granular CXL migration still causes tail-latency
+spikes" over a broad resource label. For broad topics, still phrase each cluster as one
+primary unresolved problem or bottleneck. For each cluster, state the unresolved
+problem/bottleneck, solution attempts already tried, what those attempts achieved and
+where they plateau, scenario/evaluation limitations including workload coverage,
+hardware coverage, artifact maturity, and `EC-P*.platform_limitations` /
+`EC-W*.representativeness_limits` references where applicable, the hardware generation
+or `hardware-agnostic` status, and the workload/model-size class when evidence permits.
+These problem clusters should directly ground Section 4 `B*` bottlenecks and `S*`
+solution attempts.
+
+For each cluster also summarize field-level agreement, conflicting findings,
+quantifiable metrics when available, and user-note conflicts or qualifications from
+Zotero/Obsidian when available.
+
+#### Section 2.5 -- Negative Evidence
+
+Identify 0-5 findings in the candidate set that either (a) refute a field-wide hidden
+assumption shared by most `S*` solution attempts, (b) report a structural failure mode
+shared by >=3 mainstream baselines on a benchmark (e.g., near-zero accuracy where the
+field-standard metric would predict success), or (c) expose a failure mode that
+aggregate benchmark scores in this topic hide. Incremental "we beat SOTA by X%" results
+do NOT qualify. Each finding becomes a `NE-*` row in Section 2.5 with `claim`,
+`source` paper(s), `affected_methods` (list of `S*` IDs or paper names),
+`affected_assumption`, `confidence` (`high` = independently reproduced or multi-baseline
+at multiple budgets; `medium` = single-paper multi-baseline; `low` = single-paper
+single-baseline), and `linked_gaps` (G* IDs that build on this). If no qualifying
+evidence is present, write `none_identified` as a single row with a one-line reason.
+
+#### Section 3 -- Structural Gaps
+
+Use five lenses: cross-domain transfer, contradictory findings, untested assumptions,
+unexplored regimes, and unasked diagnostic questions. Produce 1-2 grounded gaps per
+applicable lens and no more than 8 total unless the user explicitly requests a broader
+survey. Every gap must be anchored to a `B*` bottleneck, an `S*` solution attempt, or a
+`NE-*` negative evidence row from Section 2.5 (when Section 2.5 has `none_identified`,
+gaps may still cite raw negative evidence from the search but cannot cite `NE-*` IDs).
+
+#### Section 4 -- Landscape Pack
+
+Section 4 is the machine-readable handoff for `/idea-creator`. Treat it as the
+ID-backed projection of Sections 2-3, not as a parallel summary. Section 3 carries
+lens-shaped narrative; `Gap Seeds` carries actionable `G*` rows derived from
+`B*.residual_gap`, `S*.missing_piece`, or explicit negative evidence.
+
+The `Competitive Landscape` sub-section of Section 4 contains the top 3 directly
+competing papers (or fewer when the field is sparse, with a one-line reason). Treat
+directly competing as sharing the same primary `B*` bottleneck, comparable workload
+class, and comparable hardware/system tier when possible. Identify what each competitor
+solves and where it leaves residual evaluation or mechanism gaps; do not mint global
+baseline candidates here. Write the two fixed sub-tables (Competitors + Excluded
+Competitors) defined in `## Landscape Pack Contract`. Hard rules:
+
+- `selection_rule`: rank candidates by (1) workload-class overlap with the scope's
+  `decisive_metrics`, then (2) `best_outcome` on those metrics, then (3) recency;
+  break further ties by preferring papers with public artifact. Record the chosen rule
+  in one line above the Competitors table when it deviates from this default.
+- Scope is anchored to a single `primary_B*`. Cross-bottleneck competitors belong in
+  the same Competitors table with their `B*_scope` cell written as
+  `B<primary> (adj: B<secondary>, ...)`. Do not split the Competitive Landscape
+  sub-section into multiple Competitors tables per bottleneck.
+- NE-* coupling (hard gate): every paper appearing in the `source` column of a `NE-*`
+  row in Section 2.5, when it shares the `primary_B*`, must appear either in the
+  Competitors table or in the Excluded Competitors table. If excluded,
+  `excluded_reason` must explain why the negative evidence does not warrant inclusion
+  (e.g., different `eval_tier`).
+- Excluded Competitors table is required (not optional) whenever any paper from a
+  shared `B*` is dropped from the top-3. Use `none_excluded` as a single placeholder
+  row when no qualifying paper was dropped.
 
 ### 5. Save Outputs
 
@@ -244,21 +378,38 @@ The saved review must contain:
 
 - Header: generation UTC timestamp, skill name, and original topic.
 - `## Section 0 -- Source Audit` with `Source | Status | Action Taken / Notes`.
-- `## Section 1 -- Paper Table` with `| Paper | Venue | Year | Method | Key Result | Relevance | Source | Verification | Preprint | Full Text | Artifact |`. `Verification` is `verified|unverified|verify_pending|error` from `verified_papers.json`. `Preprint` is `yes|no` (peer-reviewed = `no`). `Full Text` is `yes|no` (use `no` for `NO FULL TEXT` rows). `Artifact` is `yes|partial|no|unknown` (code/data availability, prefer artifact-evaluation badges when present).
-- `## Section 2 -- Landscape Map`.
+- `## Section 1 -- Paper Table` with `| Paper | Venue | Year | Method | Key Result | Eval Platform | Workload | Baseline | Relevance | Source | Verification | Preprint | Full Text | Artifact |`. `Verification` is `verified|unverified|verify_pending|error` from `verified_papers.json`. `Preprint` is `yes|no` (peer-reviewed = `no`). `Full Text` is `yes|no` (use `no` for `NO FULL TEXT` rows). `Artifact` is `yes|partial|no|unknown` (code/data availability, prefer artifact-evaluation badges when present). `Eval Platform` is the hardware/system/simulator used (e.g., `BF3 DPU`, `A100 cluster`, `LLMServingSim`). `Workload` is the benchmark, trace, or task class (e.g., `NCCL AllReduce`, `GPT-3 prefill`). `Baseline` is the primary comparison system(s) (e.g., `raw RDMA`, `PEDAL`). All three use `none/NA` when not reported.
+- `## Section 2 -- Problem-Anchored Clusters`.
+- `## Section 2.5 -- Negative Evidence`. Fixed table with columns
+  `| negative_id | claim | source | affected_methods | affected_assumption | confidence | linked_gaps |`.
+  `negative_id` is `NE-1`, `NE-2`, ... `confidence` is `high|medium|low` (see
+  Workflow Step 4 for the rule). `affected_methods` lists `S*` IDs or paper
+  names of methods refuted by the finding; `linked_gaps` lists `G*` IDs from
+  Section 4 Gap Seeds that build on this. If nothing in the candidate set
+  qualifies, the table contains exactly one row: `NE-NONE | none_identified | n/a | n/a | n/a | n/a | n/a` and a one-line reason below.
+  This section is a HARD GATE for `/idea-creator`: ideas whose hidden assumption
+  is listed in `affected_assumption` must either be eliminated or explicitly
+  declare how they evade or address that assumption.
 - `## Section 3 -- Structural Gaps`.
-- `## Section 4 -- Competitive Landscape`.
-- `## Section 5 -- Landscape Pack`.
+- `## Section 4 -- Landscape Pack`. Contains sub-sections: `Topic Scope`,
+  `Bottleneck Evidence`, `Evaluation Canon`, `Gap Seeds`, and
+  `Competitive Landscape`. The `Competitive Landscape` sub-section holds two
+  fixed tables (Competitors + Excluded Competitors); see `## Landscape Pack
+  Contract` for the full schema and field rules.
 
-Section 3 is for human reading. Section 5 is the primary machine-readable handoff
-for `/idea-creator`.
+Section 3 is for human reading. Section 2.5 is a small, structured table read by
+`/idea-creator` as a hard gate. Section 4 is the primary machine-readable
+handoff for `/idea-creator`.
 
 ## Landscape Pack Contract
 
-Keep these headings and field names stable.
+Keep these headings and field names stable. In all `representative_papers` cells use
+Markdown link format: `[Short Title](URL)` where URL is `https://doi.org/<DOI>` for
+peer-reviewed papers or `https://arxiv.org/abs/<ID>` for preprints; fall back to a
+plain title when no confirmed URL is available.
 
 ```markdown
-## Landscape Pack
+## Section 4 -- Landscape Pack
 
 ### Topic Scope
 - original_topic:
@@ -283,73 +434,132 @@ Keep these headings and field names stable.
 | workload_id | workload | bottlenecks | workload_characteristics | representative_papers | representativeness_limits |
 | --- | --- | --- | --- | --- | --- |
 
+### Competitive Landscape
+
+selection_rule: <rule>  _(omit this line when the default rule was used)_
+
+#### Competitors
+| competitor_id | papers | B*_scope | eval_tier | what_it_solves | residual_gap | NE_link |
+| --- | --- | --- | --- | --- | --- | --- |
+
+#### Excluded Competitors
+| excluded_paper | shared_B* | eval_tier | excluded_reason | revisit_condition |
+| --- | --- | --- | --- | --- |
+
 ### Gap Seeds
 | gap_id | bottleneck_id | source_gap_ref | mechanism_hint | validation_target | decisive_metric | kill_reason |
 | --- | --- | --- | --- | --- | --- | --- |
 ```
 
-Gap Seeds table meaning:
+### Topic Scope
 
-- `Gap Seeds` is the idea-generation projection of the Landscape Pack. It does
-  not restate every residual gap. It converts one or more unresolved residuals
-  into an actionable research seed that `/idea-creator` can expand, rank, and
-  test.
+- `original_topic`: verbatim topic string passed to the skill.
+
+### Bottleneck Evidence
+
+**Bottlenecks** (`B*` IDs) — one row per distinct unresolved problem or structural bottleneck:
+
+- `bottleneck_id`: stable `B*` ID (e.g., `B1`).
+- `bottleneck`: one-phrase label for the unresolved problem.
+- `context`: one sentence situating the bottleneck in the topic's system or workload space.
+- `decisive_metrics`: comma-separated metrics that would confirm or refute progress.
+- `representative_papers`: 1-3 papers best evidencing this bottleneck; use `[Short Title](URL)`.
+- `current_status`: one sentence on where the state of the art plateaus.
+- `residual_gap`: the unresolved part of this bottleneck; seeds `Gap Seeds.source_gap_ref`.
+
+**Solution Attempts** (`S*` IDs) — one row per distinct mechanism family addressing a bottleneck:
+
+- `solution_id`: stable `S*` ID (e.g., `S1`).
+- `bottleneck_ids`: comma-separated `B*` IDs this solution targets.
+- `mechanism_family`: compact label for the approach class (e.g., `speculative decoding`, `KV offload`).
+- `representative_papers`: 1-3 papers; use `[Short Title](URL)`.
+- `best_outcome`: best reported result on `decisive_metrics`; include benchmark and hardware tier.
+- `missing_piece`: what the mechanism leaves unsolved; seeds `Gap Seeds.source_gap_ref`.
+
+### Evaluation Canon
+
+**Platforms** (`EC-P*` IDs) — one row per concrete evaluation substrate available to test ideas:
+
+- `platform_id`: stable `EC-P*` ID.
+- `evaluation_platform`: simulator, trace harness, benchmark artifact, prototype, testbed, or open-source system.
+- `access_readiness`: `ready | small_adapter_needed | major_bringup_needed | unavailable | unknown`.
+- `supported_workloads`: comma-separated `EC-W*` IDs; concise workload family when no `EC-W*` row exists yet.
+- `validates_refs`: comma-separated `B*` or `S*` IDs this platform can measure or reproduce.
+- `artifact_access_path`: public URL, repo path, or `none_found`.
+- `platform_limitations`: access, fidelity, scale, hardware, or license blockers; `none` when absent.
+
+**Workloads** (`EC-W*` IDs) — one row per benchmark, trace family, or synthetic workload class:
+
+- `workload_id`: stable `EC-W*` ID.
+- `workload`: canonical name of the benchmark, trace, or workload class.
+- `bottlenecks`: comma-separated `B*` IDs this workload stresses.
+- `workload_characteristics`: workload shape — model family, trace type, request pattern, sequence length, topology, scale, or benchmark configuration. Record shape, not outcome.
+- `representative_papers`: 1-3 papers using this workload; use `[Short Title](URL)`.
+- `representativeness_limits`: caveats — synthetic traces, outdated benchmarks, small scale, missing multi-tenancy, no tail behavior, narrow model family, or unavailable real traces. Write `weak_or_missing` when no good representative exists.
+
+### Competitive Landscape
+
+The `Competitive Landscape` sub-section is the authoritative location for all competitive data.
+
+**selection_rule** (optional line above Competitors table): default ranking is (1) workload-class overlap with `decisive_metrics`, then (2) `best_outcome` on those metrics, then (3) recency; ties broken by public artifact. Include only when deviating from the default.
+
+**Competitors** (`C*` IDs) — top 3 rows, or fewer with a one-line reason; directly competing papers sharing the same primary `B*`:
+
+- `competitor_id`: stable `C*` ID (e.g., `C1`); stable across re-runs when the same paper stays in scope.
+- `papers`: `[Short Title](URL)` plus venue/year; one paper per row; group only when the same lab releases an explicit follow-up.
+- `B*_scope`: `B<primary>` or `B<primary> (adj: B<secondary>, ...)` for cross-bottleneck competitors. Every `B*` ID, including `adj:` IDs, must resolve to a `B*`.
+- `eval_tier`: `"<workload class> @ <hw/system tier>"` in one cell (e.g., `LongBench 32K @ commodity GPU`).
+- `what_it_solves`: one sentence; do not restate the abstract.
+- `residual_gap`: one sentence; end with `-> G<id>` when a Gap Seeds row exists, else `no_gap_seed_yet`.
+- `NE_link`: `NE-*` IDs where this paper is a revealer or refuted method; `none` when absent.
+
+**Excluded Competitors** — required table; one `none_excluded` placeholder row when no shared-`B*` paper was dropped:
+
+- `excluded_paper`: paper handle; no `C*` ID needed.
+- `shared_B*`: the primary bottleneck this paper shares with the scope.
+- `eval_tier`: same format as Competitors.
+- `excluded_reason`: concrete and audit-grade (e.g., `different substrate: CXL-PNM, not commodity GPU`).
+- `revisit_condition`: trigger that would force re-inclusion.
+
+NE-* coupling (hard gate): every paper in the `source` column of a `NE-*` row that shares the `primary_B*` must appear in Competitors or Excluded Competitors. If excluded, `excluded_reason` must address why the negative evidence does not warrant inclusion.
+
+### Gap Seeds
+
+**Gap Seeds** (`G*` IDs) — one row per actionable research seed; converts bottleneck residuals into testable ideas for `/idea-creator`:
+
 - `gap_id`: stable `G*` ID for downstream references.
-- `bottleneck_id`: primary `B*` bottleneck this seed targets.
-- `source_gap_ref`: evidence pointer for the seed, using `B*.residual_gap`,
-  `S*.missing_piece`, or explicit negative evidence.
-- `mechanism_hint`: compact hint for the possible mechanism, measurement, or
-  study direction. This is not a complete proposed method.
-- `validation_target`: platform, workload, trace, baseline, simulator,
-  prototype, or `EC-P*`/`EC-W*` target that would test the seed.
+- `bottleneck_id`: primary `B*` this seed targets; must resolve to a `B*`.
+- `source_gap_ref`: evidence pointer — `B*.residual_gap`, `S*.missing_piece`, or `NE-*` ID from Section 2.5 (raw text only when Section 2.5 is `none_identified`).
+- `mechanism_hint`: compact hint for the possible mechanism, measurement, or study direction; not a complete proposed method.
+- `validation_target`: `EC-P*`/`EC-W*` target, platform, workload, baseline, or prototype that would test the seed.
 - `decisive_metric`: first metric that would decide whether the seed has value.
-- `kill_reason`: concrete observation that would make the seed not worth
-  pursuing.
+- `kill_reason`: concrete observation that would make the seed not worth pursuing.
+
+Gap Seeds must be grounded in at least one source found during the search, a `NE-*` row from Section 2.5, or raw negative evidence. Structural gap categories belong in Section 3 prose, not in Gap Seeds.
 
 Contract rules:
 
-- Preserve the top-level headings exactly: `Topic Scope`, `Bottleneck Evidence`,
-  `Evaluation Canon`, and `Gap Seeds`.
-- `Bottleneck Evidence` contains `Bottlenecks` and `Solution Attempts`.
-  Use stable `B*` IDs for bottlenecks and `S*` IDs for solution attempts.
-- `Evaluation Canon` contains `Platforms` and `Workloads`, not mixed rows
-  selected by a category column. Use stable `EC-P*` IDs for platforms and
-  `EC-W*` IDs for workloads. `Evaluation Canon > Platforms` must absorb
-  platform access readiness, supported workload refs, artifact/access path, and
-  blocker information; do not create a separate readiness heading.
-- `evaluation_platform` is the concrete evaluation substrate: simulator, trace
-  harness, benchmark artifact, prototype, testbed, or open-source system.
-- `access_readiness` is one of `ready`, `small_adapter_needed`,
-  `major_bringup_needed`, `unavailable`, `unknown`.
-- `supported_workloads` lists matching `EC-W*` IDs when known, or a concise
-  workload family if no workload row exists yet.
-- `validates_refs` entries must resolve to `B*` or `S*`. They mean the platform
-  can measure a bottleneck or reproduce/compare a solution attempt.
-- `platform_limitations` records platform, access, or fidelity blockers such as
-  missing artifact, unsupported workload, weak simulator fidelity,
-  hardware/license access, scale limits, or required adapter work.
-- `workload_characteristics` records workload shape, not evaluation outcome:
-  model family, trace type, request pattern, sequence length regime,
-  traffic/topology, scale, dataset, or benchmark configuration.
-- `representativeness_limits` records workload-level caveats such as synthetic
-  traces, outdated benchmarks, small scale, missing multi-tenancy, no tail
-  behavior, unrealistic traffic, narrow model family, or unavailable real
-  traces.
-- `Gap Seeds` must be grounded in at least one source found during the search or
-  explicit negative evidence from the search. Structural gap categories belong
-  in Section 3 prose, not in the machine-readable `Gap Seeds` table.
-- `Bottlenecks.residual_gap` records the unresolved problem; `Gap Seeds`
-  converts one or more residuals into an actionable idea seed with a mechanism
-  hint, validation target, decisive metric, and kill criterion.
-- When a canon item is weak or missing, write `none_found` or `weak_or_missing`
-  and explain the gap in `platform_limitations` or
-  `representativeness_limits`.
-- `S*.bottleneck_ids` is a comma-separated list of `B*` IDs (one solution may
-  address multiple bottlenecks). Every entry must resolve to a `B*`.
+**General:**
+
+- Preserve the top-level headings exactly: `Topic Scope`, `Bottleneck Evidence`, `Evaluation Canon`, `Competitive Landscape`, and `Gap Seeds`.
+- No Landscape Pack table should exceed 7 columns.
+- When a Bottlenecks or Evaluation Canon item is weak or missing, write `none_found` or `weak_or_missing` and explain in `residual_gap`, `platform_limitations`, or `representativeness_limits`.
+- `Bottlenecks.residual_gap` records the unresolved problem; `Gap Seeds` converts one or more residuals into an actionable idea seed.
+- `evaluation_platform` is the concrete evaluation substrate.
+- `access_readiness` is one of `ready`, `small_adapter_needed`, `major_bringup_needed`, `unavailable`, `unknown`.
+- `validates_refs` entries must resolve to `B*` or `S*`.
+- `platform_limitations` records platform, access, or fidelity blockers.
+- `workload_characteristics` records workload shape.
+- `representativeness_limits` records workload-level caveats.
+
+**ID resolution constraints:**
+
+- `S*.bottleneck_ids` is a comma-separated list of `B*` IDs. Every entry must resolve to a `B*`.
 - Every `EC-W*.bottlenecks` entry must resolve to `B*`.
 - Every `G*.bottleneck_id` must resolve to `B*`.
 - Every `G*.source_gap_ref` must point to `B*.residual_gap`, `S*.missing_piece`, or explicit negative evidence.
-- No Landscape Pack table should exceed 7 columns.
+- `C*.B*_scope`: every `B*` ID in the cell (including `adj:` IDs) must resolve to a `B*`.
+- `C*` IDs must be stable across re-runs when the same paper stays in scope.
 
 ## Key Rules
 

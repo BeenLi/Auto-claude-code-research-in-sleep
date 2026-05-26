@@ -90,7 +90,7 @@ For every kept block, fully specify:
 
 - **Claim tested**
 - **Why this block exists**
-- **Evaluation Inputs referenced**: `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, `metrics`, `target_validation_style`, `evaluation_target_clarity`, `evaluation_target_feasibility`, and feasibility subfields
+- **Evaluation Inputs referenced**: `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, `metrics`, `negative_evidence_response`, `target_validation_style`, `evaluation_target_clarity`, `evaluation_target_feasibility`, and feasibility subfields
 - **Workload / trace / benchmark / configuration**
 - **Compared systems**: strongest baselines, ablations, and variants only
 - **Metrics**: decisive metrics first, secondary metrics second; metrics may follow the baseline's original `metrics_used` or add idea-specific metrics, but must explain why they decide the question
@@ -154,6 +154,7 @@ Use this structure:
 - baseline_evaluability_score:
 - canon_mapping:
 - metrics:
+- negative_evidence_response:
 - target_validation_style:
 - evaluation_target_clarity:
 - evaluation_target_feasibility:
@@ -261,7 +262,7 @@ Tracker file: refine-logs/EXPERIMENT_TRACKER.md
 - **Defend simplicity explicitly.** If complexity is a concern, include a deletion study or a stronger-but-bloated variant comparison.
 - **Defend platform choices explicitly.** If a modern primitive is central, prove why it is better than the strongest simpler alternative.
 - **Prefer strong baselines over long baseline lists.** A short, credible comparison set is better than a padded one.
-- **Respect Evaluation Inputs.** `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, `metrics`, `target_validation_style`, `evaluation_target_clarity`, `evaluation_target_feasibility`, and its four feasibility subfields are the handoff contract from Workflow 1 and must be visible in `EXPERIMENT_PLAN.md`. A baseline score of `0` must stay deferred or blocked, not ready for Workflow 1.5.
+- **Respect Evaluation Inputs.** `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, `metrics`, `negative_evidence_response`, `target_validation_style`, `evaluation_target_clarity`, `evaluation_target_feasibility`, and its four feasibility subfields are the handoff contract from Workflow 1 and must be visible in `EXPERIMENT_PLAN.md`. A baseline score of `0` must stay deferred or blocked, not ready for Workflow 1.5.
 - **Metrics are idea-specific.** Baseline metrics are useful hints, not hard constraints; add or drop metrics based on whether they decide the proposed mechanism's value.
 - **Separate must-run from nice-to-have.** Do not let appendix ideas delay the core paper evidence.
 - **Reuse proposal constraints.** Do not invent unrealistic budgets or data assumptions.

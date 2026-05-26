@@ -7,7 +7,7 @@ allowed-tools: Bash(*), Read, Glob, Grep, WebSearch, WebFetch, Write, Agent, mcp
 
 # Research Literature Review
 
-Research topic: $ARGUMENTS
+Research topic: $ARGUMENTS  _(if $ARGUMENTS is a `.md` path, topic and context are extracted from the brief in Step 0)_
 
 ## Role In The Workflow
 
@@ -104,6 +104,100 @@ details, use `references/search-sources.md`.
 
 ## Workflow
 
+### 0. Detect Input Mode and Load Context
+
+Detect the input mode from `$ARGUMENTS` before any other step. Modes are
+mutually exclusive — do not combine a topic string with research brief or paper reference.
+Log one line after detection: `Input mode: <1|2|3> — <topic | brief path | paper title/URL>`
+
+| Mode | Detection rule | Search framing |
+| --- | --- | --- |
+| 1 — Topic | Plain string; does not match mode 2 or 3 rules | Broad exploration of the topic area |
+| 2 — Research Brief | Ends with `.md` and the file exists | Scoped, constrained search driven by stated intent |
+| 3 — Reference Paper | Matches `http(s)://`, bare arXiv ID (`\d{4}\.\d{4,5}`), DOI (`10\.\d{4,}/`), or ends with `.pdf` | "Can we improve this?" — treat paper as SOTA; search for competing/related work |
+
+Canonical examples:
+
+```text
+/research-lit "KV cache CXL"                                    (mode 1 — topic)
+/research-lit "idea-stage/RESEARCH_BRIEF.md"                    (mode 2 — brief)
+/research-lit "https://arxiv.org/abs/2406.04329"                (mode 3 — arXiv URL)
+/research-lit "2406.04329"                                      (mode 3 — bare arXiv ID)
+/research-lit "papers/baseline.pdf"                             (mode 3 — local PDF)
+/research-lit "10.1145/3725843.3756079"                         (mode 3 — DOI)
+```
+
+#### Mode 1 — Topic
+
+If `$ARGUMENTS` is a plain string, use it as the research topic. Broad exploration of the topic area.
+
+#### Mode 2 — Research Brief
+
+If `$ARGUMENTS` ends with `.md` and the file exists, read it and extract the
+following fields before any other step. These extracted values replace
+`$ARGUMENTS` as the effective research context for all subsequent steps.
+
+| Field | Source section in Brief | How it is used |
+| --- | --- | --- |
+| `topic` | Title line + `## Problem Statement` (first 2 sentences) | Replaces `$ARGUMENTS` as the search direction |
+| `known_papers` | `## Background` → `Key papers I've read` bullet list | Must be included in Step 3 Analyze Papers — treat as mandatory coverage; discovered through normal search flow |
+| `constraints` | `## Constraints` | Scope the search: honour venue/timeline focus, limit evaluation platforms to those listed |
+| `non_goals` | `## Non-Goals` | Exclude these directions from gap analysis and Gap Seeds |
+| `domain_knowledge` | `## Domain Knowledge` | Seed query variants and inform cluster framing in Section 2 |
+
+Extraction rules:
+- Parse with best effort; missing sections are silently skipped.
+- `known_papers`: extract each bullet's paper title (bold or plain) and any URL present.
+- `constraints.venue`: if listed, prefer papers and evaluation setups relevant to that venue's scope.
+- After extraction, log: `Brief loaded: topic="<topic>", known=<N> papers, non-goals=<N>`.
+- If the file does not exist or cannot be read, fall back to treating `$ARGUMENTS` as a plain topic string.
+
+#### Mode 3 — Reference Paper
+
+Fetch and read the **complete paper** — no page limit; this paper is the
+primary research input and must be fully understood before searching.
+
+- arXiv URL or bare ID: download PDF via the arxiv adapter or fetch full text via WebFetch.
+- Local PDF path (ends with `.pdf`): read the complete PDF.
+- DOI or other URL: fetch full content via WebFetch.
+
+Extract from the full paper: `title`, `authors`, `venue`, `year`, `problem`
+(primary problem the paper addresses), `method` (core technical approach),
+`key_results` (main quantitative findings), `limitations` (acknowledged or
+inferable weaknesses), `open_questions` (future work or unresolved issues).
+
+Write `idea-stage/REF_PAPER_SUMMARY.md` before continuing:
+
+```markdown
+# Reference Paper Summary
+
+**Title**: [paper title]
+**Authors**: [authors]
+**Venue**: [venue, year]
+
+## What They Did
+[2-3 sentences: core method and contribution]
+
+## Key Results
+[Main quantitative findings]
+
+## Limitations & Open Questions
+[What the paper did not solve, acknowledged weaknesses, future work suggestions]
+
+## Potential Improvement Directions
+[Directions implied by the limitations and open questions]
+```
+
+Derive `topic` from `problem`. Add this paper to `known_papers` as mandatory
+coverage. Apply this framing to all subsequent steps:
+
+> **SOTA baseline framing**: this paper is the current best-known solution.
+> Search for competing and related work. Section 2 clusters ask "where does
+> this paper plateau?" Gap Seeds ask "what does this paper leave unsolved,
+> and how could it be improved or extended?"
+
+Log: `Ref paper loaded: title="<title>", topic derived="<topic>", venue="<venue> <year>"`.
+
 ### 1. Load Prior Review
 
 If `idea-stage/LITERATURE_REVIEW.md` exists, load it first. Treat existing
@@ -152,13 +246,15 @@ Handling rules:
 
 ### 3. Analyze Papers
 
-For every relevant paper, extract:
+For every relevant paper, extract and write into Section 1:
 
-- Problem, method, key result, limitations, and relevance
-- Source labels and whether it was already known or newly added
+- Problem, method, key result, limitations, and relevance.
+- Source labels and whether it was already known or newly added.
 - Verification status from `.aris/verify-papers/verified_papers.json`.
-- Evaluation platform/substrate, benchmark/workload/trace, comparison systems,
-  metrics, artifact/code status, and evaluation limitations.
+- Evaluation platform/substrate → `Eval Platform` column (e.g., `BF3 DPU`, `A100 cluster`, `LLMServingSim`); use `none/NA` when not reported.
+- Benchmark/workload/trace → `Workload` column (e.g., `NCCL AllReduce`, `GPT-3 175B prefill`); use `none/NA` when not reported.
+- Comparison systems → `Baseline` column (e.g., `raw RDMA`, `PEDAL`, `vLLM 0.4`); use `none/NA` when not reported.
+- Metrics, artifact/code status, and evaluation limitations (these feed Section 4 Evaluation Canon `EC-P*`/`EC-W*` rows).
 
 ### 4. Synthesize Landscape
 
@@ -282,7 +378,7 @@ The saved review must contain:
 
 - Header: generation UTC timestamp, skill name, and original topic.
 - `## Section 0 -- Source Audit` with `Source | Status | Action Taken / Notes`.
-- `## Section 1 -- Paper Table` with `| Paper | Venue | Year | Method | Key Result | Relevance | Source | Verification | Preprint | Full Text | Artifact |`. `Verification` is `verified|unverified|verify_pending|error` from `verified_papers.json`. `Preprint` is `yes|no` (peer-reviewed = `no`). `Full Text` is `yes|no` (use `no` for `NO FULL TEXT` rows). `Artifact` is `yes|partial|no|unknown` (code/data availability, prefer artifact-evaluation badges when present).
+- `## Section 1 -- Paper Table` with `| Paper | Venue | Year | Method | Key Result | Eval Platform | Workload | Baseline | Relevance | Source | Verification | Preprint | Full Text | Artifact |`. `Verification` is `verified|unverified|verify_pending|error` from `verified_papers.json`. `Preprint` is `yes|no` (peer-reviewed = `no`). `Full Text` is `yes|no` (use `no` for `NO FULL TEXT` rows). `Artifact` is `yes|partial|no|unknown` (code/data availability, prefer artifact-evaluation badges when present). `Eval Platform` is the hardware/system/simulator used (e.g., `BF3 DPU`, `A100 cluster`, `LLMServingSim`). `Workload` is the benchmark, trace, or task class (e.g., `NCCL AllReduce`, `GPT-3 prefill`). `Baseline` is the primary comparison system(s) (e.g., `raw RDMA`, `PEDAL`). All three use `none/NA` when not reported.
 - `## Section 2 -- Problem-Anchored Clusters`.
 - `## Section 2.5 -- Negative Evidence`. Fixed table with columns
   `| negative_id | claim | source | affected_methods | affected_assumption | confidence | linked_gaps |`.
@@ -403,7 +499,7 @@ selection_rule: <rule>  _(omit this line when the default rule was used)_
 
 ### Competitive Landscape
 
-The `Competitive Landscape` sub-section is the authoritative location for all competitive data. 
+The `Competitive Landscape` sub-section is the authoritative location for all competitive data.
 
 **selection_rule** (optional line above Competitors table): default ranking is (1) workload-class overlap with `decisive_metrics`, then (2) `best_outcome` on those metrics, then (3) recency; ties broken by public artifact. Include only when deviating from the default.
 
@@ -448,13 +544,20 @@ Contract rules:
 - Preserve the top-level headings exactly: `Topic Scope`, `Bottleneck Evidence`, `Evaluation Canon`, `Competitive Landscape`, and `Gap Seeds`.
 - No Landscape Pack table should exceed 7 columns.
 - When a Bottlenecks or Evaluation Canon item is weak or missing, write `none_found` or `weak_or_missing` and explain in `residual_gap`, `platform_limitations`, or `representativeness_limits`.
+- `Bottlenecks.residual_gap` records the unresolved problem; `Gap Seeds` converts one or more residuals into an actionable idea seed.
+- `evaluation_platform` is the concrete evaluation substrate.
+- `access_readiness` is one of `ready`, `small_adapter_needed`, `major_bringup_needed`, `unavailable`, `unknown`.
+- `validates_refs` entries must resolve to `B*` or `S*`.
+- `platform_limitations` records platform, access, or fidelity blockers.
+- `workload_characteristics` records workload shape.
+- `representativeness_limits` records workload-level caveats.
 
 **ID resolution constraints:**
 
-- `S*.bottleneck_ids`: every entry must resolve to a `B*`.
-- `EC-W*.bottlenecks`: every entry must resolve to a `B*`.
-- `G*.bottleneck_id`: must resolve to a `B*`.
-- `G*.source_gap_ref`: must point to `B*.residual_gap`, `S*.missing_piece`, or a `NE-*` row from Section 2.5.
+- `S*.bottleneck_ids` is a comma-separated list of `B*` IDs. Every entry must resolve to a `B*`.
+- Every `EC-W*.bottlenecks` entry must resolve to `B*`.
+- Every `G*.bottleneck_id` must resolve to `B*`.
+- Every `G*.source_gap_ref` must point to `B*.residual_gap`, `S*.missing_piece`, or explicit negative evidence.
 - `C*.B*_scope`: every `B*` ID in the cell (including `adj:` IDs) must resolve to a `B*`.
 - `C*` IDs must be stable across re-runs when the same paper stays in scope.
 

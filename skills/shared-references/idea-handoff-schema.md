@@ -47,6 +47,7 @@ not a global pool.
 | `platform_access_path` | string | Repository, artifact, simulator, benchmark, trace, or adapter path. |
 | `handoff_to_workflow_1_5` | `ready` \| `needs_canon_clarification` \| `designed_not_run` | `ready` requires `baseline_evaluability_score` 1 or 2 plus clear baseline, canon mapping, metrics, and validation style. |
 | `main_blocker` | `none` \| `missing_artifact` \| `trace_unavailable` \| `backend_adapter` \| `platform_bringup` \| `unclear_canon_mapping` \| `unclear_comparison_target` \| `no_credible_evaluation_path` \| `other` | Required when the handoff is not ready. |
+| `negative_evidence_response` | `n/a` \| `evades: NE-* (...)` \| `addresses: NE-* (...)` \| `conflicts: NE-* (...)` | Required audit trail for the Section 2.5 Negative Evidence hard gate. Every surviving idea must explain how it handles any relevant `NE-*` affected assumption, or use `n/a` when no `NE-*` applies. |
 
 ## Workflow 1 Exit Gate
 
@@ -62,6 +63,8 @@ same checks manually:
   `evaluation_target_clarity`, `evaluation_target_feasibility`,
   `evaluation_environment_access`, `idea_adapter_cost`, and
   `pilot_runtime_cost` are present.
+- `negative_evidence_response` is present so Workflow 1.5 can audit the
+  Section 2.5 Negative Evidence gate.
 
 The gate does not run experiments. It only decides whether Workflow 1 produced
 enough structured evidence for Workflow 1.5 to start.

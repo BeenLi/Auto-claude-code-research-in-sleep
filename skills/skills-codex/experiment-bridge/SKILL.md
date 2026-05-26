@@ -63,6 +63,7 @@ Write this file before changing experiment code:
 - **selected_evaluation_backend**:
 - **workload**:
 - **metrics**:
+- **negative_evidence_response**: n/a | evades: NE-* (...) | addresses: NE-* (...) | conflicts: NE-* (...)
 - **target_validation_style**: analytical_model | simulator_evaluation | prototype_measurement
 - **evaluation_target_clarity**: clear | partial | missing
 - **evaluation_target_feasibility**: high | medium | low | unknown
@@ -87,6 +88,9 @@ Workflow 1 → 1.5 handoff gate:
 - `baseline_evaluability_score: 0` blocks `handoff_gate_status: pass` and prevents immediate execution.
 - `canon_mapping.platform` must cite `EC-P*`; `canon_mapping.workload` must cite `EC-W*`.
 - `metrics` must name the decisive metric and why it decides the idea.
+- `negative_evidence_response` must be present. If it cites `conflicts: NE-*`,
+  set `handoff_gate_status: blocked` until the conflict is reviewed and either
+  scoped away or resolved in `/research-lit` / `/idea-creator`.
 - `target_validation_style` must be `analytical_model`, `simulator_evaluation`, or `prototype_measurement`.
 - `evaluation_target_clarity` must be `clear` or an explicitly acceptable `partial`; `missing` sets `handoff_gate_status: blocked`.
 - `evaluation_target_feasibility` and its four subfields must be present; `unknown` sets `handoff_gate_status: needs_canon_clarification`, and `low` is allowed only for deferred or platform-bringup paths.

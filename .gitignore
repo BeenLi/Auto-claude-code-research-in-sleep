@@ -32,6 +32,8 @@ CLAUDE.md
 .aris/installed-*
 .aris/tools
 .aris/traces
+.aris/cache/
+.aris/verify-papers/
 
 # Patent output — contains confidential invention details, do not commit
 patent/

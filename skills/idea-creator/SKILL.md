@@ -83,8 +83,8 @@ From the literature review, identify:
   `representativeness_limits`; EC-W rows describe workload shape and caveats,
   while decisive metrics remain idea-specific.
 - **Verified paper/system evidence**: Section 1 paper rows with
-  `Verification: verified`, Section 4 competitors, and any explicit system or
-  artifact notes tied to `B*` or `S*` evidence.
+  `Verification: verified`, Competitive Landscape competitors inside Section 4,
+  and any explicit system or artifact notes tied to `B*` or `S*` evidence.
 
 If the loaded Landscape Pack still contains the legacy global baseline pool or
 legacy simulator/prototype readiness heading, stop and ask to re-run
@@ -197,11 +197,10 @@ Read: idea-stage/LITERATURE_REVIEW.md
   multi-baseline failure modes; **this is a HARD GATE in Phase 3** — every
   surviving idea must declare a `negative_evidence_response` (see Phase 3 below)
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
-- **Section 4** (competitive landscape) → top competing papers and positioning
-- **Section 5** (Landscape Pack) → topic scope, bottleneck evidence (`Bottlenecks` and `Solution Attempts`), Evaluation Canon (`Platforms` and `Workloads`), and `Gap Seeds`
+- **Section 4** (Landscape Pack) → topic scope, bottleneck evidence (`Bottlenecks` and `Solution Attempts`), Evaluation Canon (`Platforms` and `Workloads`), `Gap Seeds`, and Competitive Landscape top competing papers / excluded competitors
 - **Bottleneck Evidence** → `B*` bottlenecks plus `S*` solution attempts; use `Solution Attempts` as the mechanism source
 - **Evaluation Canon** → `EC-P*` platform rows and `EC-W*` workload rows commonly used by papers in this topic
-- **Verified evidence for baselines** → verified Section 1 papers/systems and Section 4 competitors that can seed idea-local baseline records
+- **Verified evidence for baselines** → verified Section 1 papers/systems and Section 4 Competitive Landscape competitors that can seed idea-local baseline records
 
 Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {V} verified papers, {NE} negative-evidence rows, {M} structural gaps, {K} Gap Seeds, {P} platforms, and {W} workloads for {topic} identified."_
 
@@ -261,10 +260,10 @@ mcp__codex__codex:
     Structural gaps identified (from /research-lit Section 3):
     [paste the 5-lens gap analysis: cross-domain / contradictions / untested assumptions / unexplored regimes / unasked questions]
 
-    Top competing papers (from /research-lit Section 4):
+    Top competing papers (from /research-lit Section 4 Competitive Landscape):
     [paste competitive landscape — top 3 papers and what they leave open]
 
-    Landscape Pack (from /research-lit Section 5):
+    Landscape Pack (from /research-lit Section 4):
     [paste Topic Scope, Bottleneck Evidence, Evaluation Canon, and Gap Seeds]
     `Bottleneck Evidence` contains `Bottlenecks` and `Solution Attempts`; use `Solution Attempts` as the mechanism source.
     `Evaluation Canon` contains `Platforms` and `Workloads`.

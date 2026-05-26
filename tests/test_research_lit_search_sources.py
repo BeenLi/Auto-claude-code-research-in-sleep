@@ -133,20 +133,22 @@ def test_verify_venue_urls_tool_is_available_for_maintenance() -> None:
 def test_synthesize_landscape_projects_prose_into_landscape_pack_ids() -> None:
     text = read(RESEARCH_LIT)
     synthesize = section(text, "### 4. Synthesize Landscape", "### 5. Save Outputs")
+    synthesize_flat = re.sub(r"\s+", " ", synthesize)
 
     assert "ID-backed projection" in synthesize
-    assert "Sections 2-4" in synthesize
+    assert "Sections 2-3" in synthesize
     for id_family in ("`B*`", "`S*`", "`EC-P*`", "`EC-W*`", "`G*`"):
         assert id_family in synthesize
 
     assert "Section 2" in synthesize
-    assert "Consensus and disagreements" in synthesize
+    assert "field-level agreement" in synthesize
+    assert "conflicting findings" in synthesize
     assert "hardware-agnostic" in synthesize
     assert "workload/model-size class" in synthesize
 
-    assert "same `B*` bottleneck" in synthesize
-    assert "comparable workload class" in synthesize
-    assert re.search(r"comparable\s+hardware/system tier", synthesize)
+    assert "same primary `B*` bottleneck" in synthesize_flat
+    assert "comparable workload class" in synthesize_flat
+    assert "comparable hardware/system tier" in synthesize_flat
 
     assert re.search(r"no more than 8\s+total", synthesize)
     assert "`B*.residual_gap`" in synthesize
@@ -157,7 +159,11 @@ def test_synthesize_landscape_projects_prose_into_landscape_pack_ids() -> None:
 def test_synthesize_landscape_map_uses_topic_specific_unresolved_bottlenecks() -> None:
     text = read(RESEARCH_LIT)
     synthesize = section(text, "### 4. Synthesize Landscape", "### 5. Save Outputs")
-    landscape = re.search(r"- Landscape map:.*?(?=\n- Consensus)", synthesize, flags=re.S)
+    landscape = re.search(
+        r"#### Section 2 -- Problem-Anchored Clusters.*?(?=\n#### Section 2\.5)",
+        synthesize,
+        flags=re.S,
+    )
 
     assert landscape is not None
     landscape_bullet = landscape.group(0)
@@ -168,7 +174,7 @@ def test_synthesize_landscape_map_uses_topic_specific_unresolved_bottlenecks() -
     assert "EC-P*.platform_limitations" in landscape_flat
     assert "EC-W*.representativeness_limits" in landscape_flat
     assert "KV cache CXL" in landscape_flat
-    assert "Section 5 `B*` bottlenecks and `S*` solution attempts" in landscape_flat
+    assert "Section 4 `B*` bottlenecks and `S*` solution attempts" in landscape_flat
     assert not re.search(
         r"such as compute,\s+memory/KV cache,\s+interconnect/network,\s+"
         r"storage/checkpointing,\s+scheduling/runtime,\s+or co-design",

@@ -203,7 +203,7 @@ topic / RESEARCH_BRIEF.md / RefPaper
 - Inputs: user topic or `RESEARCH_BRIEF.md`, prior `idea-stage/LITERATURE_REVIEW.md` if any, optional `research-wiki/`, Zotero, Obsidian notes, local paper library, web/arXiv/Semantic Scholar/OpenAlex/Gemini sources depending on availability and source selection.
 - Process: audit source availability, infer the AI infrastructure layer, search primary and adjacent literature, analyze papers, synthesize mechanism clusters and structural gaps.
 - Outputs: `idea-stage/LITERATURE_REVIEW_{YYYYMMDD_HHmmssZ}.md`, latest copy `idea-stage/LITERATURE_REVIEW.md`, optional downloaded PDFs or wiki updates, and `MANIFEST.md` rows.
-- Handoff: Section 5 `Landscape Pack` is the machine-readable contract for `/idea-creator`; it must preserve `Bottleneck Evidence`, `Evaluation Canon` with platform/backend readiness, and `Gap Seeds`. Baselines are derived per idea from verified paper/system evidence.
+- Handoff: Section 4 `Landscape Pack` is the machine-readable contract for `/idea-creator`; it must preserve `Bottleneck Evidence`, `Evaluation Canon` with platform/backend readiness, `Gap Seeds`, and the merged `Competitive Landscape`. Section 2.5 `Negative Evidence` is a hard gate: every surviving idea must explain its `NE-*` response. Baselines are derived per idea from verified paper/system evidence.
 - Stop or degrade: missing sources are recorded in Source Audit and the skill continues with available sources; software-only topics without concrete hardware bottlenecks should be marked out-of-scope unless explicitly requested.
 
 ##### 0.4.1.1.1 research-lit 处理流程详解
@@ -256,33 +256,31 @@ topic / RESEARCH_BRIEF.md / RefPaper
 
 `Problem` / `Method` / `Results` / `Relevance` / `Source` / `Evaluation Platform` / `Workload` / `Compared Baselines` / `Metrics` / `Artifact Availability` / `Evaluation Limitations`
 
-Artifact 走 `official_artifact` / `open_source_system` / `config_reproducible` / `paper_only` / `unavailable` / `not_reported` 枚举——这套枚举直接喂给 Step 3e 的 Landscape Pack。
+Artifact 走 `official_artifact` / `open_source_system` / `config_reproducible` / `paper_only` / `unavailable` / `not_reported` 枚举——这套枚举直接喂给 Section 4 `Landscape Pack` 的 Evaluation Canon 与 idea-local baseline 选择。
 
 **Step 3 — 综合(产出地形图,5 子步)**
 
 - **3a Landscape Map**:把所有论文分 3-6 个 sub-direction cluster,每个 cluster 给 1 句话定义 + 论文列表 + "已经做到哪 / 卡在哪"。
 - **3b Consensus & Disagreements**:点出共识(如 "100Gbps 硬件 LZ4 已被解决")与活跃争议(冲突结论或对立设计哲学);若 Obsidian 有用户笔记,在此融合用户视角。
 - **3c Structural Gaps**(idea-creator 直接消费):5 个 lens——cross-domain transfer / contradictory findings / untested assumptions / unexplored regimes / unasked diagnostic questions。每个 gap 必须 ground 到具体论文或显式 negative evidence。
-- **3d Competitive Landscape**:top 3 最直接竞争者的"claim vs leave-open + 是否同方向 + 是否 peer-reviewed"。
-- **3e Landscape Pack**:固定 7 块表的机器契约,见下节。
+- **3d Negative Evidence**:抽取 0-5 条足以推翻隐藏假设或暴露多 baseline 共同失败的发现,写成 Section 2.5 `Negative Evidence` 的 `NE-*` 行;这不是普通 negative result 列表,而是下游硬门槛。
+- **3e Landscape Pack**:写 Section 4 `Landscape Pack` 机器契约,包含 Topic Scope / Bottleneck Evidence / Evaluation Canon / Competitive Landscape / Gap Seeds。
 
-**Landscape Pack 七块表(下游 `/idea-creator` 的契约)**
+**Section 4 `Landscape Pack` 稳定子块(下游 `/idea-creator` 的契约)**
 
 | 块                               | 内容                                                                                                                                                             | 稳定 ID                               |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | Topic Scope                     | original_topic                                            | —                                   |
-| Bottleneck Evidence             | bottleneck + supporting_papers + decisive_metrics                                                                                     | `bottleneck_id`                     |
-| Mechanism Clusters              | mechanism_family + representative_papers + plateau_or_missing_piece                                                                                            | cluster name                        |
-| **Evaluation Canon**            | item + supporting_papers + adoption_strength + artifact_or_access + limitations                                                       | **`EC-P*`(平台) / `EC-W*`(workload)** |
-| **Core Baseline Candidates**    | baseline_name + paper_or_system + scenario + evaluation_platform_used + workload_used + metrics_used + artifact_status                                         | **`CB*`**                           |
-| Simulator / Prototype Readiness | backend + readiness(ready/partial/future) + what_it_can_validate + blocker                                                                       | —                                   |
-| **Gap Seeds**                   | gap_type + bottleneck + supporting_papers + possible_mechanism_hint + minimum_validation_backend + decisive_metric + main_risk_or_kill_reason | **`gap_id`**                        |
+| Bottleneck Evidence             | `Bottlenecks` + `Solution Attempts`,包括 unresolved problem、best_outcome、missing_piece                                        | `B*` / `S*`                         |
+| **Evaluation Canon**            | concrete platform/substrate 与 workload/trace/benchmark;带 access readiness、artifact path、representativeness limits             | **`EC-P*`(平台) / `EC-W*`(workload)** |
+| **Competitive Landscape**       | top 3 direct competitors + required Excluded Competitors;必须覆盖共享 `primary_B*` 的 `NE-*` source paper                       | `C*` + `NE_link`                    |
+| **Gap Seeds**                   | bottleneck_id + source_gap_ref(`B*.residual_gap` / `S*.missing_piece` / `NE-*`) + validation target + decisive metric          | **`G*`**                            |
 
-下游 `/idea-creator` 通过 `canon_mapping: platform=[EC-P*]; workload=[EC-W*]` 引用 Canon;`core_baseline` 从 `CB*` 池中选;Gap Seeds 是 ideation 起点。**禁止跨主题复用** Canon/baseline——每个 topic 现搜现填。
+下游 `/idea-creator` 通过 `canon_mapping: platform=[EC-P*]; workload=[EC-W*]` 引用 Canon;`core_baseline` 是 idea-local baseline record,从 verified Section 1 论文/系统或 Section 4 competitor 中派生,不再依赖全局 `CB*` 池;Gap Seeds 是 ideation 起点。**禁止跨主题复用** Canon/baseline——每个 topic 现搜现填。
 
-**Step 4 — 输出(7 个 Section)**
+**Step 4 — 输出(当前 Section 结构)**
 
-`LITERATURE_REVIEW.md` 固定结构:Section 0 Source Audit / Section 1 Paper Table(主) / Section 1b Cross-domain References / Section 2 Landscape Map / Section 3 Structural Gaps / Section 4 Competitive Landscape / **Section 5 Landscape Pack**(机器契约)。Zotero 来源论文加 📚 + 集合路径,新增论文加 🆕。
+`LITERATURE_REVIEW.md` 固定结构:Section 0 Source Audit / Section 1 Paper Table(主,含 Eval Platform / Workload / Baseline) / Section 1b Cross-domain References / Section 2 Problem-Anchored Clusters / Section 2.5 Negative Evidence / Section 3 Structural Gaps / Section 4 Landscape Pack(含 Competitive Landscape 机器契约)。Zotero 来源论文加 📚 + 集合路径,新增论文加 🆕。
 
 **Step 5 — 文件落盘**
 
@@ -329,7 +327,7 @@ flowchart TB
     externalSearch -->|"候选论文 (含 cross-domain 标记)"| fulltext
     fulltext -->|"可读论文 + degrade 标记"| analyze
     analyze -->|"论文结构化表"| synthesis
-    synthesis -->|"7 块 Landscape Pack"| writeOut
+    synthesis -->|"Section 4 Landscape Pack"| writeOut
     writeOut -->|"top 8-12 arXiv IDs"| wikiIngest
 
     classDef inputCls fill:#10B981,color:#fff,stroke:#047857,stroke-width:1.5px
@@ -352,34 +350,33 @@ flowchart TB
     map3a["3a Landscape Map<br/>3-6 个 sub-direction cluster"]
     consensus["3b Consensus 与 Disagreement<br/>+ Obsidian 用户视角"]
     gaps["3c Structural Gaps<br/>5 lens 分析<br/>(cross-domain / contradiction /<br/>untested / unexplored / unasked)"]
-    competing["3d Competitive Landscape<br/>top 3 直接竞争者定位"]
-    pack["3e Landscape Pack<br/>Section 5 机器契约"]
+    negEvidence["3d Negative Evidence<br/>Section 2.5 硬门槛"]
+    pack["3e Landscape Pack<br/>Section 4 机器契约"]
 
-    subgraph packBlocks["Landscape Pack 七块"]
+    subgraph packBlocks["Landscape Pack 稳定子块"]
         direction TB
         topicScope["Topic Scope"]
-        bnEvidence["Bottleneck Evidence<br/>(bottleneck_id)"]
-        mechClusters["Mechanism Clusters"]
+        bnEvidence["Bottleneck Evidence<br/>B* / S*"]
         evalCanon["Evaluation Canon<br/>EC-P* 平台 / EC-W* workload"]
-        coreBaseline["Core Baseline Candidates<br/>CB* 池"]
-        simReadiness["Simulator / Prototype<br/>Readiness"]
-        gapSeeds["Gap Seeds<br/>(gap_id, ground to paper)"]
+        compLandscape["Competitive Landscape<br/>Competitors + Excluded"]
+        gapSeeds["Gap Seeds<br/>G* / NE-* grounded"]
     end
 
     papers -->|"按 method 聚类"| map3a
     map3a -->|"sub-direction 视图"| consensus
     consensus -->|"共识 + 争议"| gaps
-    gaps -->|"5 lens gap 候选"| competing
-    competing -->|"竞争定位 + 风险"| pack
-    pack -->|"落 7 块表"| packBlocks
+    gaps -->|"5 lens gap 候选"| negEvidence
+    negEvidence -->|"NE-* rows"| pack
+    pack -->|"竞争定位 + 风险"| compLandscape
+    pack -->|"落稳定子块"| packBlocks
 
     classDef synthCls fill:#3B82F6,color:#fff,stroke:#1D4ED8,stroke-width:1.4px
     classDef contractCls fill:#8B5CF6,color:#fff,stroke:#6D28D9,stroke-width:1.4px
     classDef inputCls fill:#10B981,color:#fff,stroke:#047857,stroke-width:1.5px
 
     class papers inputCls
-    class map3a,consensus,gaps,competing synthCls
-    class pack,topicScope,bnEvidence,mechClusters,evalCanon,coreBaseline,simReadiness,gapSeeds contractCls
+    class map3a,consensus,gaps,negEvidence synthCls
+    class pack,topicScope,bnEvidence,evalCanon,compLandscape,gapSeeds contractCls
 ```
 
 **降级与红线**
@@ -387,7 +384,7 @@ flowchart TB
 - **MCP 缺失零失败**:Zotero / Obsidian / Gemini MCP / Exa / DeepXiv / OpenAlex 任一不可用都静默 skip,只在 Source Audit 留记录。
 - **rate-limit**:Semantic Scholar 重试一次仍 429 就放弃,改回 S1/S2/S4;DBLP keyword API 直接禁用,只用 DBLP 直链。
 - **ACM DL / IEEE Xplore**:返回 403,**绝不**声称搜过这两个站点。
-- **Section 5 缺则 Workflow 1 死**:Landscape Pack 七块表缺任意一块,下游 `/idea-creator` 会在 `canon_mapping` 处出 `unclear_canon_mapping`,导致 idea 全部进 `needs_canon_clarification`。
+- **Section 4 机器契约缺失则 Workflow 1 死**:Landscape Pack 稳定子块缺任意关键项,或 Section 2.5 `Negative Evidence` 未被明确处理,下游 `/idea-creator` 会在 `canon_mapping` / `negative_evidence_response` 处出 `unclear_canon_mapping` 或 `unclear_negative_evidence_response`,导致 idea 进入 `needs_canon_clarification`、`designed_not_run` 或被 elimination。
 
 `/idea-creator` turns the landscape into ranked, evaluable ideas.
 
@@ -435,12 +432,12 @@ These are compact template summaries for auditing output shape. The detailed can
 
 - Header: generation date, skill name, original topic query.
 - Section 0 `Source Audit`: source, status, action taken or fallback notes.
-- Section 1 `Paper Table`: paper, venue, year, method, key result, relevance, source.
+- Section 1 `Paper Table`: paper, venue, year, method, key result, eval platform, workload, baseline, relevance, source.
 - Section 1b `Cross-domain References`: adjacent-domain papers and transferable insights.
-- Section 2 `Landscape Map`: 3-5 paragraphs by sub-direction cluster.
+- Section 2 `Problem-Anchored Clusters`: 3-6 clusters by unresolved problem or bottleneck.
+- Section 2.5 `Negative Evidence`: `NE-*` rows for refuted hidden assumptions or multi-baseline failure modes; this is a hard gate for idea generation.
 - Section 3 `Structural Gaps`: cross-domain transfer, contradictions, untested assumptions, unexplored regimes, unasked questions.
-- Section 4 `Competitive Landscape`: top competing papers and positioning notes.
-- Section 5 `Landscape Pack`: topic scope, bottleneck evidence, solution attempts, `Evaluation Canon` with platform/backend readiness and artifact access paths, `Gap Seeds`.
+- Section 4 `Landscape Pack`: topic scope, bottleneck evidence, solution attempts, `Evaluation Canon` with platform/backend readiness and artifact access paths, merged competitive landscape, excluded competitors, `Gap Seeds`.
 
 `idea-stage/IDEA_REPORT.md`:
 
@@ -449,7 +446,7 @@ These are compact template summaries for auditing output shape. The detailed can
 - `Recommended Ideas`: ranked ideas with idea shape, merit, idea-local `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, metrics, validation style, feasibility fields, platform path, blocker, reviewer objection, and rationale.
 - `Eliminated Ideas`: idea, category, reason, revisit condition.
 - `Deferred / Designed-Not-Run Ideas`: why deferred and what must become available.
-- `Evaluation Handoff Summary`: compact table of ranking, feasibility, baseline, canon, metrics, validation style, handoff status, blocker.
+- `Evaluation Handoff Summary`: compact table of ranking, feasibility, baseline, canon, metrics, validation style, `negative_evidence_response`, handoff status, blocker.
 - `Suggested Execution Order` and `Next Steps`: selected idea goes to `/research-refine-pipeline`, then Workflow 1.5 creates `EVALUATION_CONTRACT.md`.
 
 `Novelty Check Report`:

@@ -1,7 +1,7 @@
 ---
 name: idea-discovery
 description: 'Workflow 1: Full idea discovery pipeline. Orchestrates research-lit → idea-creator → novelty-check → research-review to go from a broad research direction to validated ideas with evaluation handoff plans. Use when user says "找idea全流程", "idea discovery pipeline", "从零开始找方向", or wants the complete idea exploration workflow.'
-argument-hint: \[research-direction]
+argument-hint: \[research-direction | path/to/RESEARCH_BRIEF.md | paper-ref]
 allowed-tools: Bash(\*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp\_\_codex\_\_codex, mcp\_\_codex\_\_send_input
 ---
 
@@ -35,80 +35,13 @@ Shared references:
 - **OUTPUT\_DIR =** **`idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 - **ARXIV\_DOWNLOAD = false** — When `true`, `/research-lit` downloads the top relevant arXiv PDFs during Phase 1. When `false` (default), only fetches metadata. Passed through to `/research-lit`.
 - **COMPACT = false** — When `true`, generate compact summary files for short-context models and session recovery. Writes `idea-stage/IDEA_CANDIDATES.md` (top 3-5 ideas only) at the end of this workflow. Downstream skills read this instead of the full `idea-stage/IDEA_REPORT.md`.
-- **REF\_PAPER = false** — Reference paper to base ideas on. Accepts: local PDF path, arXiv URL, or any paper URL. When set, the paper is summarized first (`idea-stage/REF_PAPER_SUMMARY.md`), then idea generation uses it as context. Combine with `base repo` for "improve this paper with this codebase" workflows.
+- **REF\_PAPER** — Pass the paper reference directly as `$ARGUMENTS` (arXiv URL/ID, DOI, or local `.pdf` path); `/research-lit` detects mode 3 automatically, reads the complete paper, and writes `idea-stage/REF_PAPER_SUMMARY.md` before the literature search. Combine with `base repo` for "improve this paper with this codebase" workflows.
 
-> 💡 These are defaults. Override by telling the skill, e.g., `/idea-discovery "topic" — auto proceed: false`, `/idea-discovery "topic" — ref paper: https://arxiv.org/abs/2406.04329`, or `/idea-discovery "topic" — compact: true`.
+> 💡 These are defaults. Override by telling the skill, e.g., `/idea-discovery "topic" — auto proceed: false`, `/idea-discovery "https://arxiv.org/abs/2406.04329"` (reference paper as SOTA baseline; mutually exclusive with topic), or `/idea-discovery "topic" — compact: true`.
 
 ## Pipeline
 
-### Phase 0: Load Research Brief (if available)
-
-Before starting any other phase, check for a detailed research brief in the project:
-
-1. Look for `RESEARCH_BRIEF.md` in the project root (or path passed as `$ARGUMENTS`)
-2. If found, read it and extract:
-   - Problem statement and context
-   - Constraints (compute, data, timeline, venue)
-   - What the user already tried / what didn't work
-   - Domain knowledge and non-goals
-   - Existing results (if any)
-3. Use this as the primary context for all subsequent phases — it replaces the one-line prompt
-4. If both `RESEARCH_BRIEF.md` and a one-line `$ARGUMENTS` exist, merge them (brief takes priority for details, argument sets the direction)
-
-If no brief exists, proceed normally with `$ARGUMENTS` as the research direction.
-
-> 💡 Create a brief from the template: `cp templates/RESEARCH_BRIEF_TEMPLATE.md RESEARCH_BRIEF.md`
-
-### Phase 0.5: Reference Paper Summary (when REF\_PAPER is set)
-
-**Skip entirely if** **`REF_PAPER`** **is** **`false`.**
-
-Summarize the reference paper before searching the literature:
-
-1. **If arXiv URL** (e.g., `https://arxiv.org/abs/2406.04329`):
-   - Invoke `/arxiv "ARXIV_ID" — download` to fetch the PDF
-   - Read the first 5 pages (title, abstract, intro, method overview)
-2. **If local PDF path** (e.g., `papers/reference.pdf`):
-   - Read the PDF directly (first 5 pages)
-3. **If other URL**:
-   - Fetch and extract content via WebFetch
-4. **Generate** **`idea-stage/REF_PAPER_SUMMARY.md`**:
-
-```markdown
-# Reference Paper Summary
-
-**Title**: [paper title]
-**Authors**: [authors]
-**Venue**: [venue, year]
-
-## What They Did
-[2-3 sentences: core method and contribution]
-
-## Key Results
-[Main quantitative findings]
-
-## Limitations & Open Questions
-[What the paper didn't solve, acknowledged weaknesses, future work suggestions]
-
-## Potential Improvement Directions
-[Based on the limitations, what could be improved or extended?]
-
-## Codebase
-[If `base repo` is also set: link to the repo and note which parts correspond to the paper]
-```
-
-**🚦 Checkpoint:** Present the summary to the user:
-
-```
-📄 Reference paper summarized:
-- Title: [title]
-- Key limitation: [main gap]
-- Improvement directions: [2-3 bullets]
-
-Proceeding to literature survey with this as context.
-```
-
-Phase 1 and Phase 2 will use `idea-stage/REF_PAPER_SUMMARY.md` as additional context — `/research-lit` searches for related and competing work, `/idea-creator` generates ideas that build on or improve the reference paper.
+> 💡 `$ARGUMENTS` accepts a plain research direction, a `.md` path (e.g., `idea-stage/RESEARCH_BRIEF.md`), or a paper reference (arXiv URL/ID, DOI, or local `.pdf` path). Modes are mutually exclusive — do not combine a topic string with a paper reference. For modes 2 and 3, `/research-lit` handles all extraction in Phase 1. Create a brief from the template: `cp templates/RESEARCH_BRIEF_TEMPLATE.md idea-stage/RESEARCH_BRIEF.md`
 
 ### Phase 1: Literature Survey
 
@@ -129,6 +62,7 @@ If `gemini-cli` is not installed, `/research-lit` skips the Gemini source gracef
 - Build a landscape map: sub-directions, approaches, open problems
 - Identify structural gaps, `B*` bottlenecks, `S*` solution attempts, and `G*` residual-gap seeds
 - Output a structured `Landscape Pack` for downstream idea generation, including `Evaluation Canon`, verified paper status, and `Gap Seeds`
+- For paper-reference mode, write `idea-stage/REF_PAPER_SUMMARY.md`; Phase 2 uses it as additional context so ideas build on or improve the reference paper
 - In `Evaluation Canon`, expect platform rows to carry `evaluation_platform`,
   `access_readiness`, `validates_refs`, and `platform_limitations`; expect
   workload rows to carry `workload_characteristics` and
