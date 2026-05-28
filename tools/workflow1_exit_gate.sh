@@ -35,12 +35,18 @@ The gate enforces every required field listed in
 `skills/shared-references/idea-handoff-schema.md` "Workflow 1 Exit Gate":
 - IDEA_REPORT.md, FINAL_PROPOSAL.md, EXPERIMENT_PLAN.md all exist.
 - The selected idea row has `handoff_to_workflow_1_5: ready`.
-- `baseline_evaluability_score` is 1 or 2 (0 cannot be ready).
+- `baseline_artifact_readiness.score` is 1 or 2 (0 cannot be ready).
+- `evaluation_feasibility_score` is 4 or 5 (1-3 cannot be ready).
+- `refine_verdict` is READY, `refine_overall_score` is at least 9,
+  `drift_status` is preserved or corrected, and `handoff_refresh_status`
+  is passed.
 - `canon_mapping` references both `EC-P*` and `EC-W*`.
 - core_baseline, metrics, target_validation_style,
-  evaluation_target_clarity, evaluation_target_feasibility,
-  evaluation_environment_access, idea_adapter_cost, pilot_runtime_cost,
-  negative_evidence_response are all present and non-empty.
+  evaluation_target_clarity, evaluation_feasibility_score,
+  evaluation_feasibility_breakdown, baseline_artifact_readiness,
+  baseline_verification_delta, negative_evidence_response,
+  refine_overall_score, refine_verdict, drift_status, and
+  handoff_refresh_status are all present and non-empty.
 
 Selected idea matching is case-insensitive exact match first; if that
 misses, the gate falls back to "selected value is a prefix of the row's
@@ -157,37 +163,20 @@ else:
     if record is None:
         fail("no ready handoff row found")
 
-handoff = record.get("handoff_to_workflow_1_5", "").lower()
-score = record.get("baseline_evaluability_score", "").strip()
-canon = record.get("canon_mapping", "")
-clarity = record.get("evaluation_target_clarity", "").strip().lower()
-feasibility = record.get("evaluation_target_feasibility", "").strip().lower()
-
-if handoff != "ready":
-    fail(f"selected idea is not ready for Workflow 1.5: handoff_to_workflow_1_5={handoff or 'missing'}")
-if score == "0":
-    fail("baseline_evaluability_score: 0 cannot be marked handoff_to_workflow_1_5: ready")
-if score not in {"1", "2"}:
-    fail(f"baseline_evaluability_score must be 1 or 2 for ready handoff, got: {score or 'missing'}")
-if not re.search(r"platform=\[?EC-P[0-9A-Za-z_-]*\]?", canon):
-    fail("canon_mapping must reference platform=[EC-P*]")
-if not re.search(r"workload=\[?EC-W[0-9A-Za-z_-]*\]?", canon):
-    fail("canon_mapping must reference workload=[EC-W*]")
-if clarity == "missing":
-    fail("evaluation_target_clarity: missing blocks Workflow 1.5 (must be clear or partial)")
-if feasibility == "unknown":
-    fail("evaluation_target_feasibility: unknown blocks Workflow 1.5 (resolve feasibility first)")
-
 required_nonempty = [
+    "baseline_artifact_readiness",
     "core_baseline",
     "metrics",
     "target_validation_style",
     "evaluation_target_clarity",
-    "evaluation_target_feasibility",
-    "evaluation_environment_access",
-    "idea_adapter_cost",
-    "pilot_runtime_cost",
+    "evaluation_feasibility_score",
+    "evaluation_feasibility_breakdown",
+    "baseline_verification_delta",
     "negative_evidence_response",
+    "refine_overall_score",
+    "refine_verdict",
+    "drift_status",
+    "handoff_refresh_status",
 ]
 for key in required_nonempty:
     if key not in record:
@@ -197,6 +186,64 @@ for key in required_nonempty:
         )
     if not record.get(key, "").strip():
         fail(f"missing required handoff field: {key}")
+
+handoff = record.get("handoff_to_workflow_1_5", "").lower()
+baseline_readiness = record.get("baseline_artifact_readiness", "").strip()
+baseline_match = re.search(r"(?:^|score\s*=\s*)([0-2])\b", baseline_readiness)
+baseline_score = baseline_match.group(1) if baseline_match else ""
+canon = record.get("canon_mapping", "")
+clarity = record.get("evaluation_target_clarity", "").strip().lower()
+feasibility_score = record.get("evaluation_feasibility_score", "").strip()
+feasibility_match = re.match(r"([1-5])\b", feasibility_score)
+feasibility_value = feasibility_match.group(1) if feasibility_match else ""
+feasibility_breakdown = record.get("evaluation_feasibility_breakdown", "")
+refine_score_text = record.get("refine_overall_score", "").strip()
+try:
+    refine_score = float(refine_score_text)
+except ValueError:
+    refine_score = -1.0
+refine_verdict = record.get("refine_verdict", "").strip().upper()
+drift_status = record.get("drift_status", "").strip().lower()
+handoff_refresh_status = record.get("handoff_refresh_status", "").strip().lower()
+
+if handoff != "ready":
+    fail(f"selected idea is not ready for Workflow 1.5: handoff_to_workflow_1_5={handoff or 'missing'}")
+if baseline_score == "0":
+    fail("baseline_artifact_readiness.score: 0 cannot be marked handoff_to_workflow_1_5: ready")
+if baseline_score not in {"1", "2"}:
+    fail(
+        "baseline_artifact_readiness.score must be 1 or 2 for ready handoff, "
+        f"got: {baseline_readiness or 'missing'}"
+    )
+if not re.search(r"platform=\[?EC-P[0-9A-Za-z_-]*\]?", canon):
+    fail("canon_mapping must reference platform=[EC-P*]")
+if not re.search(r"workload=\[?EC-W[0-9A-Za-z_-]*\]?", canon):
+    fail("canon_mapping must reference workload=[EC-W*]")
+if clarity == "missing":
+    fail("evaluation_target_clarity: missing blocks Workflow 1.5 (must be clear or partial)")
+if feasibility_value not in {"4", "5"}:
+    fail(
+        "evaluation_feasibility_score must be 4 or 5 for ready handoff, "
+        f"got: {feasibility_score or 'missing'}"
+    )
+for required_breakdown_key in (
+    "platform_workload_access",
+    "evaluation_adapter_cost",
+    "first_signal_runtime",
+):
+    if required_breakdown_key not in feasibility_breakdown:
+        fail(f"evaluation_feasibility_breakdown must include {required_breakdown_key}")
+if refine_verdict != "READY":
+    fail(f"refine_verdict must be READY for ready handoff, got: {refine_verdict or 'missing'}")
+if refine_score < 9:
+    fail(f"refine_overall_score must be >= 9 for ready handoff, got: {refine_score_text or 'missing'}")
+if drift_status not in {"preserved", "corrected"}:
+    fail(f"drift_status must be preserved or corrected for ready handoff, got: {drift_status or 'missing'}")
+if handoff_refresh_status != "passed":
+    fail(
+        "handoff_refresh_status must be passed for ready handoff, "
+        f"got: {handoff_refresh_status or 'missing'}"
+    )
 
 print(f"Workflow 1 exit gate passed: {record.get('idea', selected_idea or 'selected idea')}")
 PY

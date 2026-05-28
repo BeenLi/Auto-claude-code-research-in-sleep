@@ -19,8 +19,10 @@ Show after `/idea-creator`, novelty checks, and review:
 
 - ranked idea title and one-line shape
 - `overall_merit_score`
-- `evaluation_target_feasibility`
+- `evaluation_feasibility_score`
+- `evaluation_feasibility_breakdown`
 - `core_baseline` short ID
+- `baseline_artifact_readiness`
 - `canon_mapping`
 - `handoff_to_workflow_1_5`
 - `main_blocker` for backups or deferred ideas
@@ -36,6 +38,8 @@ Show after `/research-refine-pipeline`:
 - method thesis
 - dominant contribution
 - required experiment blocks
+- `refine_overall_score`, `refine_verdict`, `drift_status`, and
+  `handoff_refresh_status`
 - paths to `refine-logs/FINAL_PROPOSAL.md` and `refine-logs/EXPERIMENT_PLAN.md`
 - Workflow 1 exit-gate status
 

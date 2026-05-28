@@ -1772,8 +1772,7 @@ Override inline: `/research-pipeline "topic" — auto proceed: false, illustrati
 
 | Constant | Default | Description | Pass-through |
 |----------|---------|-------------|:---:|
-| `MAX_HANDOFF_IDEAS` | 6 | Write evaluation handoff plans for at most 6 strong ideas; Workflow 1 does not run pilots | — |
-| `MAX_READY_FOR_WORKFLOW_1_5` | 3 | Mark at most 3 ideas as immediate Workflow 1.5 candidates | — |
+| Handoff planning | priority-ordered | Attempt the highest-ranked survivor first; if blocked, record the blocker and move to the next survivor. Only one selected ready idea crosses into Workflow 1.5 | — |
 | `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | — |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `research-lit` |
 | `COMPACT` | false | Generate compact summary files for short-context models and session recovery | — |

@@ -58,9 +58,9 @@ After Workflow 1 generates the report, proposal, and experiment plan, **pause an
 ```
 📋 Idea Discovery complete. Top ideas:
 
-1. [Idea 1 title] — merit: [1-4], feasibility: [high/medium/low/unknown], handoff: ready, schema: `idea-handoff-schema.md`
-2. [Idea 2 title] — merit: [1-4], feasibility: [high/medium/low/unknown], handoff: needs_canon_clarification, schema: `idea-handoff-schema.md`
-3. [Idea 3 title] — merit: [1-4], feasibility: [low], handoff: designed_not_run, blocker: [main_blocker]
+1. [Idea 1 title] — merit: [1-5], evaluation_feasibility_score: [4|5], handoff: ready, schema: `idea-handoff-schema.md`
+2. [Idea 2 title] — merit: [1-5], evaluation_feasibility_score: [1-5], handoff: needs_canon_clarification, schema: `idea-handoff-schema.md`
+3. [Idea 3 title] — merit: [1-5], evaluation_feasibility_score: [1|2], handoff: designed_not_run, blocker: [main_blocker]
 
 Recommended: Idea 1. Shall I proceed to Workflow 1.5 evaluation contract and implementation bridge?
 ```
@@ -72,7 +72,7 @@ Recommended: Idea 1. Shall I proceed to Workflow 1.5 evaluation contract and imp
 - **Reject all ideas** → collect feedback on what's missing, re-run Stage 1 with adjusted research direction. Repeat until the user commits to an idea.
 - **Stop here** → save current state to `idea-stage/IDEA_REPORT.md` for future reference.
 
-**If `AUTO_PROCEED=true`:** Present the top ideas, wait briefly for user input if interactive, auto-select the #1 ranked idea with the strongest overall merit and evaluation target feasibility. If the highest-merit idea has `evaluation_target_feasibility: low`, keep it as deferred and select the highest-ranked feasible idea for immediate Workflow 1.5. Log: `"AUTO_PROCEED: selected Idea 1 — [title]"`.
+**If `AUTO_PROCEED=true`:** Present the top ideas, wait briefly for user input if interactive, auto-select the #1 ranked idea with the strongest overall merit and evaluation feasibility score. If the highest-merit idea has `evaluation_feasibility_score <= 3`, keep it as deferred or clarification-needed and select the highest-ranked idea with `evaluation_feasibility_score` 4 or 5 for immediate Workflow 1.5. Log the actual selected label and title, for example: `"AUTO_PROCEED: selected [Idea N] — [title]"`.
 
 ### Stage 2: Evaluation Contract + Implementation Bridge (Workflow 1.5)
 
@@ -84,8 +84,8 @@ Once the user confirms which idea to pursue:
    - If it is missing, Workflow 1 has not completed the refinement/planning path. Continue `/idea-discovery` or run `/research-refine-pipeline` for the selected idea before invoking `/experiment-bridge`.
 
 2. **Run the Workflow 1 → 1.5 Handoff Gate**:
-   - Run `tools/workflow1_exit_gate.sh --idea-report idea-stage/IDEA_REPORT.md --experiment-plan refine-logs/EXPERIMENT_PLAN.md --selected-idea "[title]"`.
-   - The gate enforces `../shared-references/idea-handoff-schema.md`: score `0` cannot be ready, canon mapping must cite `EC-P*` and `EC-W*`, and required handoff fields must be present.
+   - Run `tools/workflow1_exit_gate.sh --idea-report idea-stage/IDEA_REPORT.md --experiment-plan refine-logs/EXPERIMENT_PLAN.md --final-proposal refine-logs/FINAL_PROPOSAL.md --selected-idea "[title]"`.
+   - The gate enforces `../shared-references/idea-handoff-schema.md`: `baseline_artifact_readiness.score: 0` cannot be ready, `canon_mapping` must cite `EC-P*` and `EC-W*`, `refine_verdict` must be `READY`, `refine_overall_score` must be at least `9`, `drift_status` must not be `drifted`, `handoff_refresh_status` must be `passed`, and required handoff fields must be present.
    - If any gate item fails, do not invoke `/experiment-bridge`; return to `/research-lit`, `/idea-discovery`, or `/research-refine-pipeline` as appropriate.
 
 3. **Invoke `/experiment-bridge` before implementation**:
@@ -99,7 +99,7 @@ Once the user confirms which idea to pursue:
    - baseline source, platform/workload, and metrics are explicit
    - handoff feasibility and access assumptions are explicit
    - `handoff_gate_status`, `baseline_go_no_go`, `baseline_smoke_required`, and `baseline_evidence_strength` are recorded
-   - selected evaluation backend follows the baseline/canon mapping
+   - selected evaluation backend follows the baseline and platform/workload mapping
    - workload and metrics are decisive for the idea, not merely copied from prior work
    - baseline reproduction mode and idea execution readiness are honest
 

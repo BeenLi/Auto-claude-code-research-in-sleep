@@ -254,7 +254,7 @@ For every relevant paper, extract and write into Section 1:
 - Evaluation platform/substrate → `Eval Platform` column (e.g., `BF3 DPU`, `A100 cluster`, `LLMServingSim`); use `none/NA` when not reported.
 - Benchmark/workload/trace → `Workload` column (e.g., `NCCL AllReduce`, `GPT-3 175B prefill`); use `none/NA` when not reported.
 - Comparison systems → `Baseline` column (e.g., `raw RDMA`, `PEDAL`, `vLLM 0.4`); use `none/NA` when not reported.
-- Metrics, artifact/code status, and evaluation limitations (these feed Section 4 Evaluation Canon `EC-P*`/`EC-W*` rows).
+- Metrics, artifact/code status, and evaluation limitations. Metrics feed bottleneck and result summaries; artifact/code status and evaluation limitations feed Section 4 Evaluation Canon `EC-P*`/`EC-W*` rows.
 
 ### 4. Synthesize Landscape
 

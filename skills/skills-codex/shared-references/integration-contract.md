@@ -173,9 +173,12 @@ and confirm all seven columns are populated.
 The idea handoff from `/idea-creator` and `/research-refine-pipeline`
 (Workflow 1) to `/experiment-bridge` (Workflow 1.5) is under this contract, but
 the field list lives in `shared-references/idea-handoff-schema.md`. That file is
-the only canonical source for `core_baseline`, `baseline_evaluability_score`,
+the only canonical source for `core_baseline`, `baseline_artifact_readiness`,
 `canon_mapping`, metrics, `negative_evidence_response`, validation style,
-feasibility fields, `handoff_to_workflow_1_5`, and `main_blocker`.
+`evaluation_feasibility_score`, `evaluation_feasibility_breakdown`,
+`baseline_verification_delta`, `refine_overall_score`, `refine_verdict`,
+`drift_status`, `handoff_refresh_status`, `handoff_to_workflow_1_5`, and
+`main_blocker`.
 
 Producer side:
 - `/idea-creator` writes report/candidate shapes from templates.

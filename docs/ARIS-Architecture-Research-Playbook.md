@@ -1,7 +1,7 @@
 [GitHub 原文](https://github.com/BeenLi/Auto-claude-code-research-in-sleep/blob/myMain/docs/ARIS-Architecture-Research-Playbook.md)
 本文档把当前仓库的 ARIS 工作流展开到 skill、reviewer、状态文件和中间产物级别。
 ## 0.1 总览
-**Workflow 1 -- Idea Discovery** (`/idea-discovery "topic"`): `research-lit` -> `idea-creator` -> `novelty-check` -> `research-review` -> `research-refine` -> `experiment-plan`
+**Workflow 1 -- Idea Discovery** (`/idea-discovery "topic"`): `research-lit` -> `idea-creator` -> `novelty-check` -> `research-review` -> `research-refine-pipeline`
 
 **Workflow 1.5 -- Experiment Bridge** (`/experiment-bridge`): Reads `refine-logs/EXPERIMENT_PLAN.md` -> implements code -> deploys experiments -> collects initial results in `EXPERIMENT_LOG.md`
 
@@ -160,10 +160,10 @@ Inputs:
 - Local papers, Zotero, web/arXiv/Semantic Scholar depending on selected sources.
 - Research Domain from `AGENTS.md`: This ARIS instance is configured for **Computer Architecture / AI Infrastructure for LLM** research with a hardware-leaning systems focus.
 
-Controls and limits:
+Controls and defaults:
 
-- `MAX_HANDOFF_IDEAS = 6`: write evaluation handoff plans for at most six strong ideas.
-- `MAX_READY_FOR_WORKFLOW_1_5 = 3`: mark at most three ideas as immediate Workflow 1.5 candidates.
+- Handoff planning is priority-ordered: attempt the highest-ranked survivor first, then move to the next survivor only when the current idea records a concrete blocker.
+- Immediate Workflow 1.5 entry is single-selected: only an idea with `handoff_to_workflow_1_5: ready`, `baseline_artifact_readiness.score` 1 or 2, `evaluation_feasibility_score` 4 or 5, `refine_verdict: READY`, `refine_overall_score >= 9`, non-drifted `drift_status`, and `handoff_refresh_status: passed` should cross the exit gate.
 - `AUTO_PROCEED = true`: proceed with the best option at checkpoints unless the user overrides.
 - `COMPACT = false`: when enabled, write a lean `idea-stage/IDEA_CANDIDATES.md` for recovery and downstream handoff.
 - `REF_PAPER = false`: when set, summarize the reference paper and use it as context for literature and idea generation.
@@ -389,9 +389,9 @@ flowchart TB
 `/idea-creator` turns the landscape into ranked, evaluable ideas.
 
 - Inputs: `idea-stage/LITERATURE_REVIEW.md`, its `Landscape Pack`, optional `idea-stage/REF_PAPER_SUMMARY.md`, optional `research-wiki/` query pack, and domain constraints.
-- Process: load prior memory, generate 8-12 ideas, filter by architecture/systems relevance, extract evaluation canon mappings, run first-pass ranking, and prepare deeper validation for top ideas.
+- Process: load prior memory, generate 8-12 ideas, filter by literature-derived topic fit and concrete research question, extract Evaluation Canon platform/workload mappings, run first-pass ranking with `overall_merit_score` and `evaluation_feasibility_score`, and prepare deeper validation for priority-ordered survivors.
 - Outputs: `idea-stage/IDEA_REPORT_{YYYYMMDD_HHmmssZ}.md`, latest copy `idea-stage/IDEA_REPORT.md`, optional `idea-stage/IDEA_CANDIDATES.md` in compact mode, wiki idea pages when enabled, and `MANIFEST.md` rows.
-- Handoff: writes `evaluation_handoff_plan` for the top 4-6 ideas and marks at most 2-3 immediate Workflow 1.5 candidates with `handoff_to_workflow_1_5`.
+- Handoff: writes `evaluation_handoff_plan` in priority order until one idea is `handoff_to_workflow_1_5: ready`; later viable ideas stay as backup, deferred, or clarification-needed entries.
 - Stop or degrade: Workflow 1 does not run pilots or baseline reproduction; unclear platform/workload/baseline paths become `needs_canon_clarification` or `designed_not_run`, not fake readiness.
 
 `/novelty-check` tests whether the selected idea has a defensible technical delta.
@@ -443,7 +443,7 @@ These are compact template summaries for auditing output shape. The detailed can
 
 - Header: direction, UTC generation time, generated/survived/handoff/recommended counts.
 - `Landscape Summary`: concise synthesis from the literature review.
-- `Recommended Ideas`: ranked ideas with idea shape, merit, idea-local `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, metrics, validation style, feasibility fields, platform path, blocker, reviewer objection, and rationale.
+- `Recommended Ideas`: ranked ideas with idea shape, `overall_merit_score`, idea-local `core_baseline`, `baseline_artifact_readiness`, `canon_mapping`, metrics, validation style, `evaluation_feasibility_score`, `evaluation_feasibility_breakdown`, refine score/verdict/drift/refresh fields, `baseline_verification_delta`, blocker, reviewer objection, and rationale.
 - `Eliminated Ideas`: idea, category, reason, revisit condition.
 - `Deferred / Designed-Not-Run Ideas`: why deferred and what must become available.
 - `Evaluation Handoff Summary`: compact table of ranking, feasibility, baseline, canon, metrics, validation style, `negative_evidence_response`, handoff status, blocker.
@@ -485,7 +485,7 @@ These are compact template summaries for auditing output shape. The detailed can
 - Header: problem, method thesis, date.
 - `Claim Map`: claim, why it matters, minimum convincing evidence, linked blocks.
 - `Paper Storyline`: main-paper proof, appendix support, intentionally cut experiments.
-- `Evaluation Inputs`: idea-local `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, metrics, validation style, clarity, feasibility, baseline reproducibility, environment access, adapter cost, pilot runtime cost.
+- `Evaluation Inputs`: idea-local `core_baseline`, `baseline_artifact_readiness`, `canon_mapping`, metrics, validation style, clarity, `evaluation_feasibility_score`, `evaluation_feasibility_breakdown`, `baseline_verification_delta`, `negative_evidence_response`, `refine_overall_score`, `refine_verdict`, `drift_status`, and `handoff_refresh_status`.
 - `Experiment Blocks`: claim tested, purpose, referenced Evaluation Inputs, workload/configuration, compared systems, decisive metrics, setup, success criterion, failure interpretation, table/figure target, priority.
 - `Run Order and Milestones`, `Validation Budget`, `Risks and Mitigations`, `Final Checklist`.
 
@@ -521,7 +521,7 @@ Inputs:
 - Optional `refine-logs/EXPERIMENT_TRACKER.md`.
 - Optional `refine-logs/FINAL_PROPOSAL.md`.
 - `idea-stage/IDEA_REPORT.md` and `idea-stage/docs/research_contract.md` when available.
-- Evaluation handoff fields from Workflow 1: idea-local `core_baseline`, `baseline_evaluability_score`, `canon_mapping`, `metrics`, `target_validation_style`, feasibility, environment access, adapter cost, pilot runtime cost, and `handoff_to_workflow_1_5`.
+- Evaluation handoff fields from Workflow 1: idea-local `core_baseline`, `baseline_artifact_readiness`, `canon_mapping`, `metrics`, `target_validation_style`, `evaluation_target_clarity`, `evaluation_feasibility_score`, `evaluation_feasibility_breakdown`, `baseline_verification_delta`, `negative_evidence_response`, `refine_overall_score`, `refine_verdict`, `drift_status`, `handoff_refresh_status`, and `handoff_to_workflow_1_5`.
 
 Internal stages:
 
@@ -529,7 +529,7 @@ Internal stages:
 2. Evaluate the Workflow 1 -> 1.5 handoff gate before implementation.
 3. Write `refine-logs/EVALUATION_CONTRACT.md` first.
 4. Map `handoff_to_workflow_1_5` to `idea_execution_readiness`.
-5. Select the evaluation backend from `core_baseline` and `canon_mapping`; do not use a global fixed simulator default.
+5. Select the evaluation backend from `core_baseline` plus the platform/workload IDs in `canon_mapping`; do not use a global fixed simulator default.
 6. Apply the baseline reproduction Go/No-Go rule.
 7. Run baseline smoke first when required.
 8. Write or update `refine-logs/EXPERIMENT_MANIFEST.yaml`.

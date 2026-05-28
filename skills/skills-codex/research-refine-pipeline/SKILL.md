@@ -146,7 +146,9 @@ Write `refine-logs/PIPELINE_SUMMARY.md`:
 At this workflow exit, apply `shared-references/research-contract-maintenance.md` to create or refresh `idea-stage/docs/research_contract.md`.
 This is only a workflow-exit gate; experiment-plan is the semantic owner of `refine-logs/EXPERIMENT_PLAN.md`.
 Run or report the equivalent of `tools/workflow1_exit_gate.sh` before handing
-off to Workflow 1.5.
+off to Workflow 1.5. The selected idea must carry refreshed handoff fields from
+`research-refine`: `refine_overall_score >= 9`, `refine_verdict: READY`,
+`drift_status` in `preserved|corrected`, and `handoff_refresh_status: passed`.
 
 ### Phase 5: Present a Brief Summary to the User
 

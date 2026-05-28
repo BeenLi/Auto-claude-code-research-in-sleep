@@ -132,7 +132,7 @@ def test_downstream_skill_wording_matches_nested_landscape_pack() -> None:
     assert "Core Baseline Candidates" not in idea_creator
     assert "Simulator / Prototype Readiness" not in idea_creator
     assert "idea-local baseline record" in idea_creator
-    assert "baseline_evaluability_score" in idea_creator
+    assert "baseline_artifact_readiness" in idea_creator
 
     assert "Bottleneck Evidence: B* bottlenecks and S* solution attempts" in idea_discovery
     assert "Evaluation Canon: platforms=[EC-P* evaluation_platform/access_readiness summary], workloads=[EC-W* workload_characteristics summary]" in idea_discovery
@@ -148,7 +148,7 @@ def test_research_pipeline_still_preserves_handoff_contract_ids() -> None:
     assert "../shared-references/idea-handoff-schema.md" in research_pipeline
     assert "tools/workflow1_exit_gate.sh" in research_pipeline
     assert "`core_baseline`" in schema
-    assert "`baseline_evaluability_score: 0` cannot be `handoff_to_workflow_1_5: ready`" in schema
+    assert "`baseline_artifact_readiness.score: 0` cannot be `handoff_to_workflow_1_5: ready`" in schema
     assert "The platform ID must reference `EC-P*`" in schema
     assert "the workload ID must reference `EC-W*`" in schema
 
@@ -244,11 +244,11 @@ def test_idea_creator_requires_idea_local_verified_baselines() -> None:
         "metrics",
         "artifact_status",
         "baseline_reproducibility",
-        "baseline_evaluability_score",
-        "`2` = official/open-source/config reproducible",
-        "`1` = paper-only or unknown",
+        "baseline_artifact_readiness",
+        "`2` = verified and official/open-source/config reproducible",
+        "`1` = verified but paper-only or unknown reproducibility",
         "`0` = proprietary/unavailable or unverified-only",
-        "`baseline_evaluability_score: 0` cannot be `handoff_to_workflow_1_5: ready`",
+        "`baseline_artifact_readiness.score: 0` cannot be `handoff_to_workflow_1_5: ready`",
     ]
     for fragment in required_fragments:
         assert fragment in schema

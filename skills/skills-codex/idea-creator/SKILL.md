@@ -13,7 +13,7 @@ Generate publishable research ideas for: $ARGUMENTS
 
 Given a broad research direction from the user, systematically generate, validate, and rank concrete research ideas. This skill composes with `/research-lit`, `/novelty-check`, and `/research-review` to form a complete idea discovery pipeline.
 
-For this repository, the default domain is **AI infrastructure for LLM** with a computer architecture / systems bias. Valid ideas may sit in compute, memory, data movement, network, storage, runtime, or their boundaries. Do not impose protocol-, platform-, or mechanism-specific constraints globally; derive the right evaluation platforms, benchmarks, baselines, and metrics from the literature for the current topic.
+The research domain is not hard-coded in this skill. Always derive the domain context from `idea-stage/LITERATURE_REVIEW.md`, especially the Section 4 `Topic Scope`, `Bottleneck Evidence`, `Evaluation Canon`, `Gap Seeds`, and `Competitive Landscape`. Do not inject a repository-wide domain default; derive the right venues, mechanisms, evaluation platforms, benchmarks, baselines, and metrics from the loaded literature for the current topic.
 
 Shared references:
 - Handoff fields and Workflow 1 exit gate: `../shared-references/idea-handoff-schema.md`
@@ -22,8 +22,6 @@ Shared references:
 
 ## Constants
 
-- **MAX_HANDOFF_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not execute pilots.
-- **MAX_READY_FOR_WORKFLOW_1_5 = 3** — Mark at most 3 ideas as immediate Workflow 1.5 candidates.
 - **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex subagent for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
 - **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
@@ -31,47 +29,42 @@ Shared references:
 
 > Override via argument, e.g., `/idea-creator "topic" — handoff: analytical_model only`.
 
-## AI Infrastructure Layer Taxonomy
-
-Use AI infrastructure for LLM as a broad systems scope: compute/accelerator,
-memory and data movement, interconnect/network, storage/checkpointing/data
-pipeline, runtime/system, and multi-layer topics. Treat these as loose
-brainstorming labels, not hard gates.
-
 ## Scoring and Filtering Rubric
 
 Use this rubric in Phase 3. Phase 2 only generates candidate ideas and hints.
 
-Hard gates:
-1. The problem must be an LLM / AI infrastructure problem in the selected topic scope.
-2. The idea must name a concrete architecture, systems, measurement, benchmark, trace/workload, or mechanism question.
-
-Default weighted score after hard gates:
+Default weighted score:
 - Overall merit: 60%
-- Evaluation target feasibility: 40%
+- Evaluation feasibility score: 40%
 
-`overall_merit_score` follows a MICRO/HPCA-style reviewer scale where 1 is best and 4 is worst:
-- `1`: Surprisingly new contribution, or likely to have major impact on future research/products; may inspire new research or start a new line.
-- `2`: New contribution, or likely to impact future research/products.
-- `3`: Incremental improvement, or likely to have minor impact.
-- `4`: No novelty, or unlikely to have meaningful impact.
+`overall_merit_score` follows a target-venue reviewer scale where 5 is best and 1 is worst:
+- `5`: Surprisingly new contribution, or likely to have major impact on future research/products; may inspire new research or start a new line.
+- `4`: Clear new contribution, or likely to impact future research/products.
+- `3`: Incremental but valid improvement, with limited yet non-trivial impact.
+- `2`: Weak novelty or marginal impact; generally not enough to justify acceptance.
+- `1`: No clear novelty, or unlikely to have meaningful impact; should be rejected.
 
-For weighted ranking, convert it with `overall_merit_points = 5 - overall_merit_score`.
+`evaluation_feasibility_score` provides a comprehensive assessment of the engineering effort, resource availability, and time required to achieve a credible first-signal pilot on a 1-5 high-is-better scale. It is a merged gate field determined by four primary factors:
+1. **`platform_workload_access`**: Do we have access to the specific hardware, required cluster scale, or necessary production traces/data described by the selected EC-P*/EC-W* mapping?
+2. **`baseline_artifact_readiness`**: A single structured baseline gate with `score`, `status`, `verification_status`, `evidence`, and `adapter_notes`. This replaces any separate baseline-code score.
+3. **`evaluation_adapter_cost`**: What adapter or integration work is required before the first credible pilot?
+4. **`first_signal_runtime`**: How long does it take to run the experiment that yields the *decisive metric*? This dictates the idea iteration speed (minutes/hours vs. weeks).
 
-`evaluation_target_feasibility` estimates the distance to a credible first-signal pilot:
-- It is an aggregate score from `baseline_reproducibility`, `evaluation_environment_access`, `idea_adapter_cost`, and `pilot_runtime_cost`.
-- `high`: baseline is `official_artifact`, `open_source_system`, or `config_reproducible`; environment is `ready` or `small_adapter_needed`; idea adapter cost is `parameter_or_config_only`, `small_local_patch`, or `moderate_adapter`; `pilot_runtime_cost` is exactly `minutes_to_hours`; no subfactor is unknown and there is no unavailable/proprietary artifact, unavailable environment, or major platform bring-up.
-- `medium`: comparison target and evaluation environment are credible, but first-signal feedback takes `one_to_two_days` or `multi_day_to_two_weeks`, or the idea needs `major_system_change` while baseline/platform/workload remain available; no hard blocker is present.
-- `low`: baseline is paper-only/proprietary, platform/workload needs major bring-up, idea needs a new platform/prototype, workload is unavailable, or first-signal pilot is long-running/large-scale. Keep high-merit ideas as deferred rather than eliminated.
-- `unknown`: key artifact, platform, workload, baseline, or runtime information is missing; return to artifact/canon clarification rather than treating it as scientific rejection.
+- **CRITICAL DISTINCTION in Systems Research**: "Baseline" (code) is separate from "Platform/Workload" (hardware/data). A perfectly open-source baseline still yields a low feasibility score if it requires inaccessible hardware or proprietary traces. Summarize the dominant rationale among these 4 factors in the score value or adjacent prose instead of adding separate handoff columns.
 
-For weighted ranking, map feasibility as `high=4`, `medium=3`, `low=2`, `unknown=1`.
+- `5`: ready evaluation path: `baseline_artifact_readiness.score` is `2`; platform/workload access is ready; adapter cost is small; first-signal runtime is minutes to hours.
+- `4`: near-ready evaluation path: comparison target and platform/workload path are credible; implementation intrusiveness is minor to moderate; first signal should arrive within one to two days; no hard blocker is present.
+- `3`: feasible but nontrivial: the path likely works, but needs major architectural changes, multi-day/multi-week bring-up, or reimplementing a closed-source baseline.
+- `2`: weak feasibility: `baseline_artifact_readiness.score` is `0` or `1`, platform/workload needs major bring-up, the idea needs a new platform/prototype, workload is unavailable, or pilot cost is large-scale/long-running.
+- `1`: no credible evaluation path: key artifact, platform, workload, baseline, comparison target, or runtime information is unavailable/unknown enough to block Workflow 1.5.
 
 ## Evaluation Canon And Baseline Extraction
 
-Before brainstorming, extract the current topic's evidence canon from
-`idea-stage/LITERATURE_REVIEW.md`. This canon anchors idea quality without
-hard-coding any previous topic's assumptions.
+Before brainstorming, extract the current topic's Evaluation Canon from
+`idea-stage/LITERATURE_REVIEW.md`. In this workflow, Evaluation Canon means only
+the literature-derived platform/workload reference set: `EC-P*` platform rows
+and `EC-W*` workload rows. It anchors evaluation provenance without hard-coding
+any previous topic's assumptions.
 
 From the literature review, identify:
 - **Bottleneck Evidence**: `Bottlenecks` rows with stable `B*` IDs and `Solution Attempts` rows with stable `S*` IDs. Use `Solution Attempts` as the mechanism source.
@@ -90,14 +83,14 @@ If the loaded Landscape Pack still contains the legacy global baseline pool or
 legacy simulator/prototype readiness heading, stop and ask to re-run
 `/research-lit`; do not try to parse the old schema.
 
-Use the canon in filtering and reviewer prompts as provenance for
-platform/workload choices. `canon_mapping` must only contain
+Use the Evaluation Canon only as provenance for platform/workload choices.
+`canon_mapping` must only contain
 `platform=[EC-P*]; workload=[EC-W*]`. Baseline, metrics, and target validation
 style are idea-specific decisions: build an idea-local baseline record for each
-surviving idea, not a global baseline pool. If the platform/workload canon is
-missing, mark `handoff_to_workflow_1_5: needs_canon_clarification` or
-`main_blocker: unclear_canon_mapping`; do not invent a platform requirement
-from a different topic.
+surviving idea, not a global baseline pool. If the required EC-P/EC-W evidence
+is missing, mark `handoff_to_workflow_1_5: needs_canon_clarification` or
+`main_blocker: unclear_canon_mapping`; do not invent a platform or workload
+requirement from a different topic.
 
 Each idea-local baseline record must follow
 `../shared-references/idea-handoff-schema.md`.
@@ -105,14 +98,23 @@ Each idea-local baseline record must follow
 Baseline source rules:
 - Prefer a verified paper/system from Section 1 or a verified competitor from
   Section 4.
+- Do not re-run `verify_papers.py` for Section 1 or Section 4 evidence already verified by `/research-lit`.
+  Mark those baselines with `baseline_verification_delta: verified_by_research_lit`.
+- Run `verify_papers.py` only when `idea-creator` adds a new baseline candidate
+  from a narrow quick baseline lookup. Before doing this, announce the lookup to
+  the user with the idea ID, the missing comparison target, and why the loaded
+  literature evidence is insufficient.
 - If a good idea needs a better comparison target, run a narrow quick baseline
-  lookup and send the resulting candidate through `verify_papers.py` before it
-  can be used as `ready` evidence.
+  lookup, send only the new candidate through `verify_papers.py`, and record
+  `baseline_verification_delta: new_baseline_lookup` with the lookup query,
+  verifier output path, verification status, and whether the new evidence
+  changed `handoff_to_workflow_1_5`.
 - A baseline backed only by `unverified`, `verify_pending`, or `error` evidence
   may be discussed but cannot make the idea ready.
 
-Resolve `verify_papers.py` with the canonical chain (same pattern as
-`/research-lit` Step 2.5; see also
+Resolve `verify_papers.py` with the canonical chain only for new
+`idea-creator` baseline candidates (same pattern as `/research-lit` Step 2.5;
+see also
 `../shared-references/integration-contract.md` row "Candidate paper
 verification"):
 
@@ -124,7 +126,7 @@ VERIFY_SCRIPT=".aris/tools/verify_papers.py"
 [ -f "$VERIFY_SCRIPT" ] || { [ -n "${ARIS_REPO:-}" ] && VERIFY_SCRIPT="$ARIS_REPO/tools/verify_papers.py"; }
 [ -f "$VERIFY_SCRIPT" ] || { echo "WARN: verify_papers.py unresolved; treat new baseline candidates as unverified." >&2; VERIFY_SCRIPT=""; }
 
-# Then, per candidate batch:
+# Then, only when idea-creator has new baseline candidates:
 mkdir -p .aris/verify-papers
 [ -n "$VERIFY_SCRIPT" ] && python3 "$VERIFY_SCRIPT" \
   --input .aris/verify-papers/idea-creator_baseline_candidates.json \
@@ -132,13 +134,15 @@ mkdir -p .aris/verify-papers
 ```
 
 When `$VERIFY_SCRIPT` is empty, mark the new candidate as
-`verification_status: unverified` and treat the affected idea as
-`designed_not_run` or set `main_blocker: unclear_comparison_target` rather
-than `ready`.
+`verification_status: unverified`, record
+`baseline_verification_delta: verification_unresolved`, and treat the affected
+idea as `designed_not_run` or set
+`main_blocker: unclear_comparison_target` rather than `ready`.
 
-Use the shared schema's `baseline_evaluability_score` rule: `2` is
-official/open-source/config reproducible, `1` is paper-only/unknown, and `0`
-is proprietary/unavailable/unverified-only. Score `0` must not be marked
+Use the shared schema's `baseline_artifact_readiness.score` rule: `2` is verified
+and official/open-source/config reproducible, `1` is verified but paper-only or
+unknown reproducibility, and `0` is proprietary/unavailable/unverified-only.
+Score `0` must not be marked
 `handoff_to_workflow_1_5: ready`; downrank, defer, or set the blocker instead.
 
 ## Workflow
@@ -194,8 +198,8 @@ Read: idea-stage/LITERATURE_REVIEW.md
 - **Section 1** (paper table) → known-papers set for deduplication
 - **Section 2** (landscape map) → sub-direction clusters, what's been tried
 - **Section 2.5** (negative evidence) → `NE-*` table of refuted assumptions and
-  multi-baseline failure modes; **this is a HARD GATE in Phase 3** — every
-  surviving idea must declare a `negative_evidence_response` (see Phase 3 below)
+  multi-baseline failure modes; every surviving idea must declare a
+  `negative_evidence_response` (see Phase 3 below)
 - **Section 3** (structural gaps) → the 5-lens gap analysis — **this is the primary input for Phase 2 brainstorming**
 - **Section 4** (Landscape Pack) → topic scope, bottleneck evidence (`Bottlenecks` and `Solution Attempts`), Evaluation Canon (`Platforms` and `Workloads`), `Gap Seeds`, and Competitive Landscape top competing papers / excluded competitors
 - **Bottleneck Evidence** → `B*` bottlenecks plus `S*` solution attempts; use `Solution Attempts` as the mechanism source
@@ -204,26 +208,10 @@ Read: idea-stage/LITERATURE_REVIEW.md
 
 Announce: _"Loaded research-lit from `idea-stage/LITERATURE_REVIEW.md`: {N} papers, {V} verified papers, {NE} negative-evidence rows, {M} structural gaps, {K} Gap Seeds, {P} platforms, and {W} workloads for {topic} identified."_
 
-If Section 2.5 is absent (i.e., the literature review was produced by an older
-`/research-lit` version), warn:
-> ⚠️ `Section 2.5 -- Negative Evidence` not found. The current `/research-lit`
-> emits a hard-gate `NE-*` table. Re-run `/research-lit "{topic}"` to get the
-> Negative Evidence gate before Phase 3; proceeding without it disables the
-> hard gate and may surface ideas whose hidden assumptions have been refuted.
-Treat the negative-evidence set as empty (`NE-*` absent) but still record this
-in the final report under `idea_health.negative_evidence_gate: skipped`.
-
 **If not found**: Warn the user:
-> ⚠️ No `idea-stage/LITERATURE_REVIEW.md` found. It is strongly recommended to run `/research-lit "{topic}"` first — it produces the landscape map and structural gaps that drive idea quality. Proceeding with a minimal web-only landscape survey (results will be shallower).
+> ⚠️ No `idea-stage/LITERATURE_REVIEW.md` found. Please run `/research-lit "{topic}"` first to generate the landscape map and structural gaps.
 
-Then run a condensed version: WebSearch across MICRO/ISCA/HPCA/NSDI/SIGCOMM for top 10 papers, build a basic landscape map, and identify gaps as best as possible.
-
-> **All landscape search is done by `/research-lit`.** If the loaded output is
-> stale or incomplete, re-run `/research-lit` first rather than rebuilding the
-> landscape here. `idea-creator` may run only narrow quick baseline lookup for a
-> specific idea, and those candidates must pass through `verify_papers.py` before
-> they can support `handoff_to_workflow_1_5: ready`. Use `Gap Seeds` from the
-> Landscape Pack as the main idea-generation substrate.
+Then terminate the entire workflow early.
 
 ### Phase 2: Idea Generation (brainstorm with external LLM)
 
@@ -234,17 +222,17 @@ spawn_agent:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    You are a senior computer architecture / systems researcher (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level) brainstorming research ideas.
+    You are a senior researcher brainstorming publishable research ideas for the topic and venues implied by the supplied literature review.
 
     Research direction: [user's direction]
-    Domain context: AI infrastructure for LLM, including compute/accelerator, memory and data movement, interconnect/network, storage/checkpointing/data pipeline, runtime/system, and multi-layer topics.
+    Domain context: [paste Topic Scope from /research-lit Section 4]
 
     Here is the current landscape (from /research-lit Section 2):
     [paste landscape map — sub-direction clusters]
 
-    Negative evidence (from /research-lit Section 2.5) -- HARD CONSTRAINT:
+    Negative evidence (from /research-lit Section 2.5) -- AUDIT INPUT:
     [paste the NE-* table verbatim, including claim, source, affected_methods, affected_assumption, confidence, linked_gaps]
-    Do NOT generate ideas whose hidden assumption matches any NE-*.affected_assumption
+    Avoid ideas whose hidden assumption matches any NE-*.affected_assumption
     unless the idea explicitly describes a mechanism that evades or addresses that
     assumption. For every idea you generate, populate a new field
     `negative_evidence_response`:
@@ -268,7 +256,7 @@ spawn_agent:
     `Bottleneck Evidence` contains `Bottlenecks` and `Solution Attempts`; use `Solution Attempts` as the mechanism source.
     `Evaluation Canon` contains `Platforms` and `Workloads`.
 
-    Evaluation canon extracted from the literature:
+    Evaluation Canon platform/workload references extracted from the literature:
     [paste Evaluation Canon > Platforms rows with EC-P* IDs, evaluation_platform, access_readiness, supported_workloads, validates_refs, artifact_access_path, and platform_limitations; paste Evaluation Canon > Workloads rows with EC-W* IDs, workload_characteristics, representative papers, and representativeness_limits]
 
     Verified baseline evidence extracted from the literature:
@@ -278,8 +266,8 @@ spawn_agent:
     1. idea_id: stable short ID
     2. title
     3. idea_shape: one compact paragraph describing the idea, the gap it targets, the proposed mechanism/study, and why the answer may matter
-    4. canon_platform_candidates: EC-P* candidates or missing
-    5. canon_workload_candidates: EC-W* candidates or missing
+    4. evaluation_platform_candidates: EC-P* candidates or missing
+    5. evaluation_workload_candidates: EC-W* candidates or missing
     6. baseline_candidate_hint: verified paper/system candidate, quick_lookup_needed, or missing
     7. validation_route_hint: analytical_model | simulator_evaluation | prototype_measurement | unknown
     8. early_risk_notes
@@ -287,14 +275,14 @@ spawn_agent:
     10. negative_evidence_response: `n/a` | `evades: NE-X (reason)` | `addresses: NE-X (mechanism)` | `conflicts: NE-X (rationale)`
 
     Prioritize ideas that are:
-    - Grounded in the topic's literature-derived platform/workload canon candidates
+    - Grounded in the topic's literature-derived EC-P*/EC-W* platform/workload candidates
     - Clear enough for Phase 3 to define the comparison target, decisive metrics, and target validation style
-    - Diverse across AI infrastructure layers and research shapes, without requiring cross-layer mechanisms
+    - Diverse across the topic-derived mechanism families, bottlenecks, validation routes, and research shapes
     - Not "integrate X with Y" unless the integration reveals surprising performance/design insights
     - Differentiated from the 10-15 papers above
-    - Targeting MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM/OSDI/USENIX ATC/EuroSys/FCCM/DAC bar
+    - Targeting the venue bar implied by the topic scope and closest competing papers
 
-    Be creative but grounded. A great architecture idea is one whose answer — positive or negative — changes how people design AI infrastructure hardware or hardware/software boundaries.
+    Be creative but grounded. A strong idea is one whose answer — positive or negative — changes design judgment in the loaded topic.
 ```
 
 Save the agent id for follow-up.
@@ -303,10 +291,8 @@ Save the agent id for follow-up.
 
 For each generated idea, convert the Phase 2 hints into authoritative ranking and handoff fields. Use the `Scoring and Filtering Rubric` above; do not redefine another scoring scheme here.
 
-1. **Apply hard gates from the rubric**:
-   - Reject ideas outside the selected AI infrastructure topic.
-   - Reject ideas without a concrete architecture, systems, measurement, benchmark, trace/workload, or mechanism question.
-   - **Negative-evidence hard gate** (when Section 2.5 has any `NE-*` rows):
+1. **Audit negative evidence**:
+   - **Negative-evidence audit** (when Section 2.5 has any `NE-*` rows):
      - Reject ideas with `negative_evidence_response = n/a` whose hidden
        assumption (extracted from `idea_shape` mechanism) matches any
        `NE-*.affected_assumption`. Re-classify as `eliminated` with reason
@@ -316,83 +302,96 @@ For each generated idea, convert the Phase 2 hints into authoritative ranking an
        (e.g., "we focus on a different metric") become `needs_canon_clarification`
        with `main_blocker: unclear_negative_evidence_response`.
      - Accept `addresses: NE-X (mechanism)` only if the mechanism is a concrete
-       architectural / measurement intervention, not a restatement of the gap.
+       mechanism / measurement intervention, not a restatement of the gap.
        Add `decisive_metric_must_include: NE-X failure mode` to the
        evaluation_handoff_plan.
      - Accept `conflicts: NE-X (rationale)` only when the idea is itself a
-       diagnostic re-test of the negative evidence; downrank `overall_merit`
-       by one step (1->2, 2->3) unless the rationale identifies a concrete
-       scope where the original NE-* finding may not generalize.
+     diagnostic re-test of the negative evidence; downrank `overall_merit`
+     by one step (5->4, 4->3, 3->2) unless the rationale identifies a concrete
+     scope where the original NE-* finding may not generalize.
      - When Section 2.5 is `none_identified` or absent, this gate is inactive;
        record `idea_health.negative_evidence_gate: inactive` in the final
        report rather than skipping silently.
 
 2. **Overall merit estimation**:
    - Run a quick novelty check with 2-3 targeted searches for closest work; full `/novelty-check` comes later for survivors.
-   - Assign `overall_merit_score: 1 | 2 | 3 | 4` using the reviewer-style scale above.
+   - Assign `overall_merit_score: 1 | 2 | 3 | 4 | 5` using the reviewer-style scale above.
    - Write `overall_merit_rationale`: closest known work, differentiation, likely impact, and whether positive or negative results would matter.
-   - Use quick closest-work checks only to calibrate `overall_merit_score`: already-covered ideas should usually become `already_done` or score 4; differentiated and impactful ideas may score 1 or 2.
+   - Use quick closest-work checks only to calibrate `overall_merit_score`: already-covered ideas should usually become `already_done` or score 1; differentiated and impactful ideas may score 4 or 5.
 
 3. **Evaluation target definition**:
-   - Populate the canonical baseline, canon, metrics, validation-style, and clarity fields from `../shared-references/idea-handoff-schema.md`.
+   - Populate the handoff fields from `../shared-references/idea-handoff-schema.md`.
    - Do not place baseline or metrics inside `canon_mapping`; it only records `platform=[EC-P*]; workload=[EC-W*]`.
-   - Prefer a verified Section 1 paper/system or Section 4 competitor; if the best comparison target is absent, run narrow quick baseline lookup and verify it with `verify_papers.py` before treating it as ready.
+   - Prefer a verified Section 1 paper/system or Section 4 competitor; if the best comparison target is absent, run narrow quick baseline lookup, announce the lookup to the user, verify only the new candidate with `verify_papers.py`, and record `baseline_verification_delta` before treating it as ready.
 
 4. **Evaluation target feasibility assessment**:
-   - Populate the shared schema's feasibility subfields and aggregate feasibility.
-   - Explain the dominant cost or blocker.
+   - For every idea, you MUST explicitly output both the `overall_merit_score` (1-5) and the `evaluation_feasibility_score` (1-5).
+   - For the `evaluation_feasibility_score`, you MUST provide `evaluation_feasibility_breakdown` with four sub-factors:
+     1) **`platform_workload_access`**: access to required platform/hardware and workload/data
+     2) **`baseline_artifact_readiness`**: `score`, `status`, `verification_status`, `evidence`, and `adapter_notes`
+     3) **`evaluation_adapter_cost`**: adapter/integration work required before the first pilot
+     4) **`first_signal_runtime`**: time required to run the decisive metric experiment
+   - Summarize how these four sub-factors yield the final merged `evaluation_feasibility_score`.
 
 5. **Defer, eliminate, and rank**:
-   - Eliminate `overall_merit_score: 4` ideas by default. Negative-result, benchmark, or measurement ideas should only survive if the likely finding itself justifies `overall_merit_score: 1-3`.
-   - Mark high-merit but low-feasibility ideas as `handoff_to_workflow_1_5: designed_not_run`, not eliminated.
+   - Eliminate `overall_merit_score: 1` ideas by default. Negative-result, benchmark, or measurement ideas should only survive if the likely finding itself justifies `overall_merit_score: 3-5`.
+   - Mark high-merit but `evaluation_feasibility_score <= 3` ideas as not immediate: use `needs_canon_clarification` when clarification could raise readiness, or `designed_not_run` for long-horizon platform/prototype work.
    - Mark missing EC-P/EC-W evidence as `needs_canon_clarification` or `main_blocker: unclear_canon_mapping`.
    - Mark unclear comparison targets as `main_blocker: unclear_comparison_target`.
-   - Mark `baseline_evaluability_score: 0` ideas as `designed_not_run`, `needs_canon_clarification`, or blocked by `main_blocker`; they must not be marked `handoff_to_workflow_1_5: ready`.
+   - Mark `baseline_artifact_readiness.score: 0` ideas as `designed_not_run`, `needs_canon_clarification`, or blocked by `main_blocker`; they must not be marked `handoff_to_workflow_1_5: ready`.
+   - Mark `handoff_to_workflow_1_5: ready` only when `evaluation_feasibility_score` is `4` or `5`.
    - Mark ideas with no credible analytical, simulation, artifact, benchmark, trace/workload, or prototype route as `main_blocker: no_credible_evaluation_path` and eliminate or defer based on merit.
-   - Rank surviving ideas with `overall_merit` 60% and `evaluation_target_feasibility` 40%. Typically 8-12 ideas reduce to 4-6.
+   - Rank surviving ideas with `overall_merit_score` 60% and `evaluation_feasibility_score` 40%. Keep all viable ideas in priority order; handoff planning will attempt them one at a time.
 
-### Phase 4: Deep Validation (for top ideas)
+### Phase 4: Deep Validation (for priority-ordered survivors)
 
-For each surviving idea, run a deeper evaluation:
+For each surviving idea in priority order, run a deeper evaluation:
 
 1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + GPT-5.5 cross-verification) for each idea
 
 2. **Critical review**: Use GPT-5.5 via `send_input` (same agent):
    ```
    Here are our top ideas after filtering:
-   [paste surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, metrics, target_validation_style, evaluation_target_clarity, evaluation_target_feasibility, feasibility subfields, handoff_to_workflow_1_5, and main_blocker]
+   [paste surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, baseline_artifact_readiness, baseline_verification_delta, metrics, target_validation_style, evaluation_target_clarity, evaluation_feasibility_score, evaluation_feasibility_breakdown, handoff_to_workflow_1_5, and main_blocker]
 
    For each, play devil's advocate:
-   - What's the strongest objection a MICRO/ISCA/HPCA/ASPLOS/NSDI reviewer would raise?
-   - What's the most likely failure mode (e.g., bottleneck too small, simulator abstraction too weak, area/power overhead dominates, workload not representative)?
+   - What's the strongest objection a target-venue reviewer would raise?
+   - What's the most likely failure mode (e.g., bottleneck too small, model abstraction too weak, overhead dominates, workload not representative)?
    - **Negative-evidence audit**: does this idea silently rely on any
      assumption that Section 2.5's `NE-*` rows have refuted? Is the stated
      `negative_evidence_response` concrete enough, or is it cosmetic? If
      `addresses: NE-X`, does the proposed `decisive_metric` actually surface
-     the NE-X failure mode (e.g., credential retention rate, dormant-token
-     recall) and not just hide it behind LongBench/RULER aggregate scores?
-   - What overall merit score would you assign, and why?
+     the NE-X failure mode and not just hide it behind aggregate scores?
+   - Evaluate and provide the `overall_merit_score` (1-5), and explain why.
+   - Evaluate and provide the `evaluation_feasibility_score` (1-5). You MUST explicitly break down this score into the 4 sub-factors: 1) `platform_workload_access`, 2) `baseline_artifact_readiness`, 3) `evaluation_adapter_cost`, and 4) `first_signal_runtime`. Is the evaluation target feasible enough for a credible first-signal pilot, or should it be deferred?
    - Does the proposed platform/workload mapping cite the right EC-P*/EC-W* items?
    - Is the selected core baseline credible for this idea, and are the chosen metrics decisive?
    - Is the novelty credible after considering the closest papers?
    - Which ideas have a positive-or-negative answer that would change design judgment?
-   - Is the evaluation target feasible enough for a credible first-signal pilot, or should it be deferred?
    - How would you rank these for a top venue submission?
-   - Which 2-3 are ready for Workflow 1.5, and which high-upside ideas should be deferred or sent back for canon/comparison-target clarification?
+   - Which highest-priority idea is ready for Workflow 1.5 now, and which high-upside backups should be deferred or sent back for EC-P*/EC-W* or comparison-target clarification?
 
-   For runtime/system ideas:
-   - Is the hardware bottleneck real and central, or is this a pure software scheduler?
+   For systems or architecture ideas:
+   - Is the named bottleneck real and central, or is the idea mostly an implementation detail without a decisive research question?
    ```
 
-3. **Combine rankings**: Merge your assessment with GPT-5.5's ranking. Select top 4-6 ideas for evaluation handoff plans and top 2-3 ideas as immediate Workflow 1.5 candidates when their comparison target, platform/workload mapping, and feasibility are clear enough.
+3. **Combine rankings**: Merge your assessment with GPT-5.5's ranking. Produce a single priority-ordered survivor list. The first idea with a clear comparison target, platform/workload mapping, decisive metrics, and feasible baseline path becomes the immediate Workflow 1.5 candidate; later viable ideas remain backups or deferred options.
 
-### Phase 5: Evaluation Handoff Planning (top 4-6 ideas)
+### Phase 5: Evaluation Handoff Planning (priority-ordered ideas)
 
 Workflow 1 does **not** run pilots or baseline reproduction. It only prepares enough evaluation context for Workflow 1.5 (`/experiment-bridge`) to lock an `EVALUATION_CONTRACT.md` and run baseline-first pilots after the idea and evaluation platform are selected.
 
-For each top 4-6 idea, write an `evaluation_handoff_plan` that follows
-`../shared-references/idea-handoff-schema.md`. Use the shared ready,
-clarification, and designed-not-run rules without copying the schema inline.
+Start with the highest-ranked surviving idea. Write an `evaluation_handoff_plan`
+that follows `../shared-references/idea-handoff-schema.md`; use the shared
+ready, clarification, and designed-not-run rules without copying the schema
+inline.
+
+If the highest-ranked idea cannot reach a reproducible baseline path, stop
+trying to force it into `ready`: warn the user, record the failed handoff attempt
+in `baseline_verification_delta`, `main_blocker`, and the report's deferred
+ideas section, then try the next ranked surviving idea. Continue in priority
+order until one idea reaches `handoff_to_workflow_1_5: ready` or every survivor
+has a recorded blocker.
 
 ### Phase 6: Output — Ranked Idea Report
 
@@ -457,10 +456,10 @@ if research-wiki/ exists:
 - Quantity first, quality second: brainstorm broadly, then filter ruthlessly.
 - A good negative result is just as publishable as a positive one. Prioritize ideas where the answer matters regardless of direction.
 - Don't fall in love with any idea before validating it. Be willing to kill ideas.
-- Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up should get low `evaluation_target_feasibility` or a `designed_not_run` handoff; that is not the same as scientific rejection.
+- Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up should get `evaluation_feasibility_score <= 2` or a `designed_not_run` handoff; that is not the same as scientific rejection.
 - "Apply X to Y" is the lowest form of research idea. Push for deeper questions.
 - Include eliminated ideas in the report — they save future time by documenting dead ends.
-- **If the user's direction is too broad (e.g., "AI infrastructure" with no workload, mechanism, or validation target), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the LLM infrastructure problem, workload or mechanism focus, and validation constraint — e.g., "KV cache placement under CXL memory bandwidth limits" or "LLM checkpoint recovery under storage bandwidth and metadata pressure".
+- **If the user's direction is too broad (e.g., only a field name with no workload, mechanism, object of study, or validation target), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the problem, workload or mechanism focus, and validation constraint, using terms that match the loaded literature scope.
 
 ## Composing with Other Skills
 

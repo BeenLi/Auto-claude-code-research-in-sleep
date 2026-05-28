@@ -28,8 +28,7 @@ Shared references:
 
 ## Constants
 
-- **MAX\_HANDOFF\_IDEAS = 6** — Write evaluation handoff plans for at most 6 strong ideas. Workflow 1 does not run pilots.
-- **MAX\_READY\_FOR\_WORKFLOW\_1\_5 = 3** — Mark at most 3 ideas as immediate Workflow 1.5 candidates.
+- **Handoff planning is priority-ordered** — Attempt the highest-ranked survivor first; if it records a concrete blocker, move to the next survivor. Only one selected ready idea crosses into Workflow 1.5.
 - **AUTO\_PROCEED = true** — After each phase summary, automatically proceed with the best option if the user does not respond. Set to `false` to wait for explicit user confirmation at phase decision points.
 - **REVIEWER\_MODEL =** **`gpt-5.5`** — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Passed to sub-skills.
 - **OUTPUT\_DIR =** **`idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
@@ -100,10 +99,10 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 
 - If `idea-stage/REF_PAPER_SUMMARY.md` exists, include it as context — ideas should build on, improve, or extend the reference paper
 - Brainstorm 8-12 concrete idea candidates from `Landscape Pack` / `Gap Seeds`
-- Filter by the `idea-creator` scoring rubric: topic fit and concrete architecture/systems/measurement/benchmark question
-- Run quick novelty checks, overall merit scoring, and evaluation target feasibility assessment
-- Write evaluation handoff plans for the top 4-6 ideas
-- Rank by overall merit and evaluation target feasibility
+- Filter by the `idea-creator` scoring rubric: literature-derived topic scope, concrete research question, overall merit, and evaluation feasibility score
+- Run quick novelty checks, overall merit scoring, and `evaluation_feasibility_score` assessment
+- Write evaluation handoff plans in priority-ordered sequence until one idea reaches `handoff_to_workflow_1_5: ready` or all survivors have recorded blockers
+- Rank by `overall_merit_score` and `evaluation_feasibility_score`
 - Output `idea-stage/IDEA_REPORT.md` using `templates/IDEA_REPORT_TEMPLATE.md`
 - Optionally output `idea-stage/IDEA_CANDIDATES.md` using `templates/IDEA_CANDIDATES_TEMPLATE.md`
 
@@ -112,9 +111,9 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 ```
 💡 Generated X ideas, filtered to Y, wrote Z evaluation handoff plans. Top results:
 
-1. [Idea 1] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record], baseline_evaluability_score: [2|1], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: [clear], handoff: ready
-2. [Idea 2] — merit: [1-4], feasibility: [high/medium/low/unknown], core_baseline: [idea-local baseline record or new baseline with rationale], baseline_evaluability_score: [2|1|0], canon_mapping: [mapping], target_validation_style: [style], clarity: [partial], handoff: needs_canon_clarification
-3. [Idea 3] — merit: [1-4], feasibility: [low], handoff: designed_not_run, blocker: [main_blocker]
+1. [Idea 1] — merit: [1-5], evaluation_feasibility_score: [4|5], evaluation_feasibility_breakdown: platform_workload_access=[...], evaluation_adapter_cost=[...], first_signal_runtime=[...], core_baseline: [idea-local baseline record], baseline_artifact_readiness: score=[2|1], status=[...], verification=[...], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: [clear], handoff: ready
+2. [Idea 2] — merit: [1-5], evaluation_feasibility_score: [1-5], evaluation_feasibility_breakdown: [main weak factor], core_baseline: [idea-local baseline record or new baseline with rationale], baseline_artifact_readiness: score=[2|1|0], status=[...], verification=[...], canon_mapping: [mapping], target_validation_style: [style], clarity: [partial], handoff: needs_canon_clarification
+3. [Idea 3] — merit: [1-5], evaluation_feasibility_score: [1|2], handoff: designed_not_run, blocker: [main_blocker]
 
 Which ideas should I validate further? Or should I regenerate with different constraints?
 (If no response, I'll proceed with the top-ranked ideas.)
@@ -147,7 +146,7 @@ For each selected top idea with strong overall merit and a credible evaluation h
 For the surviving top idea(s), get brutal feedback:
 
 ```
-/research-review "[top idea with idea_shape + overall_merit_score + evaluation_target_feasibility + core_baseline + canon_mapping + metrics + evaluation handoff plan]"
+/research-review "[top idea with idea_shape + overall_merit_score + evaluation_feasibility_score + core_baseline + canon_mapping + metrics + evaluation handoff plan]"
 ```
 
 **What this does:**
@@ -193,9 +192,10 @@ Use the `Refined proposal ready` checkpoint from `../shared-references/workflow1
 Proceed to implementation? Or adjust the proposal?
 ```
 
-- **User approves** (or `AUTO_PROCEED=true` behavior) → proceed to Final Report.
+- **User approves** (or `AUTO_PROCEED=true` behavior) → proceed to Final Report only if `refine_verdict=READY`, `refine_overall_score >= 9`, `drift_status` is `preserved` or `corrected`, and `handoff_refresh_status=passed`.
 - **User requests changes** → pass feedback to `/research-refine` for another round.
-- **Lite mode:** If reviewer score < 6 or the evaluation handoff is unclear, run `/research-refine` only (skip `/experiment-plan`) and note remaining risks in the report.
+- **Refine does not converge:** If `refine_verdict != READY`, `refine_overall_score < 9/10`, `drift_status=drifted`, or `handoff_refresh_status != passed`, automatically try the next priority idea from `IDEA_REPORT.md`; if no ready backup remains, mark `main_blocker: refine_did_not_converge`.
+- **Lite mode:** If `refine_overall_score < 6/10` or the evaluation handoff is unclear, run `/research-refine` only (skip `/experiment-plan`) and note remaining risks in the report.
 
 ### Phase 5: Final Report
 

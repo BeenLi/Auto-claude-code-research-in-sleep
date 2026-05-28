@@ -28,7 +28,7 @@ User input (PROBLEM + vague APPROACH)
   -> Phase 2 (Codex/GPT-5.5): Review for fidelity, specificity, contribution quality, and platform leverage
   -> Phase 3 (Claude): Anchor check + simplicity check -> revise method -> rewrite full proposal
   -> Phase 4 (Codex, same agent): Re-evaluate revised proposal
-  -> Repeat Phase 3-4 until OVERALL SCORE >= 9 or MAX_ROUNDS reached
+  -> Repeat Phase 3-4 until OVERALL SCORE >= 9, READY, no drift, and handoff refresh passes, or MAX_ROUNDS reached
   -> Phase 5: Save full history to refine-logs/
   -> Optional handoff: /experiment-plan for a detailed execution-ready experiment roadmap
 ```
@@ -360,14 +360,14 @@ spawn_agent:
 
     4. **Platform Leverage**: Does the proposal use modern platform capabilities (accelerators, memory hierarchy, CXL/HBM, DPU offload engines, FPGA IP blocks, P4 match-action, RDMA verb extensions, storage datapaths, or runtime hooks) appropriately, instead of defaulting to host-CPU software?
 
-    5. **Feasibility**: Can this mechanism be implemented and validated with the stated resources (analytical model / gem5 / htsim / RTL or HLS simulator / FPGA or DPU microbenchmark / trace replay)?
+    5. **Implementation Feasibility**: Can this refined mechanism be implemented and validated with the stated resources (analytical model / gem5 / htsim / RTL or HLS simulator / FPGA or DPU microbenchmark / trace replay)? This is not the same as `evaluation_feasibility_score`, which is the earlier Workflow 1 handoff readiness score.
 
     6. **Validation Focus**: Are the proposed experiments minimal but sufficient to validate the core claims? Is there unnecessary benchmark bloat?
 
     7. **Venue Readiness**: If executed well, would the contribution feel sharp and timely enough for MICRO/ISCA/HPCA/NSDI?
 
     **OVERALL SCORE** (1-10): Weighted toward Problem Fidelity, Method Specificity, Contribution Quality, and Platform Leverage.
-    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Platform Leverage 15%, Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
+    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Platform Leverage 15%, Implementation Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
 
     For each dimension scoring < 7, provide:
     - The specific weakness
@@ -381,7 +381,7 @@ spawn_agent:
     - **Verdict**: READY / REVISE / RETHINK
 
     Verdict rule:
-    - READY: overall score >= 9, no meaningful drift, one focused dominant contribution, and no obvious complexity bloat remains
+    - READY: overall score >= 9, no meaningful drift, one focused dominant contribution, no obvious complexity bloat remains, and Implementation Feasibility is backed by concrete implementation evidence
     - REVISE: the direction is promising but not yet at READY bar
     - RETHINK: the core mechanism or framing is still fundamentally off
 ```
@@ -404,7 +404,7 @@ Extract:
 - **Method Specificity**
 - **Contribution Quality**
 - **Frontier Leverage**
-- **Feasibility**
+- **Implementation Feasibility**
 - **Validation Focus**
 - **Venue Readiness**
 - **Overall score**
@@ -419,12 +419,12 @@ Update `refine-logs/score-history.md`:
 ```markdown
 # Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Implementation Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | X                | X                  | X                    | X                 | X           | X                | X               | X       | REVISE  |
 ```
 
-**STOP CONDITION**: If overall score >= SCORE_THRESHOLD, verdict is READY, and there is no unresolved drift warning, skip to Phase 5.
+**STOP CONDITION**: If overall score >= SCORE_THRESHOLD, verdict is READY, and there is no unresolved drift warning, run Phase 4.5 Handoff Refresh before Phase 5. Do not mark the selected idea ready unless Phase 4.5 passes.
 
 #### Step 3.2: Revise With an Anchor Check and a Simplicity Check
 
@@ -528,9 +528,9 @@ send_input:
     - State whether the method is simpler or still overbuilt
     - State whether the platform leverage is now appropriate or still host-CPU / software-only / forced hardware
     - Focus new critiques on missing micro-architectural detail, weak hardware integration point, unsupported performance claim, pseudo-novelty, or unnecessary hardware complexity
-    - Use the same verdict rule: READY only if overall score >= 9 and no blocking issue remains
+    - Use the same verdict rule: READY only if overall score >= 9, no blocking issue remains, and Implementation Feasibility is backed by concrete implementation evidence
 
-    Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items.
+    Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items. Use the dimension name **Implementation Feasibility**, not plain **Feasibility**.
 ```
 
 Save review to `refine-logs/round-N-review.md`.
@@ -539,8 +539,51 @@ Save review to `refine-logs/round-N-review.md`.
 
 Then return to Phase 3 until:
 
-- **Overall score >= SCORE_THRESHOLD** and verdict is READY and no unresolved drift
+- **Overall score >= SCORE_THRESHOLD** and verdict is READY and no unresolved drift, then Phase 4.5 handoff refresh passes
 - or **MAX_ROUNDS reached**
+
+### Phase 4.5: Handoff Refresh
+
+Before writing `FINAL_PROPOSAL.md` or allowing `/experiment-plan` to proceed,
+refresh the Workflow 1 handoff fields against the final refined method. This
+prevents stale `idea-creator` assumptions from silently crossing into Workflow
+1.5.
+
+Re-evaluate and write back to `idea-stage/IDEA_REPORT.md`:
+
+- `core_baseline`
+- `canon_mapping`
+- `baseline_artifact_readiness` with `score`, `status`,
+  `verification_status`, `evidence`, and `adapter_notes`
+- `evaluation_feasibility_score`
+- `evaluation_feasibility_breakdown` with `platform_workload_access`,
+  `evaluation_adapter_cost`, and `first_signal_runtime`
+- `metrics`
+- `target_validation_style`
+- `evaluation_target_clarity`
+- `refine_overall_score`
+- `refine_verdict`
+- `drift_status`
+- `handoff_refresh_status`
+
+Rules:
+
+- If `core_baseline` or `canon_mapping` changes, write `handoff_delta` and rerun
+  the new-baseline verification path from `/idea-creator`; set
+  `baseline_verification_delta: new_baseline_lookup` when new evidence is
+  introduced.
+- If the baseline is unchanged, set `baseline_verification_delta:
+  verified_by_research_lit (re-confirmed)` when the original evidence still
+  supports the final method.
+- Set `handoff_refresh_status: passed` only when the refreshed fields still
+  satisfy `skills/shared-references/idea-handoff-schema.md`.
+- Set `drift_status: preserved` if the Problem Anchor and handoff assumptions
+  survived unchanged; `corrected` if a drift was fixed before exit; `drifted`
+  if a blocking mismatch remains.
+- If handoff refresh fails, keep the best current `FINAL_PROPOSAL.md` as a
+  record, but set `refine_verdict: REVISE` or `RETHINK` and do not allow
+  Workflow 1 exit. `/idea-discovery` should try the next priority idea or mark
+  `main_blocker: refine_did_not_converge`.
 
 ### Phase 5: Final Report and Logs
 
@@ -616,7 +659,7 @@ If the final verdict is not READY, still write the best current final version he
 
 ## Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Implementation Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | ...              | ...                | ...                  | ...               | ...         | ...              | ...             | ...     | ...     |
 

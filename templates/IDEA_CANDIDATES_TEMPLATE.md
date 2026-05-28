@@ -9,11 +9,11 @@
 
 ## Candidates
 
-| # | Idea | Overall Merit | Feasibility | Baseline Record | Canon Mapping | Negative Evidence | Handoff | Status |
-|---|------|---------------|-------------|-----------------|---------------|-------------------|---------|--------|
-| 1 | [title] | 1 | high | IB1 | platform=[EC-P1]; workload=[EC-W1] | n/a | ready | selected |
-| 2 | [title] | 2 | medium | IB2 | platform=[EC-P2]; workload=[EC-W2] | addresses: NE-* (...) | ready | backup |
-| 3 | [title] | 1 | low | IB3 | platform=[EC-P3]; workload=[EC-W3] | conflicts: NE-* (...) | designed_not_run | deferred |
+| # | Idea | Overall Merit | Evaluation Feasibility Score | Baseline Record | Baseline Verification Delta | Canon Mapping | Negative Evidence | Handoff | Status |
+|---|------|---------------|-------------|-----------------|-----------------------------|---------------|-------------------|---------|--------|
+| 1 | [title] | 5 | 5 | IB1 | verified_by_research_lit | platform=[EC-P1]; workload=[EC-W1] | n/a | ready | selected |
+| 2 | [title] | 4 | 4 | IB2 | new_baseline_lookup | platform=[EC-P2]; workload=[EC-W2] | addresses: NE-* (...) | ready | backup |
+| 3 | [title] | 3 | 2 | IB3 | verification_unresolved | platform=[EC-P3]; workload=[EC-W3] | conflicts: NE-* (...) | designed_not_run | deferred |
 
 ## Active Idea: #1 -- [title]
 
@@ -21,17 +21,19 @@ Use `skills/shared-references/idea-handoff-schema.md` for field domains.
 
 - **Idea shape**:
 - **core_baseline**:
-- **baseline_evaluability_score**:
+- **baseline_verification_delta**:
+- **baseline_artifact_readiness**: score/status/verification/evidence/adapter notes
 - **canon_mapping**:
 - **negative_evidence_response**:
 - **metrics**:
 - **target_validation_style**:
 - **evaluation_target_clarity**:
-- **evaluation_target_feasibility**:
-- **baseline_reproducibility**:
-- **evaluation_environment_access**:
-- **idea_adapter_cost**:
-- **pilot_runtime_cost**:
+- **evaluation_feasibility_score**:
+- **evaluation_feasibility_breakdown**: platform_workload_access; evaluation_adapter_cost; first_signal_runtime
+- **refine_overall_score**:
+- **refine_verdict**:
+- **drift_status**:
+- **handoff_refresh_status**:
 - **handoff_to_workflow_1_5**:
 - **main_blocker**:
 - **Next step**: `/research-refine-pipeline`

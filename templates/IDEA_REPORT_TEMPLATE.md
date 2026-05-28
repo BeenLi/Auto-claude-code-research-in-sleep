@@ -19,7 +19,13 @@
 - **Idea shape**: [compact summary of gap, mechanism/study, and why the answer matters]
 - **negative_evidence_response**: [n/a | evades: NE-* (...) | addresses: NE-* (...) | conflicts: NE-* (...)]
 - **Status**: selected
-- **Overall merit**: [1-4] -- [rationale]
+- **overall_merit_score**: [1-5] -- [rationale]
+- **evaluation_feasibility_score**: [1-5]
+- **Feasibility Breakdown**:
+  - *platform_workload_access*: [ready | near_ready | nontrivial | weak | blocked -- evidence]
+  - *baseline_artifact_readiness*: [score/status/verification/evidence/adapter notes]
+  - *evaluation_adapter_cost*: [small | moderate | major | new_platform | blocked -- evidence]
+  - *first_signal_runtime*: [minutes | hours | 1-2_days | multi_day | weeks | blocked -- decisive metric]
 - **Evaluation handoff**: follow `skills/shared-references/idea-handoff-schema.md`
 - **Novelty check**: [confirmed / needs work / killed]
 - **Reviewer score**: [score]
@@ -30,7 +36,13 @@
 - **Idea shape**:
 - **negative_evidence_response**:
 - **Status**: backup
-- **Overall merit**:
+- **overall_merit_score**:
+- **evaluation_feasibility_score**:
+- **Feasibility Breakdown**:
+  - *platform_workload_access*:
+  - *baseline_artifact_readiness*:
+  - *evaluation_adapter_cost*:
+  - *first_signal_runtime*:
 - **Evaluation handoff**: follow `skills/shared-references/idea-handoff-schema.md`
 - **Main blocker**:
 
@@ -51,9 +63,9 @@
 Use the canonical fields and domains in
 `skills/shared-references/idea-handoff-schema.md`.
 
-| Idea | overall_merit_score | evaluation_target_feasibility | baseline_evaluability_score | core_baseline | canon_mapping | metrics | target_validation_style | evaluation_target_clarity | evaluation_environment_access | idea_adapter_cost | pilot_runtime_cost | negative_evidence_response | handoff_to_workflow_1_5 | main_blocker |
-|------|---------------------|-------------------------------|----------------------------|---------------|---------------|---------|-------------------------|---------------------------|-------------------------------|-------------------|--------------------|----------------------------|-------------------------|--------------|
-| Idea 1 | 1 | high | 2 | IB1: verified system | platform=[EC-P1]; workload=[EC-W1] | [metric] | simulator_evaluation | clear | ready | small_local_patch | minutes_to_hours | n/a | ready | none |
+| Idea | overall_merit_score | evaluation_feasibility_score | evaluation_feasibility_breakdown | baseline_artifact_readiness | core_baseline | canon_mapping | metrics | target_validation_style | evaluation_target_clarity | baseline_verification_delta | negative_evidence_response | refine_overall_score | refine_verdict | drift_status | handoff_refresh_status | handoff_to_workflow_1_5 | main_blocker |
+|------|---------------------|-------------------------------|--------------------------------|-----------------------------|---------------|---------------|---------|-------------------------|---------------------------|-----------------------------|----------------------------|----------------------|----------------|--------------|------------------------|-------------------------|--------------|
+| Idea 1 | 5 | 5 -- ready platform, small/no adapter, minutes-to-hours first signal | platform_workload_access=ready; evaluation_adapter_cost=small; first_signal_runtime=hours | score=2; status=official_artifact; verification=verified; evidence=research_lit; adapter=minor | IB1: verified system | platform=[EC-P1]; workload=[EC-W1] | [metric] | simulator_evaluation | clear | verified_by_research_lit | n/a | 9 | READY | preserved | passed | ready | none |
 
 ## Refined Proposal
 
