@@ -321,7 +321,7 @@ Use this structure:
 Send the full proposal to GPT-5.5 for an **elegance-first, platform-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     You are a senior computer architecture / systems researcher reviewing for MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM.
     Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system.
@@ -385,7 +385,7 @@ mcp__claude-review__review_start:
     - RETHINK: the core mechanism or framing is still fundamentally off
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 **CRITICAL: Save the `threadId`** from this call for all later rounds.
 
@@ -502,7 +502,7 @@ Save to `refine-logs/round-N-refinement.md`:
 Send the revised proposal back to GPT-5.5 in the **same thread**:
 
 ```
-mcp__claude-review__review_reply_start:
+mcp__claude_review__review_reply_start:
   threadId: [saved from Phase 2]
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
@@ -533,7 +533,7 @@ mcp__claude-review__review_reply_start:
     Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 Save review to `refine-logs/round-N-review.md`.
 

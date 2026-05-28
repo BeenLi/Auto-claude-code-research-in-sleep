@@ -47,7 +47,7 @@ PREREQ_BLOCK = """## Prerequisites
   ```bash
   codex mcp add claude-review -- python3 ~/.codex/mcp-servers/claude-review/server.py
   ```
-- This gives Codex access to `mcp__claude-review__review_start`, `mcp__claude-review__review_reply_start`, and `mcp__claude-review__review_status`.
+- This gives Codex access to `mcp__claude_review__review_start`, `mcp__claude_review__review_reply_start`, and `mcp__claude_review__review_status`.
 """.strip()
 
 
@@ -80,7 +80,7 @@ def normalize_description(text: str) -> str:
 
 def rewrite_spawn_block(match: re.Match[str]) -> str:
     lines = match.group(1).splitlines()
-    out = ["```", "mcp__claude-review__review_start:"]
+    out = ["```", "mcp__claude_review__review_start:"]
     for line in lines:
         stripped = line.strip()
         if not stripped:
@@ -98,7 +98,7 @@ def rewrite_spawn_block(match: re.Match[str]) -> str:
 
 def rewrite_send_block(match: re.Match[str]) -> str:
     lines = match.group(1).splitlines()
-    out = ["```", "mcp__claude-review__review_reply_start:"]
+    out = ["```", "mcp__claude_review__review_reply_start:"]
     for line in lines:
         stripped = line.strip()
         if not stripped:
@@ -120,7 +120,7 @@ def rewrite_send_block(match: re.Match[str]) -> str:
 def append_async_notes(text: str) -> str:
     note = (
         "After this start call, immediately save the returned `jobId` and poll "
-        "`mcp__claude-review__review_status` with a bounded `waitSeconds` until "
+        "`mcp__claude_review__review_status` with a bounded `waitSeconds` until "
         "`done=true`. Treat the completed status payload's `response` as the "
         "reviewer output, and save the completed `threadId` for any follow-up round."
     )
@@ -132,7 +132,7 @@ def append_async_notes(text: str) -> str:
         return f"{block}\n\n{note}"
 
     return re.sub(
-        r"```(?:yaml|text)?\n(?:mcp__claude-review__review_start:|mcp__claude-review__review_reply_start:)[\s\S]*?```",
+        r"```(?:yaml|text)?\n(?:mcp__claude_review__review_start:|mcp__claude_review__review_reply_start:)[\s\S]*?```",
         repl,
         text,
     )
@@ -145,27 +145,27 @@ def transform_body(text: str) -> str:
     text = text.replace("GPT-5.5 xhigh", "Claude review")
     text = text.replace("Send the full paper text to GPT-5.5 xhigh:", "Send the full paper text to Claude through `claude-review`:")
     text = text.replace("Send the complete outline to GPT-5.5 xhigh for feedback:", "Send the complete outline to Claude for feedback:")
-    text = text.replace("Call REVIEWER_MODEL via `spawn_agent` (`spawn_agent`) with xhigh reasoning:", "Call REVIEWER_MODEL via `mcp__claude-review__review_start` with high-rigor review:")
+    text = text.replace("Call REVIEWER_MODEL via `spawn_agent` (`spawn_agent`) with xhigh reasoning:", "Call REVIEWER_MODEL via `mcp__claude_review__review_start` with high-rigor review:")
     text = text.replace("Send a detailed prompt with xhigh reasoning:", "Send a detailed prompt with high-rigor review:")
-    text = text.replace("Use `send_input` with the returned agent id to continue the conversation:", "Use `mcp__claude-review__review_reply_start` with the saved completed `threadId`, then poll `mcp__claude-review__review_status` with the returned `jobId` until `done=true` to continue the conversation:")
-    text = text.replace("If this is round 2+, use `send_input` with the saved agent id to maintain continuity.", "If this is round 2+, use `mcp__claude-review__review_reply_start` with the saved completed `threadId`, then poll `mcp__claude-review__review_status` with the returned `jobId` until `done=true` to maintain continuity.")
-    text = text.replace("Save the agent id for Round 2.", "Save the returned `jobId`, poll `mcp__claude-review__review_status` until `done=true`, then save the completed `threadId` for Round 2.")
-    text = text.replace("Save agent id from first call, use `send_input` for subsequent rounds", "Save the completed `threadId` from the first `mcp__claude-review__review_status` result, then use `mcp__claude-review__review_reply_start` plus `mcp__claude-review__review_status` for subsequent rounds")
+    text = text.replace("Use `send_input` with the returned agent id to continue the conversation:", "Use `mcp__claude_review__review_reply_start` with the saved completed `threadId`, then poll `mcp__claude_review__review_status` with the returned `jobId` until `done=true` to continue the conversation:")
+    text = text.replace("If this is round 2+, use `send_input` with the saved agent id to maintain continuity.", "If this is round 2+, use `mcp__claude_review__review_reply_start` with the saved completed `threadId`, then poll `mcp__claude_review__review_status` with the returned `jobId` until `done=true` to maintain continuity.")
+    text = text.replace("Save the agent id for Round 2.", "Save the returned `jobId`, poll `mcp__claude_review__review_status` until `done=true`, then save the completed `threadId` for Round 2.")
+    text = text.replace("Save agent id from first call, use `send_input` for subsequent rounds", "Save the completed `threadId` from the first `mcp__claude_review__review_status` result, then use `mcp__claude_review__review_reply_start` plus `mcp__claude_review__review_status` for subsequent rounds")
     text = text.replace("Document the agent id for potential future resumption", "Document the completed `threadId` for potential future resumption")
-    text = text.replace("Use `send_input` with the saved agent id:", "Use `mcp__claude-review__review_reply_start` with the saved completed `threadId`:")
-    text = text.replace("use `send_input` for Round 2 to maintain conversation context", "use `mcp__claude-review__review_reply_start` plus `mcp__claude-review__review_status` for Round 2 to maintain conversation context")
+    text = text.replace("Use `send_input` with the saved agent id:", "Use `mcp__claude_review__review_reply_start` with the saved completed `threadId`:")
+    text = text.replace("use `send_input` for Round 2 to maintain conversation context", "use `mcp__claude_review__review_reply_start` plus `mcp__claude_review__review_status` for Round 2 to maintain conversation context")
     text = text.replace("Save the agent id for Round 2.", "Save the completed `threadId` for Round 2.")
-    text = text.replace("**CRITICAL: Save the `agent_id`** from this call for all later rounds.", "**CRITICAL: Save the returned `jobId`**, poll `mcp__claude-review__review_status` until `done=true`, then save the completed `threadId` from the status result for all later rounds.")
+    text = text.replace("**CRITICAL: Save the `agent_id`** from this call for all later rounds.", "**CRITICAL: Save the returned `jobId`**, poll `mcp__claude_review__review_status` until `done=true`, then save the completed `threadId` from the status result for all later rounds.")
     text = text.replace("- **ALWAYS use `reasoning_effort: xhigh`** for all Codex review calls.", "- **Always ask the Claude reviewer for strict, high-rigor feedback** in every review round.")
-    text = text.replace("- **Save `agent_id` from Phase 2** and use `send_input` for later rounds.", "- **Save the completed `threadId` from Phase 2** and use `mcp__claude-review__review_reply_start` plus `mcp__claude-review__review_status` for later rounds.")
-    text = text.replace("- **Use `send_input`** for Round 2 to maintain conversation context", "- **Use `mcp__claude-review__review_reply_start` plus `mcp__claude-review__review_status`** for Round 2 to maintain conversation context")
+    text = text.replace("- **Save `agent_id` from Phase 2** and use `send_input` for later rounds.", "- **Save the completed `threadId` from Phase 2** and use `mcp__claude_review__review_reply_start` plus `mcp__claude_review__review_status` for later rounds.")
+    text = text.replace("- **Use `send_input`** for Round 2 to maintain conversation context", "- **Use `mcp__claude_review__review_reply_start` plus `mcp__claude_review__review_status`** for Round 2 to maintain conversation context")
     text = text.replace("GPT-5.5 responses", "Claude reviewer responses")
     text = text.replace("`agent_id`", "`thread_id`")
     text = text.replace('"agent_id"', '"thread_id"')
     text = text.replace("ALWAYS use `reasoning_effort: xhigh` for reviews", "Always ask the Claude reviewer for strict, high-rigor feedback.")
     text = text.replace("ALWAYS use `reasoning_effort: xhigh` for maximum reasoning depth", "Always ask the Claude reviewer for strict, high-rigor feedback.")
-    text = text.replace("mcp__codex__codex", "mcp__claude-review__review_start")
-    text = text.replace("mcp__codex__codex-reply", "mcp__claude-review__review_reply_start")
+    text = text.replace("mcp__codex__codex", "mcp__claude_review__review_start")
+    text = text.replace("mcp__codex__codex-reply", "mcp__claude_review__review_reply_start")
     text = re.sub(r"^-\s+\*{0,2}REVIEWER_MODEL.*$", REVIEWER_LINE, text, flags=re.MULTILINE)
     text = re.sub(
         r"## Prerequisites\n\n(?:- .*\n)+",
@@ -177,7 +177,7 @@ def transform_body(text: str) -> str:
     text = SEND_BLOCK_RE.sub(rewrite_send_block, text)
     text = text.replace(
         "```\nreasoning_effort: xhigh\n```",
-        "```\nmcp__claude-review__review_start:\n  prompt: |\n    [Full novelty briefing + prior work list + specific novelty questions]\n```",
+        "```\nmcp__claude_review__review_start:\n  prompt: |\n    [Full novelty briefing + prior work list + specific novelty questions]\n```",
     )
     return append_async_notes(text)
 

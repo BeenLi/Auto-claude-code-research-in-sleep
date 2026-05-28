@@ -87,7 +87,7 @@ done > /tmp/paper_full_text.txt
 Send the full paper text AND compiled PDF to Claude review:
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     You are reviewing a [VENUE] paper. Please provide a detailed, structured review.
 
@@ -118,7 +118,7 @@ mcp__claude-review__review_start:
     self-containedness, notation consistency, AND visual presentation quality.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 Save the threadId for Round 2.
 
@@ -214,7 +214,7 @@ PY
 If `REVIEWER_BIAS_GUARD = true` (default), use a **fresh** `spawn_agent` thread for Round 2. Do not reuse the Round 1 threadId for prompting. Save the returned agent id only for recovery bookkeeping.
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     You are reviewing a [VENUE] paper. This is a fresh, zero-context review.
     Ignore any prior review rounds, prior fix lists, or executor explanations.
@@ -247,7 +247,7 @@ mcp__claude-review__review_start:
     self-containedness, notation consistency, and visual presentation quality.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 If `REVIEWER_BIAS_GUARD = false` (legacy debugging only), use `send_input` with the saved agent id; this is **not** the recommended path.
 

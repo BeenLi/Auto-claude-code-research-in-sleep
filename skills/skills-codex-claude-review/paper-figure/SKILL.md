@@ -202,7 +202,7 @@ Save all snippets to `figures/latex_includes.tex` for easy copy-paste into the p
 Send figure descriptions and captions to GPT-5.5 for review:
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     Review these figure/table plans for a [VENUE] submission.
 
@@ -216,7 +216,7 @@ mcp__claude-review__review_start:
     [list all figures with captions and descriptions]
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 ### Step 8: Quality Checklist
 

@@ -87,7 +87,7 @@ Long-running loops may hit the context window limit, triggering automatic compac
 Send comprehensive context to the external reviewer:
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     [Round N/MAX_ROUNDS of autonomous review loop]
 
@@ -104,7 +104,7 @@ mcp__claude-review__review_start:
     Be brutally honest. If the work is ready, say so clearly.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 If this is round 2+, use `send_input` with the saved agent id to maintain conversation context.
 
@@ -113,7 +113,7 @@ If this is round 2+, use `send_input` with the saved agent id to maintain conver
 Same as medium, but **prepend Reviewer Memory** to the prompt:
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     [Round N/MAX_ROUNDS of autonomous review loop]
 
@@ -138,7 +138,7 @@ mcp__claude-review__review_start:
     Be brutally honest. Actively look for things the author might be hiding.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 ##### Nightmare — Codex Exec (GPT reads repo directly)
 
@@ -244,7 +244,7 @@ Send Claude's rebuttal back to GPT for a ruling:
 
 *Hard mode (MCP):*
 ```
-mcp__claude-review__review_reply_start:
+mcp__claude_review__review_reply_start:
   threadId: [saved]
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
@@ -260,7 +260,7 @@ mcp__claude-review__review_reply_start:
     Then update your score if any weaknesses were withdrawn.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 *Nightmare mode (codex exec):*
 ```bash
@@ -442,7 +442,7 @@ When loop ends (positive assessment or max rounds):
 ## Prompt Template for Round 2+
 
 ```
-mcp__claude-review__review_reply_start:
+mcp__claude_review__review_reply_start:
   threadId: [saved from round 1]
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
@@ -460,4 +460,4 @@ mcp__claude-review__review_reply_start:
     Same format: Score, Verdict, Remaining Weaknesses, Minimum Fixes.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.

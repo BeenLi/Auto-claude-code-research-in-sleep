@@ -457,7 +457,7 @@ Passive voice IS acceptable for: established facts, methods where agent is irrel
 Send the complete draft to Claude review:
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     Review this [VENUE] paper draft (main body, excluding appendix).
 
@@ -476,7 +476,7 @@ mcp__claude-review__review_start:
     [paste full draft text]
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 Apply CRITICAL and MAJOR fixes. Document MINOR issues for the user.
 

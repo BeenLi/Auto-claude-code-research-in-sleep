@@ -210,7 +210,7 @@ For each section, list required citations:
 Send the complete outline to Claude review for feedback:
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     Review this paper outline for a [VENUE] submission.
     [full outline including Claims-Evidence Matrix]
@@ -227,7 +227,7 @@ mcp__claude-review__review_start:
     Be specific and actionable — "add X" not "consider more experiments".
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 Apply feedback before finalizing.
 

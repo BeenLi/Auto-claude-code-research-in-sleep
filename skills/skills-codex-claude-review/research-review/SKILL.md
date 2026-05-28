@@ -24,7 +24,7 @@ Get a multi-round critical review of research work from an external LLM with max
   ```bash
   codex mcp add claude-review -- python3 ~/.codex/mcp-servers/claude-review/server.py
   ```
-- This gives Codex access to `mcp__claude-review__review_start`, `mcp__claude-review__review_reply_start`, and `mcp__claude-review__review_status`.
+- This gives Codex access to `mcp__claude_review__review_start`, `mcp__claude_review__review_reply_start`, and `mcp__claude_review__review_status`.
 
   ```bash
   claude mcp add codex -s user -- codex mcp-server
@@ -43,7 +43,7 @@ Before calling the external reviewer, compile a comprehensive briefing:
 Send a detailed prompt with high-rigor review:
 
 ```
-mcp__claude-review__review_start:
+mcp__claude_review__review_start:
   prompt: |
     [Full research context + specific questions]
     Please act as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level).
@@ -62,10 +62,10 @@ mcp__claude-review__review_start:
     Please be brutally honest.
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 ### Step 3: Iterative Dialogue (Rounds 2-N)
-Use `mcp__claude-review__review_reply_start` with the saved completed `threadId`, then poll `mcp__claude-review__review_status` with the returned `jobId` until `done=true` to continue the conversation:
+Use `mcp__claude_review__review_reply_start` with the saved completed `threadId`, then poll `mcp__claude_review__review_status` with the returned `jobId` until `done=true` to continue the conversation:
 
 For each round:
 1. **Respond** to criticisms with evidence/counterarguments
