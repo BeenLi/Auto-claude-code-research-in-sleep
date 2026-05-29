@@ -35,7 +35,18 @@ Parses external reviews -> enforces coverage and grounding -> drafts text-only r
 ## Pipeline Status
 
 ```yaml
-{}
+stage: workflow_1_complete
+active_idea: WR-ZipGuard
+active_files:
+  literature_review: idea-stage/LITERATURE_REVIEW.md
+  idea_report: idea-stage/IDEA_REPORT.md
+  final_proposal: refine-logs/FINAL_PROPOSAL.md
+  experiment_plan: refine-logs/EXPERIMENT_PLAN.md
+  research_contract: idea-stage/docs/research_contract.md
+workflow_1_exit_gate: passed
+next_step: /experiment-bridge
+active_tasks: []
+last_updated_utc: 2026-05-29T01:44:34Z
 ```
 
 ## State Persistence Rules
