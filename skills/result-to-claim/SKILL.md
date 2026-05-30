@@ -36,6 +36,30 @@ Assemble the key information:
 - The intended claim these experiments were designed to test
 - Any known confounds or caveats
 
+### Step 1.5: Deterministic evidence pre-check (before spending a Codex call)
+
+For every claim that cites a specific number + a source file, verify the evidence
+*exists* mechanically — no model call — to catch **hallucinated evidence** before
+the jury runs (see [`shared-references/evidence-precheck.md`](../shared-references/evidence-precheck.md)).
+
+Resolve the helper via the canonical chain (integration-contract §2):
+`.aris/tools/evidence_check.py` → `tools/evidence_check.py` → `$ARIS_REPO/tools/evidence_check.py`
+(warn-and-skip if unresolved — never block the audit).
+
+1. Build a claims list `[{"id", "value", "source"}, ...]` from the cited numbers
+   and their result files, write it to `.aris/claims.json`, and run
+   `python3 <evidence_check> <root> --batch .aris/claims.json`.
+2. Any claim returned `path_missing` or `value_not_found` is **hallucinated
+   evidence** — mark it `claim_supported: no` with `integrity_status: evidence_not_found`
+   immediately; do NOT spend a Codex call defending a number that isn't in the data.
+3. **Carry the per-claim pre-check status into the Step-2 Codex context** (a small
+   `evidence pre-check: <id> → verified | value_not_found | path_missing` table) so
+   the jury knows which claims have real evidence to read.
+
+`verified` here means only that the cited evidence **exists** — whether it
+**supports** the claim is still the Codex jury's call in Step 2 (a deterministic
+gate DRIVES, it does not ACQUIT).
+
 ### Step 2: Codex Judgment
 
 Send the collected results to Codex for objective evaluation:
@@ -55,6 +79,13 @@ mcp__codex__codex:
 
     Results:
     [paste key numbers, comparison deltas, significance]
+
+    Evidence pre-check (deterministic, from Step 1.5):
+    [per-claim: <id> → verified | value_not_found | path_missing.
+     A value_not_found/path_missing means the cited number is NOT in its result
+     file — treat that claim as having no evidence; do not defend it. `verified`
+     means the number exists in the file — YOU still judge whether it supports
+     the claim.]
 
     Baselines:
     [baseline numbers and sources — reproduced or from paper]
