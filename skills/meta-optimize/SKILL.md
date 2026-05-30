@@ -120,6 +120,12 @@ For each optimization target, generate a concrete diff:
 - Patches must be minimal — change only what the data supports
 - Never change artifact schemas or MCP bridge config in v1
 - Never change behavior that would break existing user workflows
+- **Anti-self-poisoning screen** (see [`shared-references/capture-antipatterns.md`](../shared-references/capture-antipatterns.md)):
+  run a proposed patch's rationale through `tools/capture_filter.py` (resolve via
+  the canonical chain). NEVER propose a change that encodes a **negative
+  tool-capability claim** ("codex can't…", "gemini is broken") or a **one-off /
+  transient failure** as a durable rule — those harden into self-cited refusals.
+  Encode the *fix / the flag needed / the workaround*, not "X can't do Y".
 
 ### Step 4: Cross-Model Review of Patches
 
