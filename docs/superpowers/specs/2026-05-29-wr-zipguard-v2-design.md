@@ -102,6 +102,25 @@ p99 regression in no-gain regimes; simulation projection error <15%. If M3 finds
 region, pivot honestly to a "commodity DPU KV compression profitability frontier" negative-result /
 design-guidance paper (the C3 Phase-0 contribution backs this up).
 
+## Novelty check (2026-05-29, search-grounded)
+
+Trace: `.aris/traces/novelty-check/20260529_wr-zipguard-v2/report.md`. Overall **~5–6/10, PROCEED
+WITH CAUTION**.
+
+- **C2 (asymmetric / commodity BF3 decompress)** — MEDIUM-HIGH; the structural novelty. No prior
+  lossless KV work uses a commodity DPU hardware *decompressor* with a standard bitstream. Closest:
+  NVIDIA ICMSP/NIXL (move KV off-GPU over RDMA, no compression) and NetZIP (custom HW both ends).
+- **C1 (per-WR gate)** — LOW as a generic "when not to compress" idea (decades-old adaptive
+  compression / patents); MEDIUM only in combination with RDMA-WR granularity + tensor-aware
+  sampling + a measured BF3 frontier.
+- **C3 (RDMA-WR-granular bit-exact preservation)** — MEDIUM; byte-count-changing compression under
+  RDMA semantics for LLM KV is non-trivial but has transparent-compression-shim analogs.
+- **Positioning to survive**: lead with the measured negative result + gate, not "another codec";
+  state the commodity-decompress deployability delta vs NetZIP; vs ICMSP/NIXL frame it as "they move
+  bytes, we decide which bytes are worth compressing, bit-exact, on the same commodity DPU path".
+- **Risk**: BF4 may add hardware compress — scope the claim to the BF3 install base.
+- **Pending**: Codex gpt-5.5 cross-model verdict (async) to be folded into the trace when it returns.
+
 ## Open items deferred past design
 
 - Target venue/timeline assumed NSDI/ASPLOS/MICRO-class, 3–6 months to first credible result.

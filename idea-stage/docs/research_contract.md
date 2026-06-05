@@ -71,13 +71,26 @@ microbench (M2), a simulator profitable region under real parameters (M3), a bit
 through the commodity BF3 decompress path (M4a), and a measured FPGA-compressor end-to-end speedup
 (M4b).
 
+Novelty/competitive risk: next-gen **BF4** may add hardware compress, which would erode the
+"commodity decompress only, custom compress" framing — scope the contribution explicitly to the
+**BF3 commodity install base** and treat BF4 as future work, not a threat to the BF3 result.
+
 ## Current Evidence Status
 
-- Literature review complete with 18 verified candidate papers.
+- Literature review complete with 18 verified candidate papers, plus a post-run update (LITERATURE_REVIEW.md
+  Section 1b) adding ZipCCL (2604.27844), UCCL-Zip (2604.17172), HACK (2502.03589, lossy), and
+  NVIDIA ICMSP/BF4/NIXL/Dynamo (CES 2026).
 - **Confirmed externally**: NVIDIA DOCA Compress docs (2026) — BF3 supports deflate/LZ4
   *decompression* only, no hardware compress operation. This invalidated the v1 sender-side
   hardware-compress assumption.
 - Idea redesigned to the asymmetric, simulate-first form; design spec written and approved.
+- **Novelty check done** (search-grounded, 2026-05-29; trace
+  `.aris/traces/novelty-check/20260529_wr-zipguard-v2/report.md`): overall **~5–6/10, PROCEED WITH
+  CAUTION**. Per-claim — C2 asymmetric/commodity-BF3-decompress path **MEDIUM-HIGH** (no prior
+  lossless KV work uses commodity DPU hardware decompress); C1 per-WR gate **LOW alone / MEDIUM in
+  combination** (adaptive "when not to compress" is decades old; novelty is RDMA-WR granularity +
+  tensor-aware sampling + measured BF3 frontier); C3 RDMA-WR-granular bit-exact preservation
+  **MEDIUM**. A Codex gpt-5.5 cross-model verdict is still pending (to be folded in separately).
 - Largest remaining evidence gap: real tensor compression ratios and the simulator profitable region.
 
 ## Key Decisions
@@ -91,6 +104,13 @@ through the commodity BF3 decompress path (M4a), and a measured FPGA-compressor 
 - **Primary = inference KV (A), supplementary = training (B)**.
 - **No new codec** → use standard deflate/LZ4 so the commodity decompressor applies; novelty is the
   gate + asymmetric execution, not the codec.
+- **Novelty positioning (from novelty check)** → lead the paper with the *measured negative result*
+  (when commodity-DPU KV compression does NOT pay) + the gate, not "another lossless KV codec".
+  Frame the deployability delta explicitly: commodity BF3 decompress, no custom HW both ends (vs
+  NetZIP). Vs NVIDIA ICMSP/NIXL: "they move KV bytes off-GPU over RDMA; we decide *which* bytes are
+  worth compressing and do it bit-exact on the same commodity DPU path." The biggest review risk is
+  an "ICMSP/NIXL already move KV + UCCL-Zip already does lossless comm compression ⇒ incremental"
+  framing; the asymmetric-commodity-decompress angle + the gate are the defensible core.
 
 ## Immediate Research Gate
 
