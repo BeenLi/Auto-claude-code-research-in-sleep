@@ -163,8 +163,11 @@ When calling the reviewer for idea evaluation, branch on REVIEWER_BACKEND:
     prompt: [follow-up prompt]
     config: {"model_reasoning_effort": "xhigh"}
 
-Prompt fidelity: the manual prompt must be exactly the same text that Codex would receive.
-Review tracing applies equally to both backends.
+Content fidelity: the manual reviewer should see the same substantive bundle
+content Codex would read. If the manual UI supports file upload / attachment,
+reuse the same bundle file; otherwise paste the bundle contents inline because
+remote web UIs cannot read your local filesystem paths. Review tracing applies
+equally to both backends.
 
 ## Workflow
 
@@ -238,19 +241,25 @@ Then terminate the entire workflow early.
 
 Use the selected reviewer backend (see Reviewer Calling Convention) for divergent thinking.
 
-*For `codex` backend:*
+For the `codex` backend, **do not inline the full landscape + gaps prompt**
+once it stops being tiny. Write the full brainstorming request to
+`idea-stage/codex_brainstorm_bundle.md`, then keep the MCP prompt short:
 
 ```
 mcp__codex__codex:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    You are a senior researcher brainstorming publishable research ideas for the topic and venues implied by the supplied literature review.
+    Read the idea-generation bundle at <absolute path to
+    idea-stage/codex_brainstorm_bundle.md> and follow all instructions in it.
 ```
 
-*For `manual` backend:* use `mcp__manual_review__review` with the exact same prompt text and `config: {"model_reasoning_effort": "xhigh"}`. Save the returned `threadId` for Phase 4 follow-up.
+*For `manual` backend:* use `mcp__manual_review__review` with the same bundle
+contents. If the manual-review UI supports attachments, attach
+`idea-stage/codex_brainstorm_bundle.md`; otherwise paste the bundle contents
+inline. Save the returned `threadId` for Phase 4 follow-up.
 
-The brainstorming prompt:
+Bundle contents:
 
 ```
     You are a senior researcher brainstorming publishable research ideas for the topic and venues implied by the supplied literature review.
@@ -259,7 +268,7 @@ The brainstorming prompt:
     Domain context: [paste Topic Scope from /research-lit Section 4]
 
     Here is the current landscape (from /research-lit Section 2):
-    [paste landscape map — sub-direction clusters]
+    [write the landscape map — sub-direction clusters — into this bundle file]
 
     Negative evidence (from /research-lit Section 2.5) -- AUDIT INPUT:
     [paste the NE-* table verbatim, including claim, source, affected_methods, affected_assumption, confidence, linked_gaps]
@@ -380,10 +389,16 @@ For each surviving idea in priority order, run a deeper evaluation:
 
 1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + cross-model verification) for each idea
 
-2. **Critical review**: Use the selected reviewer backend (see Reviewer Calling Convention). For `codex`, use `mcp__codex__codex-reply` (same thread). For `manual`, use `mcp__manual_review__review_reply` with the saved threadId:
+2. **Critical review**: Use the selected reviewer backend (see Reviewer Calling Convention). For `codex`, use `mcp__codex__codex-reply` (same thread). For `manual`, use `mcp__manual_review__review_reply` with the saved threadId. For the `codex` backend, write the full annotated survivor set to `idea-stage/codex_triage_bundle.md` and send only a path-based follow-up:
+   ```
+   Read the idea-triage bundle at <absolute path to
+   idea-stage/codex_triage_bundle.md> and follow all instructions in it.
+   ```
+   For the `manual` backend, attach that same bundle if possible; otherwise
+   paste its contents inline. Bundle contents:
    ```
    Here are our top ideas after filtering:
-   [paste surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, baseline_artifact_readiness, baseline_verification_delta, metrics, target_validation_style, evaluation_target_clarity, evaluation_feasibility_score, evaluation_feasibility_breakdown, handoff_to_workflow_1_5, and main_blocker]
+   [write surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, baseline_artifact_readiness, baseline_verification_delta, metrics, target_validation_style, evaluation_target_clarity, evaluation_feasibility_score, evaluation_feasibility_breakdown, handoff_to_workflow_1_5, and main_blocker into this bundle file]
 
    For each, play devil's advocate:
    - What's the strongest objection a target-venue reviewer would raise?
