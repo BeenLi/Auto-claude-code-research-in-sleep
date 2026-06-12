@@ -90,7 +90,23 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   lossless KV work uses commodity DPU hardware decompress); C1 per-WR gate **LOW alone / MEDIUM in
   combination** (adaptive "when not to compress" is decades old; novelty is RDMA-WR granularity +
   tensor-aware sampling + measured BF3 frontier); C3 RDMA-WR-granular bit-exact preservation
-  **MEDIUM**. A Codex gpt-5.5 cross-model verdict is still pending (to be folded in separately).
+  **MEDIUM**.
+- **Codex gpt-5.5 cross-model verdict folded in** (2026-06-12, xhigh; full text in the novelty
+  trace): **5/10, PROCEED WITH CAUTION** — slightly harsher. C1 downgraded to **LOW** (KVServe
+  already adapts when/how to compress KV), C2 downgraded to **MEDIUM** (novelty is
+  deployment/integration; DOCA staging weakens "transparent RDMA" claims), C3 **MEDIUM**. Strongest
+  drafted attack: "assembly of known pieces" (SplitZip + UCCL-Zip + KVServe + PEDAL + ShadowServe),
+  reducible to "a measured staging shim with a cost model". Positioning survives narrowly only if
+  the paper leads with the honest negative result. ShadowServe and UCCL-Zip flagged as
+  underweighted attack surfaces.
+- **ICMSP/NIXL positioning verified against primary sources** (2026-06-12, deep-research, 14 claims
+  confirmed 3-0): NVIDIA press release + developer blog + CMX product page describe BF4's KV-pipeline
+  accelerators as crypto/CRC only — no hardware compression engine and no compression step anywhere
+  in the Dynamo/NIXL/CMX KV path; NIXL BackendGuide.md and a repo code/issue search show zero
+  data-plane compression. The "they move bytes, no lossless compression, no per-WR gate" claim is
+  **confirmed** (caveat: absence of public evidence, not formal proof; recheck before submission).
+  Bonus finding: NIXL's pluggable backend architecture (SB API + Plugin Manager) supports framing
+  WR-ZipGuard as a *pluggable gate on the NIXL transfer path* rather than a competitor.
 - Largest remaining evidence gap: real tensor compression ratios and the simulator profitable region.
 
 ## Key Decisions
@@ -111,6 +127,14 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   worth compressing and do it bit-exact on the same commodity DPU path." The biggest review risk is
   an "ICMSP/NIXL already move KV + UCCL-Zip already does lossless comm compression ⇒ incremental"
   framing; the asymmetric-commodity-decompress angle + the gate are the defensible core.
+- **Positioning refinements from the Codex cross-model verdict (2026-06-12)** → (1) do **not** sell
+  the gate (C1) as novelty — it is the mechanism; the publishable contribution is the measured
+  profitability frontier / negative-result atlas + the deployability gap vs custom HW and GPU-side
+  codecs; (2) frame WR-ZipGuard as a **NIXL-compatible data-reduction gate** (NIXL has a pluggable
+  backend architecture), not a competing KV-movement architecture; (3) candidate paper identity:
+  "the BF3 commodity decompression profitability atlas for LLM KV transfer, with a conservative
+  WR-level bypass gate and bit-exact NIXL/RDMA-compatible execution"; (4) treat ShadowServe and
+  UCCL-Zip as first-class related work to defuse, alongside NetZIP/ICMSP.
 
 ## Immediate Research Gate
 
