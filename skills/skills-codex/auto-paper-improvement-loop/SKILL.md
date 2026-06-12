@@ -255,9 +255,21 @@ If `REVIEWER_BIAS_GUARD = false` (legacy debugging only), use `send_input` with 
 
 Run this only if the paper is theory-heavy (≥5 `\begin{theorem}|\begin{lemma}|\begin{proposition}|\begin{corollary}` environments in the source) or has explicit scope/generality claims in title/abstract, and only on the final scheduled round (`current_round == MAX_ROUNDS`).
 
-**Delegate to the `kill-argument` skill** (extracted in May 2026 as a standalone primitive). This step does NOT re-implement the Attack-and-Adjudication prompt template; instead, invoke the skill and read its output. The Codex-CLI form is to call the installed skill the same way you would call any other ARIS skill from the agent's tool list, then parse `KILL_ARGUMENT.json` from the paper directory.
+**Delegate to `/kill-argument`** — the canonical implementation lives at `skills/kill-argument/SKILL.md` (extracted in May 2026). This step does NOT re-implement the Attack-and-Adjudication prompt template; instead, invoke the skill and read its output:
 
-**Merge rule** (auto-loop's responsibility — `kill-argument` itself is detect-only):
+```bash
+# Invoke the canonical adversarial-review primitive on the current paper.
+# /kill-argument runs two fresh-thread codex 5.5 xhigh calls and writes
+# KILL_ARGUMENT.{md,json} into the paper directory. It is detect-only —
+# it never edits the paper itself.
+/kill-argument "$PAPER_DIR"
+
+# Read the structured verdict.
+KILL_VERDICT=$(jq -r '.verdict' "$PAPER_DIR/KILL_ARGUMENT.json")
+KILL_REASON=$(jq -r '.reason_code' "$PAPER_DIR/KILL_ARGUMENT.json")
+```
+
+**Merge rule** (auto-loop's responsibility — `/kill-argument` itself is detect-only):
 
 - Read `details.decomposed_points` from `KILL_ARGUMENT.json`.
 - For each point with `verdict == "still_unresolved"` or `verdict == "partially_answered"` at `severity_if_unresolved == "critical"`:
@@ -269,7 +281,7 @@ Run this only if the paper is theory-heavy (≥5 `\begin{theorem}|\begin{lemma}|
 
 This phase feeds directly into Step 6. The merged findings must land before the final recompile.
 
-If kill-argument returns `verdict: NOT_APPLICABLE`, skip Step 5.5 entirely and proceed to Step 6. If it returns `BLOCKED` or `ERROR`, log the reason in `PAPER_IMPROVEMENT_LOG.md` and proceed without merging — the loop should not stall on an adversarial check that cannot run.
+If `/kill-argument` returns `verdict: NOT_APPLICABLE` (paper isn't theory- or scope-heavy enough to need this check), skip Step 5.5 entirely and proceed to Step 6. If it returns `BLOCKED` or `ERROR`, log the reason in `PAPER_IMPROVEMENT_LOG.md` and proceed without merging — the loop should not stall on an adversarial check that cannot run.
 
 **Empirical motivation:** in our April 2026 NeurIPS run, after 5 rounds of standard improvement (score 7-8/10), the kill-argument exercise surfaced framing weaknesses that no prior review caught (e.g., "width-w is mostly conditional", "CRF irrelevant to real D-LLMs"). Author rebuttal forced explicit scope qualifications in abstract and discussion.
 

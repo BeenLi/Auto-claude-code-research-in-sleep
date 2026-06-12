@@ -1,8 +1,8 @@
 ---
 name: auto-review-loop
-description: Autonomous multi-round research review loop. Repeatedly reviews via Codex subagent, implements fixes, and re-reviews until positive assessment or max rounds reached. Use when user says "auto review loop", "review until it passes", or wants autonomous iterative improvement.
+description: Autonomous multi-round research review loop. Repeatedly reviews via external reviewer backend (Codex or manual), implements fixes, and re-reviews until positive assessment or max rounds reached. Use when user says "auto review loop", "review until it passes", or wants autonomous iterative improvement.
 argument-hint: [topic-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, spawn_agent, send_input
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, spawn_agent, send_input, mcp__manual_review__review, mcp__manual_review__review_reply
 ---
 
 # Auto Review Loop: Autonomous Research Improvement
@@ -16,17 +16,41 @@ Autonomously iterate: review → implement fixes → re-review, until the extern
 - MAX_ROUNDS = 4
 - POSITIVE_THRESHOLD: score >= 6/10, or verdict contains "accept", "sufficient", "ready for submission"
 - REVIEW_DOC: `review-stage/AUTO_REVIEW.md` (cumulative log) *(fall back to `./AUTO_REVIEW.md` for legacy projects)*
-- REVIEWER_MODEL = `gpt-5.4` — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`)
-- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro (`gpt-5-5-pro`) via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- REVIEWER_MODEL = `gpt-5.5` — Default model for the Codex backend. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Manual backend uses whatever model the user chooses.
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `review-stage/`** — All review-stage outputs go here. Create the directory if it doesn't exist.
 - **HUMAN_CHECKPOINT = false** — When `true`, pause after each round's review (Phase B) and present the score + weaknesses to the user. Wait for user input before proceeding to Phase C. The user can: approve the suggested fixes, provide custom modification instructions, skip specific fixes, or stop the loop early. When `false` (default), the loop runs fully autonomously.
 - **COMPACT = false** — When `true`, (1) read `EXPERIMENT_LOG.md` and `findings.md` instead of parsing full logs on session recovery, (2) append key findings to `findings.md` after each round.
 - **REVIEWER_DIFFICULTY = medium** — Controls how adversarial the reviewer is. Three levels:
-  - `medium` (default): Current behavior — MCP-based review, Claude controls what context GPT sees.
-  - `hard`: Adds **Reviewer Memory** (GPT tracks its own suspicions across rounds) + **Debate Protocol** (Claude can rebut, GPT rules).
-  - `nightmare`: Everything in `hard` + **GPT reads the repo directly** via `codex exec` (Claude cannot filter what GPT sees) + **Adversarial Verification** (GPT independently checks if code matches claims).
+  - `medium` (default): Current behavior — MCP-based review, the executor controls what context the reviewer sees.
+  - `hard`: Adds **Reviewer Memory** (the reviewer tracks its own suspicions across rounds) + **Debate Protocol** (the executor can rebut, the reviewer rules).
+  - `nightmare`: Everything in `hard` + **Codex exec reviewer reads the repo directly** via `codex exec` (the executor cannot filter what the reviewer sees) + **Adversarial Verification** (the reviewer independently checks if code matches claims).
+
+> ⚠️ **Nightmare + Manual incompatibility**: If `REVIEWER_BACKEND = manual` and `REVIEWER_DIFFICULTY = nightmare`, STOP with:
+> "difficulty: nightmare requires Codex CLI / codex exec and is not compatible with --reviewer: manual. Use difficulty: hard, or switch reviewer to codex."
 
 > 💡 Override: `/auto-review-loop "topic" — compact: true, human checkpoint: true, difficulty: hard`
+
+## Reviewer Calling Convention
+
+When calling the reviewer, branch on REVIEWER_BACKEND:
+
+**If REVIEWER_BACKEND = `codex`:**
+  Use `spawn_agent` for new review threads.
+  Use `send_input` for follow-up rounds (reuse agent_id).
+
+**If REVIEWER_BACKEND = `manual`:**
+  Use `mcp__manual_review__review` for new review threads with:
+    prompt: [exact same prompt that would go to Codex]
+    config: {"model_reasoning_effort": "xhigh"}
+  Save the returned `agent_id`.
+  Use `mcp__manual_review__review_reply` for follow-up rounds with:
+    agent_id: [saved manual-review agent_id]
+    prompt: [follow-up prompt]
+    config: {"model_reasoning_effort": "xhigh"}
+
+Prompt fidelity: the manual prompt must be exactly the same text that Codex would receive.
+Review tracing applies equally to both backends.
 
 ## State Persistence (Compact Recovery)
 
@@ -84,7 +108,9 @@ Long-running loops may hit the context window limit, triggering automatic compac
 
 ##### Medium (default) — MCP Review
 
-Send comprehensive context to the external reviewer:
+Send comprehensive context to the external reviewer using the selected backend.
+
+*For codex backend:*
 
 ```
 spawn_agent:
@@ -105,11 +131,15 @@ spawn_agent:
     Be brutally honest. If the work is ready, say so clearly.
 ```
 
-If this is round 2+, use `send_input` with the saved agent_id to maintain conversation context.
+*For manual backend:* use `mcp__manual_review__review` with the `prompt` text above and `config: {"model_reasoning_effort": "xhigh"}`. Save the returned `agent_id`.
+
+If this is round 2+, use `send_input` (codex) or `mcp__manual_review__review_reply` (manual) with the saved agent_id.
 
 ##### Hard — MCP Review + Reviewer Memory
 
-Same as medium, but **prepend Reviewer Memory** to the prompt:
+Same as medium, but **prepend Reviewer Memory** to the prompt. Use the selected backend.
+
+*For codex backend:*
 
 ```
 spawn_agent:
@@ -211,17 +241,17 @@ After parsing the assessment, update `REVIEWER_MEMORY.md` in the project root:
 **Rules**:
 - Append each round, never delete prior rounds (audit trail)
 - If the reviewer's response includes a "Memory update" section, copy it verbatim
-- This file is passed back to GPT in the next round's Phase A — it is GPT's persistent brain
+- This file is passed back to the reviewer in the next round's Phase A — it is the reviewer's persistent memory
 
 #### Phase B.6: Debate Protocol (hard + nightmare only)
 
 **Skip entirely if `REVIEWER_DIFFICULTY = medium`.**
 
-After parsing the review, Claude (the author) gets a chance to **rebut**:
+After parsing the review, the executor gets a chance to **rebut**:
 
-**Step 1 — Claude's Rebuttal:**
+**Step 1 — Executor Rebuttal:**
 
-For each weakness the reviewer identified, Claude writes a structured response:
+For each weakness the reviewer identified, the executor writes a structured response:
 
 ```markdown
 ### Rebuttal to Weakness #1: [title]
@@ -230,25 +260,35 @@ For each weakness the reviewer identified, Claude writes a structured response:
 - **Evidence**: [point to specific code, results, or prior round fixes]
 ```
 
-Rules for Claude's rebuttal:
+Rules for the executor's rebuttal:
 - Must be honest — do NOT fabricate evidence or misrepresent results
 - Can point out factual errors in the review (reviewer misread code, wrong metric, etc.)
 - Can argue a weakness is out of scope or would require unreasonable effort
 - Maximum 3 rebuttals per round (pick the most impactful to contest)
 
-**Step 2 — GPT Rules on Rebuttal:**
+**Step 2 — Reviewer Rules on Rebuttal:**
 
-Send Claude's rebuttal back to GPT for a ruling:
+Send the executor's rebuttal back to the reviewer for a ruling:
 
-*Hard mode (MCP):*
+*Hard mode — use the selected backend for the rebuttal step:*
+
+*For codex:*
 ```
 send_input:
   agent_id: [saved]
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     The author rebuts your review:
+```
 
-    [paste Claude's rebuttal]
+*For manual:* use `mcp__manual_review__review_reply` with the same `agent_id` and prompt.
+
+The prompt content:
+
+```
+    The author rebuts your review:
+
+    [paste executor's rebuttal]
 
     For each rebuttal, rule:
     - SUSTAINED (author's argument is valid, withdraw this weakness)
@@ -263,7 +303,7 @@ send_input:
 codex exec "$(cat <<'PROMPT'
 You are the same adversarial reviewer. The author rebuts your review:
 
-[paste Claude's rebuttal]
+[paste executor's rebuttal]
 
 VERIFY the author's evidence claims yourself — read the files they reference.
 Do NOT take their word for it.
@@ -374,10 +414,10 @@ This is the authoritative record. Do NOT truncate or paraphrase.]
 <details>
 <summary>Click to expand debate</summary>
 
-**Claude's Rebuttal:**
+**Executor Rebuttal:**
 [paste rebuttal]
 
-**GPT's Ruling:**
+**Reviewer Ruling:**
 [paste ruling — SUSTAINED / OVERRULED / PARTIALLY SUSTAINED for each]
 
 **Score adjustment**: X/10 → Y/10
@@ -425,7 +465,7 @@ When loop ends (positive assessment or max rounds):
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 
 - ALWAYS use `config: {"model_reasoning_effort": "xhigh"}` for maximum reasoning depth
-- Save agent_id from first call, use `send_input` for subsequent rounds
+- Save agent_id from first call; use the appropriate reply tool (`send_input` or `mcp__manual_review__review_reply`) for subsequent rounds per the Reviewer Calling Convention
 - **Anti-hallucination citations**: When adding references during fixes, NEVER fabricate BibTeX. Use the same DBLP → CrossRef → `[VERIFY]` chain as `/paper-write`: (1) `curl -s "https://dblp.org/search/publ/api?q=TITLE&format=json"` → get key → `curl -s "https://dblp.org/rec/{key}.bib"`, (2) if not found, `curl -sLH "Accept: application/x-bibtex" "https://doi.org/{doi}"`, (3) if both fail, mark with `% [VERIFY]`. Do NOT generate BibTeX from memory.
 - Be honest — include negative results and failed experiments
 - Do NOT hide weaknesses to game a positive score
@@ -437,8 +477,10 @@ When loop ends (positive assessment or max rounds):
 
 ## Prompt Template for Round 2+
 
+Use the selected backend. *For codex:* `send_input` with the saved agent_id. *For manual:* `mcp__manual_review__review_reply` with the saved agent_id.
+
 ```
-send_input:
+[For codex:] send_input:
   agent_id: [saved from round 1]
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
@@ -455,3 +497,7 @@ send_input:
     Please re-score and re-assess. Are the remaining concerns addressed?
     Same format: Score, Verdict, Remaining Weaknesses, Minimum Fixes.
 ```
+
+## Review Tracing
+
+After each reviewer call (`spawn_agent`, `send_input`, `mcp__manual_review__review`, or `mcp__manual_review__review_reply`), save the trace following `shared-references/review-tracing.md` (Policy C — forensic; never silently skip). Use `save_trace.sh` (resolved per the chain in `shared-references/integration-contract.md` §2) or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

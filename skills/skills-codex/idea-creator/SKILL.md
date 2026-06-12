@@ -2,7 +2,7 @@
 name: idea-creator
 description: Generate and rank research ideas given a broad direction. Use when user says "找idea", "brainstorm ideas", "generate research ideas", "what can we work on", or wants to explore a research area for publishable directions.
 argument-hint: [research-direction]
-allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Agent, spawn_agent, send_input
+allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Agent, spawn_agent, send_input, mcp__manual_review__review, mcp__manual_review__review_reply
 ---
 
 # Research Idea Creator
@@ -22,8 +22,8 @@ Shared references:
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex subagent for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`).
-- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- **REVIEWER_MODEL = `gpt-5.5`** — Default model for the Codex backend. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Manual backend uses whatever model the user chooses.
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 
 
@@ -145,6 +145,30 @@ unknown reproducibility, and `0` is proprietary/unavailable/unverified-only.
 Score `0` must not be marked
 `handoff_to_workflow_1_5: ready`; downrank, defer, or set the blocker instead.
 
+## Reviewer Calling Convention
+
+When calling the reviewer for idea evaluation, branch on REVIEWER_BACKEND:
+
+**If REVIEWER_BACKEND = `codex`:**
+  Use `spawn_agent` for new review threads.
+  Use `send_input` for follow-up rounds (reuse agent_id).
+
+**If REVIEWER_BACKEND = `manual`:**
+  Use `mcp__manual_review__review` for new review threads with:
+    prompt: [exact same prompt that would go to Codex]
+    config: {"model_reasoning_effort": "xhigh"}
+  Save the returned `agent_id`.
+  Use `mcp__manual_review__review_reply` for follow-up rounds with:
+    agent_id: [saved manual-review agent_id]
+    prompt: [follow-up prompt]
+    config: {"model_reasoning_effort": "xhigh"}
+
+Content fidelity: the manual reviewer should see the same substantive bundle
+content Codex would read. If the manual UI supports file upload / attachment,
+reuse the same bundle file; otherwise paste the bundle contents inline because
+remote web UIs cannot read your local filesystem paths. Review tracing applies
+equally to both backends.
+
 ## Workflow
 
 ### Phase 0: Load Research Wiki (if active)
@@ -215,20 +239,36 @@ Then terminate the entire workflow early.
 
 ### Phase 2: Idea Generation (brainstorm with external LLM)
 
-Use the external LLM via Codex subagent for divergent thinking:
+Use the selected reviewer backend (see Reviewer Calling Convention) for divergent thinking.
+
+For the `codex` backend, **do not inline the full landscape + gaps prompt**
+once it stops being tiny. Write the full brainstorming request to
+`idea-stage/codex_brainstorm_bundle.md`, then keep the MCP prompt short:
 
 ```
 spawn_agent:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
+    Read the idea-generation bundle at <absolute path to
+    idea-stage/codex_brainstorm_bundle.md> and follow all instructions in it.
+```
+
+*For `manual` backend:* use `mcp__manual_review__review` with the same bundle
+contents. If the manual-review UI supports attachments, attach
+`idea-stage/codex_brainstorm_bundle.md`; otherwise paste the bundle contents
+inline. Save the returned `agent_id` for Phase 4 follow-up.
+
+Bundle contents:
+
+```
     You are a senior researcher brainstorming publishable research ideas for the topic and venues implied by the supplied literature review.
 
     Research direction: [user's direction]
     Domain context: [paste Topic Scope from /research-lit Section 4]
 
     Here is the current landscape (from /research-lit Section 2):
-    [paste landscape map — sub-direction clusters]
+    [write the landscape map — sub-direction clusters — into this bundle file]
 
     Negative evidence (from /research-lit Section 2.5) -- AUDIT INPUT:
     [paste the NE-* table verbatim, including claim, source, affected_methods, affected_assumption, confidence, linked_gaps]
@@ -347,12 +387,18 @@ For each generated idea, convert the Phase 2 hints into authoritative ranking an
 
 For each surviving idea in priority order, run a deeper evaluation:
 
-1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + GPT-5.5 cross-verification) for each idea
+1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + cross-model verification) for each idea
 
-2. **Critical review**: Use GPT-5.5 via `send_input` (same agent):
+2. **Critical review**: Use the selected reviewer backend (see Reviewer Calling Convention). For `codex`, use `send_input` (same agent). For `manual`, use `mcp__manual_review__review_reply` with the saved agent_id. For the `codex` backend, write the full annotated survivor set to `idea-stage/codex_triage_bundle.md` and send only a path-based follow-up:
+   ```
+   Read the idea-triage bundle at <absolute path to
+   idea-stage/codex_triage_bundle.md> and follow all instructions in it.
+   ```
+   For the `manual` backend, attach that same bundle if possible; otherwise
+   paste its contents inline. Bundle contents:
    ```
    Here are our top ideas after filtering:
-   [paste surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, baseline_artifact_readiness, baseline_verification_delta, metrics, target_validation_style, evaluation_target_clarity, evaluation_feasibility_score, evaluation_feasibility_breakdown, handoff_to_workflow_1_5, and main_blocker]
+   [write surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, baseline_artifact_readiness, baseline_verification_delta, metrics, target_validation_style, evaluation_target_clarity, evaluation_feasibility_score, evaluation_feasibility_breakdown, handoff_to_workflow_1_5, and main_blocker into this bundle file]
 
    For each, play devil's advocate:
    - What's the strongest objection a target-venue reviewer would raise?
@@ -375,7 +421,7 @@ For each surviving idea in priority order, run a deeper evaluation:
    - Is the named bottleneck real and central, or is the idea mostly an implementation detail without a decisive research question?
    ```
 
-3. **Combine rankings**: Merge your assessment with GPT-5.5's ranking. Produce a single priority-ordered survivor list. The first idea with a clear comparison target, platform/workload mapping, decisive metrics, and feasible baseline path becomes the immediate Workflow 1.5 candidate; later viable ideas remain backups or deferred options.
+3. **Combine rankings**: Merge your assessment with the reviewer's ranking. Produce a single priority-ordered survivor list. The first idea with a clear comparison target, platform/workload mapping, decisive metrics, and feasible baseline path becomes the immediate Workflow 1.5 candidate; later viable ideas remain backups or deferred options.
 
 ### Phase 5: Evaluation Handoff Planning (priority-ordered ideas)
 
@@ -475,4 +521,4 @@ After this skill produces the ranked report:
 
 ## Review Tracing
 
-After each `spawn_agent` or `send_input` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each reviewer call (`spawn_agent`, `send_input`, `mcp__manual_review__review`, or `mcp__manual_review__review_reply`), save the trace following `shared-references/review-tracing.md` (Policy C — forensic; never silently skip). Use `save_trace.sh` (resolved per the chain in `shared-references/integration-contract.md` §2) or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
