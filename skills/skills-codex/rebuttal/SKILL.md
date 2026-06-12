@@ -2,7 +2,7 @@
 name: rebuttal
 description: "Workflow 4: Submission rebuttal pipeline. Parses external reviews, enforces coverage and grounding, drafts a safe text-only rebuttal under venue limits, and manages follow-up rounds. Use when user says \"rebuttal\", \"reply to reviewers\", \"ICML rebuttal\", \"OpenReview response\", or wants to answer external reviews safely."
 argument-hint: [paper-path-or-review-bundle]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, spawn_agent, send_input
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, spawn_agent, send_input, mcp__manual_review__review, mcp__manual_review__review_reply
 ---
 
 # Workflow 4: Rebuttal
@@ -40,16 +40,37 @@ Workflow 4:   rebuttal (post-submission external reviews)
 
 - **VENUE = `ICML`** — Default venue. Override if needed.
 - **RESPONSE_MODE = `TEXT_ONLY`** — v1 default.
-- **REVIEWER_MODEL = `gpt-5.5`** — Used via Codex subagent for internal stress-testing.
-- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- **REVIEWER_MODEL = `gpt-5.5`** — Default model for the Codex backend. Used for internal stress-testing. Manual backend uses whatever model the user chooses.
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 - **MAX_INTERNAL_DRAFT_ROUNDS = 2** — draft → lint → revise.
-- **MAX_STRESS_TEST_ROUNDS = 1** — One Codex subagent critique round.
+- **MAX_STRESS_TEST_ROUNDS = 1** — One external reviewer critique round.
 - **MAX_FOLLOWUP_ROUNDS = 3** — per reviewer thread.
 - **AUTO_EXPERIMENT = false** — When `true`, automatically invoke `/experiment-bridge` to run supplementary experiments when the strategy plan identifies reviewer concerns that require new empirical evidence. When `false` (default), pause and present the evidence gap to the user for manual handling.
 - **QUICK_MODE = false** — When `true`, only run Phase 0-3 (parse reviews, atomize concerns, build strategy). Outputs `ISSUE_BOARD.md` + `STRATEGY_PLAN.md` and stops — no drafting, no stress test. Useful for quickly understanding what reviewers want before deciding how to respond.
 - **REBUTTAL_DIR = `rebuttal/`**
 
 > Override: `/rebuttal "paper/" — venue: NeurIPS, character limit: 5000`
+
+## Reviewer Calling Convention
+
+When calling the reviewer for stress-testing, branch on REVIEWER_BACKEND:
+
+**If REVIEWER_BACKEND = `codex`:**
+  Use `spawn_agent` for new review threads.
+  Use `send_input` for follow-up rounds (reuse agent_id).
+
+**If REVIEWER_BACKEND = `manual`:**
+  Use `mcp__manual_review__review` for new review threads with:
+    prompt: [exact same prompt that would go to Codex]
+    config: {"model_reasoning_effort": "xhigh"}
+  Save the returned `agent_id`.
+  Use `mcp__manual_review__review_reply` for follow-up rounds with:
+    agent_id: [saved manual-review agent_id]
+    prompt: [follow-up prompt]
+    config: {"model_reasoning_effort": "xhigh"}
+
+Prompt fidelity: the manual prompt must be exactly the same text that Codex would receive.
+Review tracing applies equally to both backends.
 
 ## Required Inputs
 
@@ -211,7 +232,9 @@ Run all lints:
 5. **Consistency** — no contradictions across reviewer replies
 6. **Limit** — exact character count, compress if over (redundancy → friendly → opener → wording, never drop critical answers)
 
-### Phase 6: Codex subagent Stress Test
+### Phase 6: External Reviewer Stress Test
+
+Use the selected backend. *For codex:*
 
 ```
 spawn_agent:
@@ -229,6 +252,8 @@ spawn_agent:
 
     Verdict: safe to submit / needs revision
 ```
+
+*For manual:* use `mcp__manual_review__review` with the same prompt and `config: {"model_reasoning_effort": "xhigh"}`.
 
 Save full response to `rebuttal/MCP_STRESS_TEST.md`. If hard safety blocker → revise before finalizing.
 
@@ -264,7 +289,7 @@ When new reviewer comments arrive:
 3. Draft **delta reply only** (not full rewrite)
 4. Update `rebuttal/REVISION_PLAN.md` in place — add any new checklist items introduced by the follow-up, tick off items the author has already completed, and keep existing items' status current
 5. Re-run safety lints
-6. Use Codex subagent reply for continuity if useful
+6. Use the appropriate reply tool for continuity if useful (per Reviewer Calling Convention)
 7. Rules: escalate technically not rhetorically; concede if reviewer is correct; stop arguing if reviewer is immovable and no new evidence exists
 
 ## Key Rules
@@ -286,4 +311,4 @@ When new reviewer comments arrive:
 
 ## Review Tracing
 
-After each `spawn_agent` or `send_input` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each reviewer call (`spawn_agent`, `send_input`, `mcp__manual_review__review`, or `mcp__manual_review__review_reply`), save the trace following `shared-references/review-tracing.md` (Policy C — forensic; never silently skip). Use `save_trace.sh` (resolved per the chain in `shared-references/integration-contract.md` §2) or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

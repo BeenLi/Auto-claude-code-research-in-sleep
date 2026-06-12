@@ -1,7 +1,7 @@
 ---
 name: research-pipeline
 description: "Full research pipeline: Workflow 1 (idea discovery) → Workflow 1.5 (evaluation contract + implementation bridge) → Workflow 2 (auto review loop) → Workflow 3 (paper writing, optional). Goes from a broad research direction all the way to a polished PDF. Use when user says \"全流程\", \"full pipeline\", \"从找idea到投稿\", \"end-to-end research\", or wants the complete autonomous research lifecycle."
-argument-hint: [research-direction]
+argument-hint: [research-direction] [— resume <run_id>]
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
@@ -17,6 +17,8 @@ End-to-end autonomous research workflow for: **$ARGUMENTS**
 - **REVIEWER_DIFFICULTY = medium** — How adversarial the reviewer is. `medium` (default): standard MCP review. `hard`: adds reviewer memory + debate protocol. `nightmare`: GPT reads repo directly via `codex exec` + memory + debate. Passed through to `/auto-review-loop`.
 - **AUTO_WRITE = false** — When `true`, automatically invoke Workflow 3 (`/paper-writing`) after Stage 5. Requires `VENUE` to be set. When `false` (default), Stage 5 generates `NARRATIVE_REPORT.md` and stops — user invokes `/paper-writing` manually.
 - **VENUE = ACM** — Target venue template family for paper writing (Stage 6). Only used when `AUTO_WRITE=true`. Options include `ACM`, `IEEE_CONF`, `IEEE_JOURNAL`, or any configured local venue template.
+
+- **RESUMABLE = true** — When `true` (default), the pipeline records per-stage state to `.aris/runs/<run_id>.json` so a crashed/interrupted run can resume via `/research-pipeline — resume <run_id>` instead of restarting. Stage status splits `done` (executor finished writing) from `accepted` (the stage's cross-model gate / deterministic verifier passed); resume re-validates any `done`-but-unaccepted stage. See `shared-references/resumable-runs.md`.
 
 > 💡 Override via argument, e.g., `/research-pipeline "topic" — auto proceed: false, human checkpoint: true, difficulty: nightmare, auto_write: true, venue: ACM`.
 
@@ -34,6 +36,48 @@ It orchestrates up to three major workflows plus the implementation bridge betwe
 Shared references:
 - Workflow 1 handoff fields and exit gate: `../shared-references/idea-handoff-schema.md`
 - Workflow 1 checkpoint summaries: `../shared-references/workflow1-checkpoints.md`
+
+## Resumable runs (`— resume <run_id>`)
+
+This pipeline is long and can fail mid-run; it tracks per-stage state via
+`run_state.py` so you can resume instead of restarting (see
+[`shared-references/resumable-runs.md`](shared-references/resumable-runs.md)).
+Skip this whole section if `RESUMABLE = false`.
+
+Resolve the helper via the canonical chain (integration-contract §2):
+`.aris/tools/run_state.py` → `tools/run_state.py` → `$ARIS_REPO/tools/run_state.py`
+(warn-and-skip if unresolved — never block the pipeline).
+
+**Phases**, in order: `idea-discovery, experiment-bridge, auto-review-loop, summary, paper-writing`.
+
+- **At start:** if `— resume <run_id>` was passed, run
+  `run_state.py resume <root> <run_id>` — it prints the first non-`accepted`
+  phase; **begin the pipeline at that stage** (re-run a `running`/`failed` stage;
+  **re-audit** a `done`-but-unaccepted stage). Otherwise derive `<run_id>` from
+  the direction slug + date and `run_state.py start <root> <run_id> --phases
+  "idea-discovery,experiment-bridge,auto-review-loop,summary,paper-writing"`.
+- **Per stage:** `set <run_id> <phase> running` on entry; `set <run_id> <phase>
+  done --artifact <path>` once the stage's artifact is written.
+- **Mark `accepted` ONLY after the stage's gate passes** — never on the executor's
+  own say-so (`run_state.py accept` requires a recorded verdict id + reviewer):
+
+  | phase | what sets `accepted` | record as reviewer |
+  |-------|----------------------|--------------------|
+  | `idea-discovery` | Gate 1 cross-model jury / novelty-check passed | `codex-gpt-5.5` + thread id |
+  | `experiment-bridge` | experiments actually ran (jobs completed) — deterministic | `deterministic:experiment-bridge` |
+  | `auto-review-loop` | the loop hit its positive STOP (`score>=6 AND verdict∈{ready,almost}` — codex's verdict) | `codex-gpt-5.5` + final review trace id |
+  | `summary` | `NARRATIVE_REPORT.md` written (+ rendered if `RENDER_HTML`) — deterministic | `deterministic:summary` |
+  | `paper-writing` | submission audits passed (`verify_paper_audits.sh` exit 0) — deterministic | `deterministic:verify_paper_audits.sh` |
+
+**If `AUTO_WRITE = false`** (default), `paper-writing` is not part of this run:
+after `summary` is accepted, `set <run_id> paper-writing skipped` so `resume`
+reports COMPLETE instead of pointing forever at a pending stage. Record each
+`accept` `verdict_id` as a **durable handle** — the codex thread/trace id, or the
+path/sha of the deterministic verifier's report (e.g. the `verify_paper_audits.sh`
+output JSON) — not just the reviewer label.
+
+A stage left `done` (gate failed/ambiguous, or the run crashed before the gate)
+is re-validated on the next resume — the acceptance obligation is never skipped.
 
 ## Pipeline
 

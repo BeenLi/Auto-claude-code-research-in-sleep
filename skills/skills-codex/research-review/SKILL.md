@@ -1,18 +1,42 @@
 ---
 name: research-review
-description: Get a deep critical review of research from GPT via Codex subagent. Use when user says "review my research", "help me review", "get external review", or wants critical feedback on research ideas, papers, or experimental results.
-argument-hint: \[topic-or-scope]
-allowed-tools: Bash(\*), Read, Grep, Glob, Write, Edit, Agent, mcp\_\_codex\_\_codex, mcp\_\_codex\_\_send_input
+description: Get a deep critical review of research from an external reviewer backend (Codex or manual). Use when user says "review my research", "help me review", "get external review", or wants critical feedback on research ideas, papers, or experimental results.
+argument-hint: [topic-or-scope]
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, spawn_agent, send_input, mcp__manual_review__review, mcp__manual_review__review_reply
 ---
 
-# Research Review via Codex subagent (xhigh reasoning)
+# Research Review via External Reviewer Backend (xhigh reasoning)
 
-Get a multi-round critical review of research work from an external LLM with maximum reasoning depth.
+Get a multi-round critical review of research work from the selected external reviewer backend with maximum reasoning depth.
 
 ## Constants
 
-- REVIEWER\_MODEL = `gpt-5.5` — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`)
-- **REVIEWER\_BACKEND =** **`codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- REVIEWER_MODEL = `gpt-5.5` — Default model for the Codex backend. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Manual backend uses whatever model the user chooses.
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
+
+## Reviewer Calling Convention
+
+When calling the reviewer, branch on REVIEWER_BACKEND:
+
+**If REVIEWER_BACKEND = `codex`:**
+  Use `spawn_agent` for new review threads.
+  Use `send_input` for follow-up rounds (reuse agent_id).
+
+**If REVIEWER_BACKEND = `manual`:**
+  Use `mcp__manual_review__review` for new review threads with:
+    prompt: [exact same prompt that would go to Codex]
+    config: {"model_reasoning_effort": "xhigh"}
+  Save the returned `agent_id`.
+  Use `mcp__manual_review__review_reply` for follow-up rounds with:
+    agent_id: [saved manual-review agent_id]
+    prompt: [follow-up prompt]
+    config: {"model_reasoning_effort": "xhigh"}
+
+Content fidelity: the manual reviewer should see the same substantive review
+brief Codex would read. If the manual UI supports file upload / attachment,
+reuse the same brief file; otherwise paste the brief contents inline because
+remote web UIs cannot read your local filesystem paths. Review tracing applies
+equally to both backends.
 
 ## Context: $ARGUMENTS
 
@@ -37,14 +61,19 @@ Before calling the external reviewer, compile a comprehensive briefing:
 <br />
 
 ### Step 2: Initial Review (Round 1)
+Send a detailed prompt with xhigh reasoning, using the selected backend. For
+the `codex` backend, keep the MCP payload short: write the full briefing to
+`RESEARCH_REVIEW_REQUEST.md`, then point Codex at that file.
 
-Send a detailed prompt with xhigh reasoning:
+*For codex backend:*
 
 ```
 spawn_agent:
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    [Full research context + specific questions]
+    Read the review brief at <absolute path to RESEARCH_REVIEW_REQUEST.md>.
+    Executor notes are not evidence beyond the files they cite, so verify the
+    referenced artifacts before judging.
     Please act as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level).
     Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
 
@@ -56,14 +85,42 @@ spawn_agent:
        - Comparison with the closest hardware/system baseline for the selected layer
        - Generalizability: does the result hold across representative LLM infrastructure workloads?
     3. Narrative weaknesses: Is the problem clearly motivated with real system bottleneck numbers?
-    4. Whether the hardware contribution is sufficient (area/power overhead acceptable? throughput competitive?)
-    5. Whether the chosen AI infrastructure layer and validation backend are coherent. For RDMA/NIC compression, also check RoCEv2/DCQCN/credit flow control and Rx decompression expansion pressure.
+    4. Whether the architecture/system contribution is sufficient (area/power or CPU/latency overhead acceptable? throughput competitive?)
+    5. Whether the chosen AI infrastructure layer and validation backend are coherent, including any protocol, flow-control, or datapath interactions specific to the selected layer.
     Please be brutally honest.
 ```
 
-### Step 3: Iterative Dialogue (Rounds 2-N)
+The review brief should contain the full research context, the specific
+questions, and the primary artifact / raw-result paths the reviewer should
+inspect. Idea-specific reviewer checks (e.g., RoCEv2/DCQCN/credit flow control
+and Rx decompression expansion pressure for a NIC-compression idea) belong in
+`RESEARCH_REVIEW_REQUEST.md`, derived from the active research contract — do
+not hard-code them into this skill.
 
-Use `send_input` with the returned `agent_id` to continue the conversation:
+*For manual backend:* use `mcp__manual_review__review` with the same brief
+contents. If the manual-review UI supports attachments, attach
+`RESEARCH_REVIEW_REQUEST.md`; otherwise paste the brief inline. Save the
+returned `agent_id`.
+
+### Step 3: Iterative Dialogue (Rounds 2-N)
+For `codex` backend: use `send_input` with the returned `agent_id`.
+For `manual` backend: use `mcp__manual_review__review_reply` with the same `agent_id`.
+Use the appropriate tool to continue the conversation. For Codex follow-up
+rounds, write an updated brief such as `RESEARCH_REVIEW_ROUND_2.md` and send
+only the path:
+
+```text
+send_input:
+  agent_id: [saved reviewer agent_id from Step 2]
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
+    Read the updated review brief at <absolute path to
+    RESEARCH_REVIEW_ROUND_2.md>.
+    Focus on unresolved weaknesses and whether the revision actually fixed them.
+```
+
+For manual follow-up rounds, attach that same updated brief if possible;
+otherwise paste it inline.
 
 For each round:
 
@@ -102,7 +159,9 @@ Update project memory/notes with key review conclusions.
 ## Key Rules
 
 - ALWAYS use `config: {"model_reasoning_effort": "xhigh"}` for reviews
-- Send comprehensive context in Round 1 — the external model cannot read your files
+- Put comprehensive context in the review brief. Codex can read local files
+  when you pass an absolute path; manual reviewers usually cannot, so attach or
+  paste the same brief there.
 - Be honest about weaknesses — hiding them leads to worse feedback
 - Push back on criticisms you disagree with, but accept valid ones
 - Focus on ACTIONABLE feedback — "what experiment would fix this?"
@@ -133,4 +192,4 @@ Update project memory/notes with key review conclusions.
 
 ## Review Tracing
 
-After each `spawn_agent` or `send_input` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each reviewer call (`spawn_agent`, `send_input`, `mcp__manual_review__review`, or `mcp__manual_review__review_reply`), save the trace following `shared-references/review-tracing.md` (Policy C — forensic; never silently skip). Use `save_trace.sh` (resolved per the chain in `shared-references/integration-contract.md` §2) or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
