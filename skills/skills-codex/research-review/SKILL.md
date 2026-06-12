@@ -85,14 +85,17 @@ spawn_agent:
        - Comparison with the closest hardware/system baseline for the selected layer
        - Generalizability: does the result hold across representative LLM infrastructure workloads?
     3. Narrative weaknesses: Is the problem clearly motivated with real system bottleneck numbers?
-    4. Whether the hardware contribution is sufficient (area/power overhead acceptable? throughput competitive?)
-    5. Whether the chosen AI infrastructure layer and validation backend are coherent. For RDMA/NIC compression, also check RoCEv2/DCQCN/credit flow control and Rx decompression expansion pressure.
+    4. Whether the architecture/system contribution is sufficient (area/power or CPU/latency overhead acceptable? throughput competitive?)
+    5. Whether the chosen AI infrastructure layer and validation backend are coherent, including any protocol, flow-control, or datapath interactions specific to the selected layer.
     Please be brutally honest.
 ```
 
 The review brief should contain the full research context, the specific
 questions, and the primary artifact / raw-result paths the reviewer should
-inspect.
+inspect. Idea-specific reviewer checks (e.g., RoCEv2/DCQCN/credit flow control
+and Rx decompression expansion pressure for a NIC-compression idea) belong in
+`RESEARCH_REVIEW_REQUEST.md`, derived from the active research contract — do
+not hard-code them into this skill.
 
 *For manual backend:* use `mcp__manual_review__review` with the same brief
 contents. If the manual-review UI supports attachments, attach
