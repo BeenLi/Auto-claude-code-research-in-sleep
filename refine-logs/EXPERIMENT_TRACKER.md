@@ -5,8 +5,9 @@
 | R001 | M0 | DOCA capability inventory | BF3 + DOCA Compress | local | supported tasks, max buffer, firmware, DOCA version | MUST | TODO | run before assuming codec support |
 | R002 | M0 | raw RDMA baseline | ib_send_bw / custom verbs | 2-node | p50/p99 latency, bandwidth | MUST | TODO | host buffers first |
 | R003 | M1 | tensor corpus generation | KV/activation/gradient chunks | synthetic + captured if possible | dtype, size, entropy sample | MUST | TODO | align with EC-W4 |
-| R004 | M2 | cold vs warm frontier | DOCA path sweep | train/held-out chunks | compression ratio, exposed latency | MUST | TODO | captures NE-1 |
-| R005 | M2 | pre-registered buffer sweep | DOCA + buffer pool | train/held-out chunks | staging time, latency | MUST | TODO | tests amortization |
+| R004 | M2 | cold vs warm frontier | DOCA path sweep | train/held-out chunks | compression ratio, exposed latency | MUST | TODO | captures NE-1; feeds red line 2 |
+| R005 | M2 | pre-registered buffer sweep | DOCA + buffer pool | train/held-out chunks | staging time, latency | MUST | TODO | tests amortization; feeds red lines 1+2 (measure D_eff incl. copy-out) |
+| R005b | M2 | decompress overlap/pipelining probe | DOCA multi-task queue, per-QP serialization check | held-out chunks | overlap ratio, exposed latency hidden % | MUST | TODO | feeds red line 3; tests chunk N decompress overlapping chunk N+1 arrival |
 | R006 | M3 | WR gate smoke | WR-ZipGuard prototype | 2-node host buffers | correctness, latency | MUST | TODO | bitwise compare every chunk |
 | R007 | M3 | policy comparison | raw/static/always/WR-ZipGuard | held-out chunks | p99, false positives, bytes | MUST | TODO | main method proof |
 | R008 | M3 | ablation | no sampling/no bypass/no pool | held-out chunks | p99, false positives | MUST | TODO | novelty isolation |
@@ -14,3 +15,17 @@
 | R010 | M4 | activation transfer harness | pipeline p2p transfer | 2-4 nodes | transfer time, stage bubble | SHOULD | TODO | run if KV path stalls |
 | R011 | M5 | SimAI projection | measured frontier model | scale sweep | step time, sensitivity | NICE | TODO | report only if calibrated |
 | R012 | M5 | LLMServingSim projection | measured frontier model | serving traces | TTFT, throughput | NICE | TODO | report only if calibrated |
+
+## M2 Go/No-Go (decided from R004 + R005 + R005b; full rules in EXPERIMENT_PLAN.md Block 2)
+
+Three red lines (`D_eff` = warm effective decompress throughput incl. staging + copy-out, output-side,
+max parallelism; `B_t` = target bandwidth tier):
+
+1. `D_eff <= B_t` at every tier where M1 ratios are profitable (ratio-independent kill).
+2. Warm `T_fixed` non-amortizable for chunks <= 16MB and copy-out not eliminable.
+3. Decompress cannot overlap next-chunk arrival (per-QP serialization).
+
+- **GREEN** (`D_eff >= 2*B_t`, `T_fixed <= ~20us`, overlap works, bit-exact) → M3, positioning intact.
+- **YELLOW** (`B_t < D_eff < 2*B_t` or only >=16MB chunks amortize) → M3 with narrowed bandwidth regime.
+- **RED** (any red line after mitigations) → pivot to profitability-atlas / hardware-implications
+  paper; do **not** build NetZIP-style dual-end inline hardware.

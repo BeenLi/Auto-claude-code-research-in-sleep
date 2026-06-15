@@ -78,6 +78,31 @@ validated simulate-first under measured parameters before any FPGA build.
   firmware, DOCA version, queue depth, buffer location.
 - **Success criterion**: BF3 decompress sustains throughput that does not bottleneck target KV
   transfer rates; bit-exact on software-produced standard streams.
+- **Go/No-Go rules** (added 2026-06-12 after the Codex "staging shim" attack; rationale in the
+  novelty trace and research_contract Key Decisions). Definitions: `D_eff` = warm-path effective
+  decompress throughput, output-side bytes, **including staging + copy-out**, at max queue
+  depth/engine parallelism; `B_t` = target link bandwidth tier; `T_fixed` = warm per-task fixed
+  overhead (persistent DOCA context + pre-registered buffer pool). Steady-state delivery of the
+  compressed path is `min(B_t/α, D_eff)` vs `B_t` raw, hence three red lines:
+  - **Red line 1 (throughput, ratio-independent)**: `D_eff <= B_t` at every bandwidth tier where
+    M1 ratios are profitable → no steady-state gain at any compression ratio.
+  - **Red line 2 (non-amortizable fixed cost)**: warm `T_fixed` such that `B_t * T_fixed / S`
+    exhausts the alpha budget for all realistic KV chunks `S <= 16MB` (guide: at `B_t = 12.5 GB/s`,
+    `S = 1MB`, `T_fixed = 50us` burns 0.6 of the alpha ceiling — dead; `20us` burns 0.25 — viable),
+    with copy-out not eliminable (DOCA cannot decompress directly into the registered region).
+  - **Red line 3 (no pipelining)**: decompress of chunk N cannot overlap arrival of chunk N+1
+    (e.g., task submission serializes per QP), so exposed latency breaks p99/TTFT even when
+    throughput suffices.
+  - **GREEN**: `D_eff >= 2*B_t` at a tier where M1 shows profitable ratios, warm `T_fixed <= ~20us`,
+    overlap works, bit-exact → proceed to M3 with the asymmetric positioning intact.
+  - **YELLOW**: `B_t < D_eff < 2*B_t`, or amortization only at chunks >= 16MB, or partial overlap →
+    proceed to M3 but narrow the claimed bandwidth regime (e.g., 25–50 Gbps cross-AZ/oversubscribed
+    fabrics) and flag the narrow profitability window.
+  - **RED**: any red line still holds after engineering mitigations (persistent context, buffer
+    pool, multi-engine parallelism, pipelining) → do **not** pivot to NetZIP-style dual-end inline
+    hardware (incremental novelty, contradicts the simulate-first cost structure); pivot to the
+    profitability-atlas / negative-result + hardware-implications paper ("what a commodity DPU must
+    provide for KV compression to pay"), reusing M1/M2 data on the same narrative line.
 - **Table / figure target**: Figure 2 decompress throughput vs chunk size.
 - **Priority**: MUST-RUN.
 
