@@ -1,0 +1,5 @@
+# Real KV capture leg only (capture_hf_kv.py). CPU torch — install with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install transformers
+torch
+transformers

@@ -1,0 +1,8 @@
+# M1 core (synthetic corpus, measurement, analysis, go/no-go). No GPU, no torch.
+numpy
+ml_dtypes
+lz4
+zstandard
+pytest
+# Optional reference codec (needs libsnappy C lib; module skips it if absent):
+# python-snappy

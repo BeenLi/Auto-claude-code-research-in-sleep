@@ -35,18 +35,23 @@ Parses external reviews -> enforces coverage and grounding -> drafts text-only r
 ## Pipeline Status
 
 ```yaml
-stage: workflow_1_complete
+stage: workflow_1_5_in_progress  # M1 deployed + first signal obtained
 active_idea: WR-ZipGuard
 active_files:
   literature_review: idea-stage/LITERATURE_REVIEW.md
   idea_report: idea-stage/IDEA_REPORT.md
   final_proposal: refine-logs/FINAL_PROPOSAL.md
   experiment_plan: refine-logs/EXPERIMENT_PLAN.md
+  evaluation_contract: refine-logs/EVALUATION_CONTRACT.md
+  experiment_log: refine-logs/EXPERIMENT_LOG.md
   research_contract: idea-stage/docs/research_contract.md
+  m1_code: experiments/m1/  # 66 unit tests, deployed to myDevbox:~/wr-zipguard/experiments/m1
 workflow_1_exit_gate: passed
-next_step: /experiment-bridge
-active_tasks: []
-last_updated_utc: 2026-05-29T01:44:34Z
+m1_status: provisional_GREEN_narrow  # deflate only; generator validated 20/20 vs real gpt2 KV
+next_step: validate fp8_e5m2 + Qwen2.5-7B anchors, then full M1 grid + M1_REPORT
+execution_platform: myDevbox  # Debian, py3.13, 64-core, 251GB RAM, no GPU; HF via hf-mirror.com
+active_tasks: []  # no long-running remote jobs; M1 runs are on-demand
+last_updated_utc: 2026-06-15T00:00:00Z
 ```
 
 ## State Persistence Rules
