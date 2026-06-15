@@ -119,6 +119,15 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   compression (M4b FPGA), which is the project thesis. Consequence for design: the asymmetric path is
   **deflate-only** (lz4≈no-op on KV); M2 benches BF3 **deflate** decompress; M3's frontier uses
   deflate ratios with an FPGA-speed compress band.
+- **Profitability is dtype-gated by byte entropy** (2026-06-15 sweep): the <0.75 ratio exists only for
+  low-entropy KV. FP8_E5M2 (2 mantissa bits, byte entropy 5.49, floor 0.686, deflate 0.716) clears;
+  FP8_E4M3 (~0.82) and **BF16 — the *default* KV dtype — provably cannot** (order-0 entropy floor
+  **0.773 > 0.75**; even big-window zstd-22 only reaches 0.777, flat across chunks 64K–16M and seq
+  1K–128K). So WR-ZipGuard's profitable regime is **FP8_E5M2 KV transfer specifically** — a real but
+  specific slice of serving. This is the measured, dtype-resolved negative-result map (with a provable
+  BF16 impossibility) to lead the paper with. Open question the contribution must address: the most
+  *bit-exact-motivated* dtype is arguably BF16 (accuracy-sensitive, can't quantize), yet BF16 can't be
+  profitably compressed — so frame the niche as FP8_E5M2 deployments that need bit-exact wire savings.
 - Largest remaining evidence gap: validate fp8_e5m2, run the full M1 grid (+zstd, larger seq/chunks),
   then BF3 decompress microbench (M2) and the simulator profitable region (M3).
 

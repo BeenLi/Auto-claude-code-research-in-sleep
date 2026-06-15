@@ -66,6 +66,18 @@ pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror
   realizing it needs **hardware-speed compression (M4b FPGA)** — confirming the
   project thesis and the contract claim boundary, and making M3's FPGA-param frontier
   the real gate.
+- **R003-bf16-sweep** (2026-06-15): does BF16 (the *default* KV dtype) ever clear 0.75
+  at larger chunks / longer sequences? `bf16_chunk_seq_sweep.jsonl`, 1920 rows, 0
+  failures. **No — flat 0.792–0.794** across chunks 64K→16M and seq 1K→128K (min
+  0.792). Larger chunks/sequences do nothing: deflate's LZ77 window caps at 32KB and
+  KV byte stats are stationary across positions.
+- **Entropy-floor result (BF16 is a provable no)**: BF16 KV byte entropy = 6.185
+  bits/byte → order-0 floor **0.773 > 0.75**, i.e. *no* lossless codec can make BF16 KV
+  profitable. Confirmed: zstd-22 (big window) reaches only 0.777 ≈ floor; deflate 0.792.
+  FP8_E5M2 byte entropy 5.486 → floor 0.686, deflate 0.716 (clears). **The profitability
+  gate is byte entropy, set by mantissa width**: FP8_E5M2 (2 mantissa bits) clears;
+  FP8_E4M3 (3 bits, ~0.82) and BF16 (8 bits, floor 0.773) do not. The negative-result
+  map is now sharp and dtype-resolved.
 
 ### Failed / stuck runs
 - None. (Earlier rsync transfer failed on shell-banner corruption; switched to
@@ -85,11 +97,16 @@ pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror
   codec CPA model for the M3 handoff: not yet (post-full-grid).
 
 ### Claim impact
-- C3 input (go/no-go): **provisional GREEN** keeps the asymmetric thesis alive into
-  M2 — but narrow, and only via deflate. The lz4≈no-op result sharpens C2: the
-  "commodity BF3 decompress" path is only useful for the **deflate** stream, so M2
-  must bench BF3 **deflate** decompress specifically, and the profitability frontier
-  must use deflate ratios (~0.72–0.82), not an optimistic blended codec number.
+- C3 input (go/no-go): **GREEN, but dtype-gated to FP8_E5M2 KV.** The profitable ratio
+  (<0.75) exists only where byte entropy is low enough: FP8_E5M2 (floor 0.686, deflate
+  0.716) clears; FP8_E4M3 (~0.82) and **BF16 — the default dtype — provably cannot**
+  (entropy floor 0.773 > 0.75; zstd-22 big window only 0.777). WR-ZipGuard's profitable
+  regime is **FP8_E5M2 KV transfer specifically**, realized at hardware compress speed.
+- Sharpens C2 (commodity BF3 path): useful only for the **deflate** stream (lz4≈no-op),
+  on FP8_E5M2 KV. M2 benches BF3 deflate decompress; M3's frontier uses FP8_E5M2 deflate
+  ratios with an FPGA-speed compress band.
+- Strengthens the negative-result lead: a measured, dtype-resolved map of when
+  commodity-DPU KV compression does/doesn't pay, with a *provable* BF16 impossibility.
 - Method note: `M1_CHECKLIST §3.3.2` example threshold table is internally
   inconsistent with its own Appendix A formula (it marks software compression as
   profitable when B>C, which Appendix A insight #1 says is impossible). The code
