@@ -78,6 +78,21 @@ pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror
   gate is byte entropy, set by mantissa width**: FP8_E5M2 (2 mantissa bits) clears;
   FP8_E4M3 (3 bits, ~0.82) and BF16 (8 bits, floor 0.773) do not. The negative-result
   map is now sharp and dtype-resolved.
+- **R003-qwen-anchor** (2026-06-15): real **Qwen2.5-7B** KV (head_dim 128, GQA 4 KV
+  heads, seq 2048; `cap_qwen7b.jsonl`, 324 rows, 0 failures). **GENERATOR VALIDATED
+  30/30**. Confirms the whole picture on a production 7B model, with deflate landing
+  **at the order-0 entropy floor** in every case:
+
+  | Qwen2.5-7B real KV | deflate-6 | entropy | floor H/8 | clears 0.75? |
+  |---|---|---|---|---|
+  | BF16 | 0.802 | 6.335 | 0.792 | no |
+  | FP8_E4M3 | 0.837 | 6.701 | 0.838 | no |
+  | FP8_E5M2 | **0.732** | 5.839 | 0.730 | **yes** |
+
+  **Correction to "more quantization ⇒ more compressible"**: FP8_E4M3 is the *least*
+  compressible (0.837, worse than BF16). It is specifically **FP8_E5M2's 2-bit mantissa**
+  that yields a low-entropy byte stream. Validated now across synthetic + gpt2 +
+  Qwen2.5-7B; deltas 0.012–0.028, lz4 still ≈no-op (Qwen K 0.97–0.98).
 
 ### Failed / stuck runs
 - None. (Earlier rsync transfer failed on shell-banner corruption; switched to

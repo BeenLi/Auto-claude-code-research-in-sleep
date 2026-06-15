@@ -119,15 +119,19 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   compression (M4b FPGA), which is the project thesis. Consequence for design: the asymmetric path is
   **deflate-only** (lz4≈no-op on KV); M2 benches BF3 **deflate** decompress; M3's frontier uses
   deflate ratios with an FPGA-speed compress band.
-- **Profitability is dtype-gated by byte entropy** (2026-06-15 sweep): the <0.75 ratio exists only for
-  low-entropy KV. FP8_E5M2 (2 mantissa bits, byte entropy 5.49, floor 0.686, deflate 0.716) clears;
-  FP8_E4M3 (~0.82) and **BF16 — the *default* KV dtype — provably cannot** (order-0 entropy floor
-  **0.773 > 0.75**; even big-window zstd-22 only reaches 0.777, flat across chunks 64K–16M and seq
-  1K–128K). So WR-ZipGuard's profitable regime is **FP8_E5M2 KV transfer specifically** — a real but
-  specific slice of serving. This is the measured, dtype-resolved negative-result map (with a provable
-  BF16 impossibility) to lead the paper with. Open question the contribution must address: the most
-  *bit-exact-motivated* dtype is arguably BF16 (accuracy-sensitive, can't quantize), yet BF16 can't be
-  profitably compressed — so frame the niche as FP8_E5M2 deployments that need bit-exact wire savings.
+- **Profitability is dtype-gated by byte entropy** (2026-06-15; validated across synthetic + gpt2 +
+  **Qwen2.5-7B**, generator 30/30 on Qwen): the <0.75 ratio exists only for low-entropy KV, and deflate
+  achieves ≈ the order-0 entropy floor in every case. On real Qwen2.5-7B KV: **FP8_E5M2** deflate 0.732
+  (entropy floor 0.730) **clears**; **FP8_E4M3** 0.837 (floor 0.838) and **BF16 — the *default* dtype**
+  0.802 (floor 0.792) **provably cannot** — their byte entropy alone exceeds the ceiling, so no codec
+  (zstd-22 big window confirmed) and no chunk size (flat 64K–16M) / seq length (1K–128K) helps.
+  Nuance: it is **not** "FP8 compresses better" — FP8_E4M3 is the *least* compressible; specifically
+  **FP8_E5M2's 2-bit mantissa** yields the low-entropy byte stream. WR-ZipGuard's profitable regime is
+  thus **FP8_E5M2 KV transfer specifically** — a real but specific slice of serving; this is the
+  measured, dtype-resolved negative-result map (with a provable BF16 impossibility) to lead the paper.
+  Open framing tension: the most *bit-exact-motivated* dtype is arguably BF16 (accuracy-sensitive,
+  can't quantize), yet BF16 can't be profitably compressed — so scope the niche to FP8_E5M2 deployments
+  needing bit-exact wire savings.
 - Largest remaining evidence gap: validate fp8_e5m2, run the full M1 grid (+zstd, larger seq/chunks),
   then BF3 decompress microbench (M2) and the simulator profitable region (M3).
 

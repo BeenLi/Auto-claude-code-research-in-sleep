@@ -47,8 +47,8 @@ active_files:
   research_contract: idea-stage/docs/research_contract.md
   m1_code: experiments/m1/  # 66 unit tests, deployed to myDevbox:~/wr-zipguard/experiments/m1
 workflow_1_exit_gate: passed
-m1_status: provisional_GREEN_narrow  # deflate only; generator validated 20/20 vs real gpt2 KV
-next_step: validate fp8_e5m2 + Qwen2.5-7B anchors, then full M1 grid + M1_REPORT
+m1_status: GREEN_fp8e5m2_only  # deflate-only; ONLY FP8_E5M2 clears 0.75 (BF16/FP8_E4M3 entropy floors >0.75, provably can't); generator validated synthetic+gpt2+Qwen2.5-7B
+next_step: full M1 grid (10 seeds, +zstd ref) + M1_REPORT; then M2 (BF3 deflate decompress microbench)
 execution_platform: myDevbox  # Debian, py3.13, 64-core, 251GB RAM, no GPU; HF via hf-mirror.com
 active_tasks: []  # no long-running remote jobs; M1 runs are on-demand
 last_updated_utc: 2026-06-15T00:00:00Z
