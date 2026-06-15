@@ -7,9 +7,10 @@ output spec. Contract: `refine-logs/EVALUATION_CONTRACT.md`.
 
 ## M1 — Real Tensor Compressibility Corpus (tracker R003)
 
-**Status (2026-06-15)**: deployed to myDevbox; pipeline validated; first real signal
-obtained (provisional GREEN, narrow); synthetic generator cross-validated against
-real gpt2 KV (20/20). Code: `experiments/m1/` (66 unit tests, all pass on box).
+**Status (2026-06-15)**: deployed to myDevbox; pipeline validated; **GREEN confirmed
+on real KV** (fp8_e5m2 deflate ~0.73 < 0.75); generator cross-validated 40/40 vs real
+gpt2 KV. Caveat: profitable *ratio* exists, but software compress is 17 MB/s →
+realizing it needs the M4b FPGA. Code: `experiments/m1/` (66 unit tests, pass on box).
 Platform: myDevbox (Debian, Python 3.13, 64-core x86_64, 251 GB RAM, **no GPU**;
 pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror.com`).
 
@@ -52,11 +53,19 @@ pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror
   (`cap_smoke.jsonl`, 432 rows). **GENERATOR VALIDATED: 20/20 overlapping configs
   match** (tol 0.08, deltas 0.007–0.017). Real KV is marginally *less* compressible
   than synthetic (e.g. bf16 deflate: syn 0.793 vs cap 0.800; fp8_e4m3: syn 0.818 vs
-  cap 0.835), so the generator is slightly optimistic but within tolerance; lz4≈1.0
-  confirmed on real bytes. **Important**: the captured overlap covers bf16 + fp8_e4m3
-  at 64KB/prefill only (gpt2 decode KV too small to chunk; fp8_e5m2 not in this
-  capture) — so the GREEN-driving fp8_e5m2=0.715 is **not yet cross-validated**, and
-  on the validated dtypes deflate lands ~0.80–0.84, *above* the 0.75 ceiling.
+  cap 0.835); lz4≈1.0 confirmed on real bytes.
+- **R003-validate-fp8e5m2** (2026-06-15): capture incl. fp8_e5m2 (`cap_fp8e5m2.jsonl`,
+  576 rows, 0 failures). **GENERATOR VALIDATED: 40/40 match**. **The GREEN-driving
+  cell is now confirmed on real KV**: fp8_e5m2 deflate-6/9 syn 0.715 vs **real gpt2
+  0.729–0.735** — still below the 0.75 ceiling (deflate-1 is marginal at 0.75).
+- **Throughput trade-off (decisive nuance)**: fp8_e5m2 deflate software throughput is
+  only **17 MB/s (level 6/9) / 32 MB/s (level 1)**. Per the break-even math, C≈17 MB/s
+  is profitable only for links slower than ~0.14 Gbps → **software deflate never pays
+  at any real link rate**, and there is no software level that both compresses enough
+  AND runs fast. M1 thus separates cleanly: a profitable *ratio* exists (GREEN), but
+  realizing it needs **hardware-speed compression (M4b FPGA)** — confirming the
+  project thesis and the contract claim boundary, and making M3's FPGA-param frontier
+  the real gate.
 
 ### Failed / stuck runs
 - None. (Earlier rsync transfer failed on shell-banner corruption; switched to
@@ -87,10 +96,11 @@ pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror
   encodes the *derivation*; the table needs correcting in M1_REPORT.
 
 ### Next runs to launch
-1. **Validate the GREEN-driving cell**: capture with fp8_e5m2 (and larger anchors —
-   Qwen2.5-7B/Mistral-7B via the mirror) to confirm the 0.715 that GREEN rests on;
-   the validated dtypes so far (bf16/fp8_e4m3) sit at ~0.80–0.84, above 0.75.
+1. **Qwen2.5-7B / Mistral-7B anchor** (via hf-mirror) — confirm fp8_e5m2 deflate ~0.73
+   holds on a large modern model with real FP8 inference dtype, not just gpt2.
 2. Full grid (10 seeds, seq 1k–128k, chunks 4KB–64MB, + zstd reference) → corpus,
    figures, `M1_REPORT.md`; recompute go/no-go per-level (not pooled).
-3. Add the deflate vs lz4 split + the corrected Appendix-A threshold table to M1_REPORT.
-4. Hand M3 the deflate ratio distribution + CPA model (only deflate matters; lz4≈no-op).
+3. Add to M1_REPORT: deflate-vs-lz4 split; the ratio×throughput Pareto (software is
+   ratio-OK but throughput-hopeless → FPGA-needed); corrected Appendix-A table.
+4. Hand M3 the **deflate** ratio distribution + CPA/throughput model (lz4≈no-op), with
+   the FPGA-speed compress band as the profitable-region parameter.

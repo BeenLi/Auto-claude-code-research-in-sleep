@@ -111,11 +111,14 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   preliminary synthetic sweep (7B, 1728 rows, 0 bit-exact failures) → **provisional GREEN but
   narrow**. Of the two BF3-decompressible codecs, **only deflate compresses KV (~0.72–0.84); lz4 is a
   no-op (~1.0)** — the expected entropy-coding-vs-match-only split, corroborating NE-2/NetZIP. The
-  synthetic generator is **cross-validated against real gpt2 KV (20/20 configs match)**, so the
-  ratios are trustworthy. Caveat: GREEN rests on fp8_e5m2=0.715 (not yet captured); on the validated
-  dtypes (bf16/fp8_e4m3) deflate is ~0.80–0.84, *above* the 0.75 ceiling. Consequence for the design:
-  the asymmetric path is **deflate-only**; M2 must bench BF3 deflate decompress and the profitability
-  frontier must use deflate ratios.
+  synthetic generator is **cross-validated against real gpt2 KV (40/40 configs match, incl.
+  fp8_e5m2)**, so the ratios are trustworthy. **GREEN confirmed on real KV**: fp8_e5m2 deflate-6/9
+  lands at ~0.73 on real gpt2 KV (syn 0.715), below the 0.75 ceiling. **But** the software deflate
+  throughput at that ratio is only ~17 MB/s, so by the break-even math software compression never
+  pays at any real link rate — M1 establishes the *ratio* exists; realizing it needs hardware-speed
+  compression (M4b FPGA), which is the project thesis. Consequence for design: the asymmetric path is
+  **deflate-only** (lz4≈no-op on KV); M2 benches BF3 **deflate** decompress; M3's frontier uses
+  deflate ratios with an FPGA-speed compress band.
 - Largest remaining evidence gap: validate fp8_e5m2, run the full M1 grid (+zstd, larger seq/chunks),
   then BF3 decompress microbench (M2) and the simulator profitable region (M3).
 
