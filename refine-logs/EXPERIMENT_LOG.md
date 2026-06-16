@@ -136,3 +136,37 @@ pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror
    ratio-OK but throughput-hopeless → FPGA-needed); corrected Appendix-A table.
 4. Hand M3 the **deflate** ratio distribution + CPA/throughput model (lz4≈no-op), with
    the FPGA-speed compress band as the profitable-region parameter.
+
+---
+
+## M2 — BF3 Hardware Decompress Microbenchmark (tracker R004/R005)
+
+**Status (2026-06-16)**: **unblocked** — real BlueField-3 available on `bf3_server`
+(10.154.163.113, root; MT43244 BF3 + integrated ConnectX-7 at c8:00.0; DOCA 2.9.2005).
+Peer `bf3_client` (10.154.163.112) available for the later M4 RDMA prototype. **C2
+correctness proven; throughput (D_eff) next.**
+
+### Capability query (doca_caps -p c8:00.0) — citable C2 evidence
+- `task_compress_deflate` = **unsupported** → BF3 has **no hardware compress**, confirming
+  the asymmetric premise on real silicon (not just DOCA docs).
+- `task_decompress_deflate` = **supported**; `task_decompress_lz4_stream` / `lz4_block` =
+  **supported**. Max decompress buffer **2 MB/task**, buffer-list ≤128 (design constraint:
+  chunks >2 MB must split across a buffer list or multiple tasks).
+
+### Correctness (R004) — DONE, bit-exact on hardware
+- Built DOCA `decompress_deflate` sample (meson/ninja) → `/tmp/dd_build/doca_decompress_deflate`.
+- Input: real **FP8_E5M2 KV** chunk (1 MB), deflate-compressed two ways on myDevbox.
+- **BF3 hardware decompress → bit-exact** (sha256 identical to original) for **both**:
+  - **stock `zlib.compress()`** (zlib header + Adler-32), `--with-frame` — the cleanest
+    "standard format" case; BF3 even validates the Adler checksum.
+  - **raw deflate** (wbits=-15), no frame.
+- This is C2's structural novelty demonstrated: a standard/commodity compressor's stream is
+  decompressed correctly by commodity BF3 hardware — the differentiator over NetZIP.
+
+### Not yet measured (next)
+- **D_eff throughput** (the red-line driver): single-shot wall time here (~225 ms) is **cold
+  DOCA context init, not decompress speed**. Need warm-context batched throughput via
+  `doca_bench` (installed) or an adapted sample loop: throughput vs chunk size (≤2 MB/task +
+  buffer-list), cold/warm context, host vs DPU memory, pre-registered buffers, queue depth.
+- Then apply the three M2 red lines (D_eff vs B_t; warm fixed cost; pipelining) → go/no-go,
+  and hand D_eff to M3 as the real decompress parameter.

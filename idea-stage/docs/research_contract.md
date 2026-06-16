@@ -83,6 +83,12 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
 - **Confirmed externally**: NVIDIA DOCA Compress docs (2026) — BF3 supports deflate/LZ4
   *decompression* only, no hardware compress operation. This invalidated the v1 sender-side
   hardware-compress assumption.
+- **Confirmed on real BF3 hardware** (2026-06-16, `bf3_server`, DOCA 2.9): `doca_caps` reports
+  `task_compress_deflate=unsupported`, `task_decompress_deflate/lz4_stream/lz4_block=supported`
+  (2 MB/task). **C2 correctness proven**: the BF3 hardware engine decompresses real FP8_E5M2 KV
+  compressed with **stock `zlib.compress()`** (and raw deflate) **bit-exactly** — the asymmetric
+  "standard compressor → commodity-DPU hardware decompress" path works on silicon. Remaining C2
+  gap: measured decompress **throughput** (D_eff) and the M2 red-line go/no-go (not yet run).
 - Idea redesigned to the asymmetric, simulate-first form; design spec written and approved.
 - **Novelty check done** (search-grounded, 2026-05-29; trace
   `.aris/traces/novelty-check/20260529_wr-zipguard-v2/report.md`): overall **~5–6/10, PROCEED WITH

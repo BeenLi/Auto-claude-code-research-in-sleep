@@ -48,7 +48,8 @@ active_files:
   m1_code: experiments/m1/  # 66 unit tests, deployed to myDevbox:~/wr-zipguard/experiments/m1
 workflow_1_exit_gate: passed
 m1_status: GREEN_fp8e5m2_only  # deflate-only; ONLY FP8_E5M2 clears 0.75 (BF16/FP8_E4M3 entropy floors >0.75, provably can't); generator validated synthetic+gpt2+Qwen2.5-7B
-next_step: inference-KV only (training deferred). M1 verdict solid; M2 (BF3 deflate decompress) blocked on DPU hardware (A100/BF3 cluster pending). Runnable now = M3 profitability sim (CPU) using FP8_E5M2 deflate ~0.73 + FPGA-speed compress band; M1 publication grid deferred to paper-writing.
+m2_status: in_progress  # bf3_server (10.154.163.113, root) has real BF3 + DOCA 2.9; capability confirms compress=unsupported/decompress=supported; C2 correctness PROVEN bit-exact on HW (stock zlib + raw deflate of FP8_E5M2 KV). Next: D_eff throughput sweep + red-line go/no-go. Peer bf3_client=10.154.163.112 for M4 RDMA.
+next_step: M2 throughput (D_eff) via doca_bench/sample loop → apply red lines → feed D_eff to M3 profitability sim. (inference-KV only; training deferred; M1 publication grid deferred.)
 execution_platform: myDevbox  # Debian, py3.13, 64-core, 251GB RAM, no GPU; HF via hf-mirror.com
 active_tasks: []  # no long-running remote jobs; M1 runs are on-demand
 last_updated_utc: 2026-06-15T00:00:00Z
