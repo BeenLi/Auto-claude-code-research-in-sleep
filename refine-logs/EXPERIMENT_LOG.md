@@ -194,22 +194,27 @@ Command: `doca_bench --device c8:00.0 --pipeline-steps doca_compress::decompress
   ≥256 KB chunks** before compressing (the per-WR gate should batch), and keep the pipeline full.
 - **D_eff(chunk) handed to M3** as the measured decompress parameter for the frontier.
 
-### Engine ceiling is HARD — decompress is the system bottleneck (scope boundary)
+### Scaling ceiling — likely a PCIe-x8 artifact, NOT proven to be the engine (CORRECTED)
 - **Does not scale with parallel contexts**: 4 independent `doca_bench` processes on separate cores
-  each got **42.6 Gib/s → sum 170.6 Gib/s**, identical to one context. So ~170–175 Gib/s (~188 Gbps
-  egress, ~135 Gbps input) is a **hard device-engine ceiling**, not a per-context limit.
-- **One BF3 decompress engine cannot match its own 400 Gbps NIC** (tops out at ~½ line rate). So the
-  **receiver decompress is the binding constraint of the entire asymmetric path** — even a line-rate
-  M4b FPGA sender is capped at ~188 Gbps by BF3 decompress. BF3 decompress *is* the system ceiling.
-- **Bandwidth scope boundary (quantitative)**: compression beats raw only when the path bottleneck
-  `B < D_eff_out ≈ 188 Gbps` — full 1.4× gain below ~135 Gbps, tapering to break-even at 188; above
-  that, raw wins. 400 Gbps is the NIC *peak*, not per-flow *available* bandwidth. This is the
-  quantitative reason for the contract's "bandwidth-limited regime": WR-ZipGuard targets
-  oversubscribed / cross-AZ / shared / lower-tier (100–200 GbE) flows, **not** line-rate-saturated
-  fabrics.
-- **Net — profitable region is now triply bounded, all measured**: dtype (**FP8_E5M2**) × bandwidth
-  (**path bottleneck < ~188 Gbps**) × chunk (**≥256 KB**). A specific but real niche:
-  bandwidth-constrained disaggregated FP8 inference.
+  each got **42.6 Gib/s → sum 170.6 Gib/s**, identical to one context → the 4 contexts share **one
+  bottleneck** at ~170–175 Gib/s (~188 Gbps egress / ~135 Gbps input).
+- **The bottleneck is most likely the host PCIe link, not the decompress silicon.** `lspci` shows the
+  BF3 link is **Gen5 x8 (downgraded from x16)** ≈ 27 GB/s practical/direction; our **egress 23.5 GB/s
+  is ~87% of that** — i.e. the host write-back of decompressed data is ~saturated, and one shared
+  half-width link split across 4 contexts explains 4=1 exactly. **Earlier "hard engine ceiling / can't
+  match 400 G NIC" was an over-claim** — it's a *system* ceiling under this host-memory + x8-slot
+  integration, not a proven silicon limit. On a full x16 slot or with DPU-local memory (no host PCIe),
+  the ceiling could be ~2× higher (~376 Gbps), largely closing the gap to line rate and **widening the
+  profitable bandwidth region**.
+- **Attribution pending the host-vs-DPU-memory test** (the EXPERIMENT_PLAN dimension I skipped):
+  decompress with buffers in BF3 DRAM removes host PCIe from the path. DPU ARM not reachable yet on
+  bf3_server (rshim present; tmfifo/SSH not configured) — needs DPU-side setup to run.
+- **Bandwidth scope boundary holds *for this setup*, with a caveat**: compression beats raw when path
+  bottleneck `B < D_eff_out ≈ 188 Gbps` (full 1.4× below ~135) — but D_eff_out here may be PCIe-x8-
+  limited, so the true boundary on a x16 slot could be ~2× higher. 400 Gbps is NIC peak, not per-flow
+  available BW; WR-ZipGuard still targets bandwidth-limited (not line-rate-saturated) flows.
+- **Net — profitable region (this setup), still triply bounded**: dtype (**FP8_E5M2**) × bandwidth
+  (**path bottleneck < ~188 Gbps, possibly x8-limited**) × chunk (**≥256 KB**).
 
 ### Honest caveats on the M2 numbers
 - **Decompress side only.** The compress side is still 17 MB/s software → the asymmetric path's
