@@ -163,10 +163,42 @@ correctness proven; throughput (D_eff) next.**
 - This is C2's structural novelty demonstrated: a standard/commodity compressor's stream is
   decompressed correctly by commodity BF3 hardware — the differentiator over NetZIP.
 
-### Not yet measured (next)
-- **D_eff throughput** (the red-line driver): single-shot wall time here (~225 ms) is **cold
-  DOCA context init, not decompress speed**. Need warm-context batched throughput via
-  `doca_bench` (installed) or an adapted sample loop: throughput vs chunk size (≤2 MB/task +
-  buffer-list), cold/warm context, host vs DPU memory, pre-registered buffers, queue depth.
-- Then apply the three M2 red lines (D_eff vs B_t; warm fixed cost; pipelining) → go/no-go,
-  and hand D_eff to M3 as the real decompress parameter.
+### Throughput / D_eff (R005) — measured via doca_bench (deflate decompress, host mem)
+Command: `doca_bench --device c8:00.0 --pipeline-steps doca_compress::decompress
+-a doca_compress.algorithm=deflate --data-provider file --uniform-job-size <comp_size>
+--job-output-buffer-size 2097152 --mode throughput`. Egress = decompressed output rate.
+
+- **Pipelining is decisive (red line 3)**: 1 job in flight = latency-bound **21 Gib/s**; queue
+  depth 64 = **170 Gib/s** — an **8× jump from depth alone**. Engine ceiling ~170–175 Gib/s is
+  **flat across 1→16 host cores** (a single core with deep queue saturates it) → it's a device
+  ceiling, and overlap is real **and required**.
+- **Chunk size gates D_eff (red line 2)** — egress (≈ Gib/s ×0.134 = GB/s), profitable iff D_eff>B:
+
+  | orig chunk | D_eff egress | GB/s | Gbps | profitable B ceiling |
+  |---|---|---|---|---|
+  | 4 KB | 6.07 Gib/s | 0.81 | 6.5 | hopeless (~5 µs/task overhead) |
+  | 64 KB | 69.8 Gib/s | 9.36 | 75 | ≤75 Gbps |
+  | 256 KB | 131.7 Gib/s | 17.7 | 141 | ≤141 Gbps |
+  | 1 MB | 167.5 Gib/s | 22.5 | 180 | ≤180 Gbps |
+  | 2 MB | 174.9 Gib/s | 23.5 | 188 | ≤188 Gbps (≈ ceiling) |
+
+### M2 red-line verdict (R005) — GREEN for the target regime
+- **Red line 1 (D_eff ≤ B_t)**: CLEARED — at ≥256 KB chunks D_eff (141–188 Gbps) > 100 Gbps;
+  even 64 KB clears ≤50 Gbps. Only trips at tiny (≤4 KB) chunks or >~140–188 Gbps links.
+- **Red line 2 (fixed cost)**: CLEARED for ≥256 KB (the ~5 µs/task overhead amortizes; D_eff
+  plateaus near the engine cap). Tiny chunks don't amortize.
+- **Red line 3 (pipelining)**: CLEARED — engine saturates with deep queues; design **must** keep
+  many tasks in flight (single-shot is 8× slower).
+- **Verdict: GREEN** — BF3 deflate decompress sustains 141–188 Gbps (≥256 KB chunks), not a
+  bottleneck at the ≤100 Gbps bandwidth-limited target. **Design constraint: aggregate KV into
+  ≥256 KB chunks** before compressing (the per-WR gate should batch), and keep the pipeline full.
+- **D_eff(chunk) handed to M3** as the measured decompress parameter for the frontier.
+
+### Honest caveats on the M2 numbers
+- **Decompress side only.** The compress side is still 17 MB/s software → the asymmetric path's
+  sender needs the M4b FPGA; M2 confirms only the receiver.
+- **Engine throughput, not full in-pipeline D_eff.** doca_bench measures the decompress engine in
+  host memory; the integrated RDMA path adds NIC-recv staging + copy-out (the "staging shim" cost).
+  The in-pipeline D_eff (and exposed WR latency) needs the M4a prototype — could be lower than the
+  engine ceiling here.
+- **2 MB/task cap**: chunks >2 MB need buffer-list splitting (≤128), untested.

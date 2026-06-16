@@ -87,8 +87,17 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   `task_compress_deflate=unsupported`, `task_decompress_deflate/lz4_stream/lz4_block=supported`
   (2 MB/task). **C2 correctness proven**: the BF3 hardware engine decompresses real FP8_E5M2 KV
   compressed with **stock `zlib.compress()`** (and raw deflate) **bit-exactly** — the asymmetric
-  "standard compressor → commodity-DPU hardware decompress" path works on silicon. Remaining C2
-  gap: measured decompress **throughput** (D_eff) and the M2 red-line go/no-go (not yet run).
+  "standard compressor → commodity-DPU hardware decompress" path works on silicon.
+- **M2 throughput measured (doca_bench) — red-line verdict GREEN** (2026-06-16): BF3 deflate
+  decompress saturates at a **~170–175 Gib/s (~23 GB/s ≈ 188 Gbps) engine ceiling**, reachable from
+  a single host core with deep queue (pipelining gives an 8× jump over single-shot — red line 3 is
+  real and required). D_eff is chunk-gated: 256 KB → 141 Gbps, 1 MB → 180, 2 MB → 188; tiny chunks
+  (≤4 KB → 6.5 Gbps) are hopeless. So BF3 decompress does **not** bottleneck KV transfer at the
+  ≤100 Gbps target for **chunks ≥256 KB** (red lines 1+2 clear). **Design constraint surfaced**: the
+  per-WR gate must **aggregate KV into ≥256 KB chunks** and keep the pipeline full. Caveats: this is
+  decompress-only (sender still needs the M4b FPGA) and engine-throughput in host memory — the full
+  in-RDMA-pipeline D_eff incl. staging/copy-out (the "staging shim" exposed cost) needs M4a. D_eff(chunk)
+  handed to M3 as the measured decompress parameter.
 - Idea redesigned to the asymmetric, simulate-first form; design spec written and approved.
 - **Novelty check done** (search-grounded, 2026-05-29; trace
   `.aris/traces/novelty-check/20260529_wr-zipguard-v2/report.md`): overall **~5–6/10, PROCEED WITH
