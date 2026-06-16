@@ -98,6 +98,15 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   decompress-only (sender still needs the M4b FPGA) and engine-throughput in host memory — the full
   in-RDMA-pipeline D_eff incl. staging/copy-out (the "staging shim" exposed cost) needs M4a. D_eff(chunk)
   handed to M3 as the measured decompress parameter.
+- **Hard engine ceiling → bandwidth scope boundary** (2026-06-16): the ~188 Gbps egress ceiling **does
+  not scale** with parallel contexts (4 contexts = 4×42.6 = 170 Gib/s, identical to 1), so a single BF3
+  decompress engine **cannot match its own 400 Gbps NIC** (~½ line rate). Consequence: the **receiver
+  decompress is the binding constraint of the whole asymmetric path** (even a line-rate M4b FPGA sender
+  is capped by it), and compression beats raw only when the path **bottleneck** bandwidth `B < ~188 Gbps`
+  (full 1.4× below ~135 Gbps). 400 Gbps is NIC *peak*, not per-flow available BW. **The profitable region
+  is therefore triply bounded, all measured: FP8_E5M2 × path-bottleneck-BW < ~188 Gbps × chunk ≥256 KB**
+  — i.e. bandwidth-limited (oversubscribed/cross-AZ/shared/lower-tier), NOT line-rate-saturated,
+  disaggregated FP8 inference. This is the quantitative basis for the "bandwidth-limited regime" scope.
 - Idea redesigned to the asymmetric, simulate-first form; design spec written and approved.
 - **Novelty check done** (search-grounded, 2026-05-29; trace
   `.aris/traces/novelty-check/20260529_wr-zipguard-v2/report.md`): overall **~5–6/10, PROCEED WITH
