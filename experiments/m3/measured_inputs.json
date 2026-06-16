@@ -1,0 +1,50 @@
+{
+  "_doc": "Single committed source of measured truth for M3. Every value traces to a measurement (M1/M2) or is flagged as an assumption. See refine-logs/EVALUATION_CONTRACT_M3.md.",
+
+  "compression": {
+    "_doc": "FP8_E5M2 KV deflate. M3 is dtype-gated: only FP8_E5M2 compresses profitably; BF16 / FP8_E4M3 provably cannot (entropy floor). LZ4 is a no-op (~1.0).",
+    "dtype": "fp8_e5m2",
+    "codec": "deflate",
+    "alpha": {
+      "best": 0.715,
+      "typical": 0.732,
+      "marginal": 0.75,
+      "entropy_floor": 0.686
+    },
+    "alpha_provenance": "M1: EXPERIMENT_LOG.md L38-42 (synthetic p50 0.715), L86-90 (real Qwen2.5-7B deflate-6 0.732; real gpt2 0.729-0.735). deflate-1 marginal ~0.75. Order-0 entropy floor 0.686.",
+    "no_op_codecs": ["lz4"]
+  },
+
+  "decompress": {
+    "_doc": "BF3 hardware deflate decompress, measured via doca_bench. EGRESS = decompressed-output rate. profitability.py's D term consumes COMPRESSED-INPUT bytes, so feed D = alpha * d_egress (D_input). See contract 'Units reconciliation'.",
+    "d_egress_gbps_by_chunk_bytes": {
+      "4096": 6.5,
+      "65536": 75.0,
+      "262144": 141.0,
+      "1048576": 180.0,
+      "2097152": 188.0
+    },
+    "d_egress_provenance": "M2: EXPERIMENT_LOG.md L178-183 (doca_bench, deflate decompress, queue depth 64). Egress Gbps column.",
+    "t_fixed_s": 5.0e-6,
+    "t_fixed_provenance": "M2 R005: ~5 us/task fixed overhead; amortizes only at >=256 KB chunks.",
+    "min_chunk_bytes": 262144,
+    "min_chunk_provenance": "M2 R005 design constraint: aggregate KV to >=256 KB before compressing; <256 KB does not amortize the fixed cost.",
+    "max_tested_chunk_bytes": 2097152,
+    "ceiling_caveat": "The ~188 Gbps egress ceiling may be a PCIe-x8 artifact (host write-back saturated at ~87% of practical x8/dir), not the silicon. On x16 / DPU-local memory the profitable bandwidth ceiling could be ~2x higher (~376 Gbps). See EXPERIMENT_LOG.md L197+."
+  },
+
+  "compress_band": {
+    "_doc": "Sender-side compressor throughput C. Software is MEASURED and never pays at real link rates (motivates the asymmetric FPGA design). FPGA band is an ASSUMPTION to be measured in M4b.",
+    "software": {
+      "deflate_6_9_mbps": 17.0,
+      "deflate_1_mbps": 32.0,
+      "provenance": "M1: EXPERIMENT_LOG.md L65, L72. zlib.compress on real KV.",
+      "kind": "measured"
+    },
+    "fpga": {
+      "band_gbps": [25.0, 50.0, 100.0],
+      "provenance": "NetZIP MICRO 2025 (doi:10.1145/3725843.3756079) + FPGA deflate IP datasheets.",
+      "kind": "assumption"
+    }
+  }
+}

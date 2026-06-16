@@ -224,3 +224,44 @@ Command: `doca_bench --device c8:00.0 --pipeline-steps doca_compress::decompress
   The in-pipeline D_eff (and exposed WR latency) needs the M4a prototype — could be lower than the
   engine ceiling here.
 - **2 MB/task cap**: chunks >2 MB need buffer-list splitting (≤128), untested.
+
+---
+
+## M3 — Profitability Sweep (analytical frontier + LLMServingSim cross-check) — YELLOW
+
+Code: `experiments/m3/` (46 unit tests, pure-stdlib analytical core). Contract:
+`refine-logs/EVALUATION_CONTRACT_M3.md`. Full write-up: `experiments/m3/M3_REPORT.md`. Two-layer
+(user-approved): analytical oracle first, LLMServingSim as a scoped cross-check (not full policy
+injection).
+
+### Layer 1 — analytical frontier (the go/no-go)
+- Reuses M1 `profitability.py`; decompress chunk-coupled as **D = α·D_egress(S)** (egress→input
+  units reconciliation: M2's table is egress, profitability's D consumes compressed input;
+  D_input = α·D_egress, matching the log's "~135 Gbps input ≈ 0.72×188 egress").
+- For the measured envelope (FP8_E5M2 **α=0.732**, 2 MB chunk), critical link rate B_crit (profitable
+  iff B < B_crit): **25 Gbps band → 5.9; 50 → 10.5; 100 Gbps FPGA → 17.2 Gbps**.
+- **Hard ceiling:** even with free/infinite compress, decompress caps the region at
+  `B < (1-α)·D_egress ≈ 0.27×188 ≈ 50 Gbps`. Realistic-KV compression **structurally cannot** pay at
+  mainstream 100–400 Gbps rates, independent of compressor speed (α≈0.73 ⇒ only ~27% wire saving).
+- Software compress (17 MB/s) never pays at any real link rate → asymmetric FPGA design mandatory.
+- **Verdict: YELLOW** — real but narrow, bandwidth-limited region (cross-AZ / oversubscribed /
+  WAN-ish). Per-WR gate is essential precisely because the no-gain regime is large.
+
+### Layer 2 — LLMServingSim cross-check (PASS)
+- Deployed sim (myDevbox `~/autoResearch/LLMServingSim`, v1.1.0, PD disaggregation, ASTRA-Sim
+  analytical). Llama-3.1-8B bf16, one 2048-tok prompt, `single_node_pd`, `--no-enable-prefix-caching`
+  (PD+prefix-cache crashes on this branch). Raw data: `experiments/m3/sim_sweep_result.json`.
+- TTFT(link_bw): **bw≤8 GB/s** follows `A + M/bw` with **R²=1.000000** (clean 1/bw law) →
+  PD KV transfer is **bandwidth-limited, ∝ bytes/link_bw**, validating the frontier's transfer model
+  in the regime that matters. **bw≥16** floors at compute (~83 ms); TPOT invariant to link_bw.
+- Implied payload 750 MB = **2.79×** minimal KV (256 MB) — sim moves a larger payload (activations
+  alongside KV); documented, does not affect the scaling law.
+- Caveats: bf16 (no FP8 profile in sim) → validates the transfer *model*, not FP8 TTFT numbers;
+  M2's ~188 Gbps ceiling may be PCIe-x8-limited so the true window could be ~2× wider; full
+  raw/always/static/gate TTFT injection deferred (needs Chakra/ASTRA instrumentation + FP8 profile).
+
+### Claim impact
+- **C3 = YELLOW (narrowed regime).** A bandwidth-limited profitable region exists and is matched by
+  the simulator's transfer physics, but it sits **≲17 Gbps (realistic FPGA) / ≲50 Gbps (ceiling)** —
+  below mainstream datacenter rates. Proceed to M4a/M4b with the claimed regime narrowed to
+  bandwidth-limited fabrics. Consistent with M1 "GREEN (narrow)".

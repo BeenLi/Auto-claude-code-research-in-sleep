@@ -1,0 +1,5 @@
+# M3 Layer-1 frontier core is PURE STDLIB (scalar break-even math) — no third-party
+# deps needed to compute the go/no-go verdict or run the tests (pytest only).
+pytest
+# Figures only (plot_m3.py). Optional; render where matplotlib is available (e.g. myDevbox).
+matplotlib

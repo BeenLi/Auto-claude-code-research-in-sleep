@@ -14,7 +14,7 @@
 | R009 | M4 | KV transfer harness | vLLM/Mooncake-like path | 2-4 nodes | TTFT, TPOT, bytes | MUST | TODO | bandwidth-limited regime |
 | R010 | M4 | activation transfer harness | pipeline p2p transfer | 2-4 nodes | transfer time, stage bubble | SHOULD | TODO | run if KV path stalls |
 | R011 | M5 | SimAI projection | measured frontier model | scale sweep | step time, sensitivity | NICE | TODO | report only if calibrated |
-| R012 | M5 | LLMServingSim projection | measured frontier model | serving traces | TTFT, throughput | NICE | TODO | report only if calibrated |
+| R012 | M3 | LLMServingSim cross-check | measured frontier model | PD link_bw sweep | TTFT vs 1/link_bw | NICE | DONE | PASS R²=1.0 — sim PD transfer is bandwidth-limited (∝bytes/link_bw), validates frontier physics; bf16 (no FP8 profile), full policy injection deferred |
 
 ## M2 Go/No-Go (decided from R004 + R005 + R005b; full rules in EXPERIMENT_PLAN.md Block 2)
 

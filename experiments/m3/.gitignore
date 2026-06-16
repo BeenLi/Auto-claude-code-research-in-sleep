@@ -1,0 +1,5 @@
+__pycache__/
+.pytest_cache/
+.venv/
+m3_outputs/
+*.pyc
