@@ -143,7 +143,12 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   before committing to FPGA RTL; this is the project-wide go/no-go (M3).
 - **Split M4** → M4a software compress (mechanism + decompress path, weeks) decoupled from M4b FPGA
   compress (headline speedup, contingent on M3 green); RTL never sits on the critical path.
-- **Primary = inference KV (A), supplementary = training (B)**.
+- **Primary = inference KV (A); training (B) deferred out of M1** (decided 2026-06-16). Near-term work
+  scopes to inference KV only: dense training tensors are near-tautological at the same BF16 entropy
+  floor, capturing real ones needs a full training loop (forward+backward+optimizer), and training is
+  NetZIP's turf — handled as a *parameterized M3 comparison* using NetZIP's reported numbers, not
+  measured here. Revisit only if the paper needs the SimAI appendix (then a small synthetic probe,
+  incl. the GELU/SwiGLU activation-sparsity question, not a full axis).
 - **No new codec** → use standard deflate/LZ4 so the commodity decompressor applies; novelty is the
   gate + asymmetric execution, not the codec.
 - **Novelty positioning (from novelty check)** → lead the paper with the *measured negative result*
