@@ -175,6 +175,37 @@ validated simulate-first under measured parameters before any FPGA build.
 - **Table / figure target**: Table 3 ablations.
 - **Priority**: MUST-RUN.
 
+### Block 7: GPU-Cost Baseline of GPU-side KV Compression  (M6 — supplementary, GPU-gated)
+
+- **Claim tested**: C1 + Gap-Analysis differentiation (the "GPU-side codecs compete for GPU
+  resources" argument, currently unmeasured).
+- **Why this block exists**: WR-ZipGuard's pitch is that compression runs *off* the GPU (FPGA sender +
+  commodity BF3 decompress), so its GPU tax is ~0. Quantify what a GPU-side codec actually costs, so
+  the differentiator is a measured number, not an assertion.
+- **System under test**: UCCL p2p + **DietGPU** (lossless GPU-side ANS kernels for fp16/bf16/fp32,
+  activates >2 MB; build `USE_DIETGPU=1`); optional **nvCOMP** (deflate/LZ4) for triangulation.
+  Note: DietGPU does **not** support FP8 — the one KV dtype that compresses (M1) — so the baseline
+  runs bf16 KV (α≈0.79 per M1), i.e. pays a GPU tax for little ratio gain.
+- **Workload / configuration**: M1 KV corpus (bf16 real KV ≥2 MB chunks) + a co-located vLLM serving
+  load (Qwen2.5-7B / Llama-3.1-8B) on the *same* GPU.
+- **Compared systems**: raw (no compression, GPU cost 0); GPU-side DietGPU ANS; (optional nvCOMP);
+  WR-ZipGuard (projected off-GPU = ~0 GPU tax, structural, no run).
+- **Metrics and why decisive**: SM activity/occupancy + HBM-BW consumed by the compression kernels
+  (DCGM `SM_ACTIVE`/`DRAM_ACTIVE`, Nsight); **co-located serving interference** = TTFT/TPOT of vLLM
+  alone vs + concurrent KV compression (the headline tax); GPU memory + power; DietGPU bf16-KV ratio.
+- **Success criterion**: produce a GPU-cost curve + an interference number. Strong-positive = a
+  non-trivial tax (≳10% SM or measurable TTFT/TPOT regression) that justifies off-GPU compression;
+  weak/negative = small tax, honestly recorded (re-lean on the other differentiators).
+- **Failure interpretation**: if the GPU tax is negligible, the "competes for GPU resources" claim is
+  weakened and we de-emphasize it (commodity-DPU decompress, RDMA-WR gate, and FP8 support DietGPU
+  lacks remain the differentiators).
+- **Table / figure target**: GPU-cost curve (SM%/HBM-BW% vs compression throughput); TTFT/TPOT
+  interference table.
+- **Priority**: SUPPLEMENTARY (off the M1→M3→M4 critical path).
+- **Blocker**: needs GPU access — myDevbox has no GPU, A100 cluster unavailable. Single-GPU loopback
+  variant answers the interference question if no RDMA pair is available. Full plan:
+  Obsidian `007 ideas/WR-ZipGuard/Experiment Plan — GPU Cost of GPU-side KV Compression (M6).md`.
+
 ## Run Order and Milestones
 
 | Milestone | Goal | Runs | Decision Gate | Cost | Risk |
@@ -182,6 +213,7 @@ validated simulate-first under measured parameters before any FPGA build.
 | M1 | Real tensor compressibility | Block 1 | some phase exceeds ratio threshold | hours–1 day | KV/FP8 incompressible |
 | M2 | BF3 decompress microbench | Block 2 | decompress not a bottleneck, bit-exact | 1–2 days | DOCA setup drift |
 | M3 | Profitability sweep | Block 3 | bandwidth-limited profitable region exists | 3–5 days | no profitable region |
+| M6 | GPU-cost baseline (supplementary) | Block 7 | quantified GPU tax of GPU-side codec | 2–4 days | GPU access unavailable |
 | M4a | Software prototype | Block 4 | mechanism correct + commodity decompress works | 1–2 weeks | staging/metadata overhead |
 | M4b | FPGA prototype | Block 5 | measured speedup within 15% of projection | 4–12 weeks | FPGA RTL / line-rate |
 | M5 | Ablations | Block 6 | every component matters | 3–5 days | weak component |

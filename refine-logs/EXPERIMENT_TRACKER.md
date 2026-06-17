@@ -15,6 +15,7 @@
 | R010 | M4 | activation transfer harness | pipeline p2p transfer | 2-4 nodes | transfer time, stage bubble | SHOULD | TODO | run if KV path stalls |
 | R011 | M5 | SimAI projection | measured frontier model | scale sweep | step time, sensitivity | NICE | TODO | report only if calibrated |
 | R012 | M3 | LLMServingSim cross-check | measured frontier model | PD link_bw sweep | TTFT vs 1/link_bw | NICE | DONE | PASS R²=1.0 — sim PD transfer is bandwidth-limited (∝bytes/link_bw), validates frontier physics; bf16 (no FP8 profile), full policy injection deferred |
+| R013 | M6 | GPU-cost baseline of GPU-side codec | UCCL p2p + DietGPU (ANS); opt. nvCOMP | bf16 KV ≥2MB + co-located vLLM | SM%/HBM-BW% of compress kernels; TTFT/TPOT interference; ratio | NICE | BLOCKED | needs GPU (myDevbox no GPU, A100 unavail); DietGPU has no FP8; quantifies "GPU-side competes for GPU resources"; single-GPU loopback fallback. Plan in Obsidian M6 note |
 
 ## M2 Go/No-Go (decided from R004 + R005 + R005b; full rules in EXPERIMENT_PLAN.md Block 2)
 
