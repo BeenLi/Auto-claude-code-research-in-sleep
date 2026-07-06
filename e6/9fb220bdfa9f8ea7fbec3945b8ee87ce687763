@@ -1,0 +1,21 @@
+experiments/m4a_pre/.gitignore
+  s_4fe9fdf95fc3bb::t_dd99c15419d994 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "e69fb220bdfa9f8ea7fbec3945b8ee87ce687763",
+  "prompts": {},
+  "sessions": {
+    "s_4fe9fdf95fc3bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "517cf874-ce8d-48eb-80e6-88b320929da8",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
