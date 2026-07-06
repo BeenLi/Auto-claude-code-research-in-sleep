@@ -159,8 +159,62 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   Open framing tension: the most *bit-exact-motivated* dtype is arguably BF16 (accuracy-sensitive,
   can't quantize), yet BF16 can't be profitably compressed — so scope the niche to FP8_E5M2 deployments
   needing bit-exact wire savings.
-- Largest remaining evidence gap: validate fp8_e5m2, run the full M1 grid (+zstd, larger seq/chunks),
-  then BF3 decompress microbench (M2) and the simulator profitable region (M3).
+- **M1.5 float-split preprocessing GREEN** (2026-06-25; `experiments/m1_5/`, 49 unit tests;
+  `refine-logs/EVALUATION_CONTRACT_M1.5.md`): a cheap reversible **byte-transpose before deflate**
+  (SoA 2-byte de-interleave, kept as ONE standard deflate stream BF3 decompresses) **rehabilitates
+  BF16 — the default KV dtype — from raw 0.79–0.80 to ~0.70** on real gpt2 (0.705) + Qwen2.5-7B
+  (0.708) KV, crossing the 0.75 gate. The win is entirely the exponent plane (high byte → ~0.40; low
+  byte + mantissa ~1.0). The split does NOT help fp8 (byte-transpose is a 1-byte no-op; bit-split
+  makes deflate worse); fp8_e5m2 keeps its raw path. Widens the **dtype set** (BF16 default → high
+  applicability), NOT the M3 **bandwidth region** (bf16 ~30% wire saving ≈ e5m2 ~27%). Open:
+  receive-side un-transpose must run off-GPU (host/DPU-ARM), T_xform not yet in the break-even model.
+- **M3 profitability frontier YELLOW** (2026-06; `experiments/m3/`, 46 unit tests, M3_REPORT.md):
+  for the measured envelope (e5m2 α=0.732, 2MB chunks), compression pays only for B < 5.9/10.5/17.2
+  Gbps at 25/50/100 Gbps FPGA compress bands; **hard ceiling ~50 Gbps** even with a free compressor
+  (α≈0.73 → only 27% wire saving). LLMServingSim cross-check PASS (TTFT ∝ bytes/link_bw, R²=1.0).
+  Verdict: real but narrow bandwidth-limited region (cross-AZ/oversubscribed/WAN-ish), not
+  mainstream 100–400 Gbps DC.
+- **Literature refresh 2026-07-06** (three parallel web sweeps + primary-source verification; full
+  table in `LITERATURE_REVIEW.md` Section 1c). Headlines: **(1) TRACE** (arXiv 2509.03377, IEEE TC)
+  achieves **lossless BF16 KV α≈0.53** via channel-major disaggregated bit-plane layout — in custom
+  CXL-controller silicon. Threat: order-0 byte entropy after byte-transpose is NOT the floor;
+  channel-major reordering exploits structure we haven't tapped. Opportunity: it is a pure layout
+  permutation, so it may port to our single-standard-deflate-stream/BF3 constraint → **M1.6 tests
+  this** (pre-registered: GREEN if bf16 ≤0.65 or e5m2 ≤0.70 on captured KV). **(2) Custom-decoder
+  ceilings quantified**: UCCL-Zip v2 (ANS, custom bitstream) reports bf16 0.64 / e5m2 0.70 / e4m3
+  0.77 — our commodity-decodable α pays only +0.06/+0.03/+0.05 vs it; **SplitZip v3's BF16 ratio is
+  1.324× (α≈0.755, and e5m2 only 1.14×=0.877) — WORSE than our 0.70/0.73** despite its 613/2182 GB/s
+  GPU throughput. **(3)** New lossy/verified alternatives to defuse: SpectrumKV (per-token mixed
+  precision for PD transfer), VeriCache (lossy draft + full-KV verify ⇒ bit-identical outputs),
+  KVTC (PCA+quant+deflate, storage). **(4)** Exponent-coding lineage grew: DFloat11 (NeurIPS'25),
+  Unweight (Cloudflare, top-16 exponent palette), Huff-LLM — all weights, all custom decoders; and
+  **ECF8 (2510.02676) gives THEORY** (α-stable SGD ⇒ provably low exponent entropy) that elevates
+  our measured exponent-plane floors to a principled claim. **(5) Gate still unclaimed**: nearest new
+  work is NetSenseML (congestion-reactive lossy gradient compression, training) and CIDR'26 "Waiting
+  to Decompress" (LLMs-as-text-compressors storage economics, ~10yr break-even) — neither does
+  per-transfer, bit-exact, measured-frontier profitability gating. **(6) Ecosystem**: BF4 still shows
+  NO hardware compress engine (re-verified; recheck at DOCA 3.x GA); no production lossless KV
+  compression in vLLM/SGLang/Mooncake/NIXL/LMCache as of 2026-07 — precise form (second pass, same
+  day): what IS merged is lossy (LMCache's only codec is CacheGen, quant+entropy coding; vLLM ships
+  FP8 KV quantization; SGLang HiCache is tiering with no codec; KVTC→Dynamo KVBM is
+  announced-not-shipped and lossy overall), while the lossless GPU codecs (DietGPU, UCCL-Zip,
+  SplitZip, ZipNN, TRACE) are all unmerged research; CXL substrate competition rising
+  (TraCT, SAC, CXL-SpecKV) → keeps our positioning on multi-rack bandwidth-constrained fabrics.
+- **M1.6 channel-major layout RED (pre-registered), architecture-dependent gain** (2026-07-06, same
+  day as the refresh; `experiments/m1_6/`, 69 unit tests; tracker R015): TRACE's channel-major
+  mechanism ported to ONE standard deflate stream gives a **real gain only on the modern model** —
+  Qwen2.5-7B bf16 0.708→**0.671** (chan_bt), fp8_e5m2 0.732→**0.704** (chan; first fp8 transform win,
+  ANS-parity with UCCL-Zip 0.70) — while gpt2 improves only 0.008/0.007, so the pre-registered
+  worst-model rule lands RED (missed YELLOW by 0.002/0.004; spreads 0.025/0.020 > 0.01 agreement
+  bound). Synthetic control: zero chan gain (no artifact). Delta coding hurts. **TRACE gap priced**:
+  portable share of its 0.80→0.53 is 0.80→0.671; the remaining ~0.14 α is its custom silicon
+  (`experiments/m1_6/commodity_decode_cost.json`). **M3 frontier stays YELLOW at every new α**
+  (B_crit@100G 17.2→≤21.1 Gbps; ceiling 50→62 Gbps; `experiments/m3/m3_outputs/alpha_refresh.json`).
+  Claimable multi-model α remains M1.5's; qwen-only numbers quoted as architecture-conditional.
+  Follow-up: third modern model (Llama-3.1-8B-class) to test whether gpt2 is the outlier.
+- Largest remaining evidence gap: M4a in-pipeline prototype (staging cost, off-GPU inverse
+  placement — now chan⁻¹∘bt⁻¹) and M4b FPGA compress for the measured end-to-end speedup; SHOULD:
+  third-model M1.6 capture, T_xform in the break-even model.
 
 ## Key Decisions
 
@@ -193,6 +247,45 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   "the BF3 commodity decompression profitability atlas for LLM KV transfer, with a conservative
   WR-level bypass gate and bit-exact NIXL/RDMA-compatible execution"; (4) treat ShadowServe and
   UCCL-Zip as first-class related work to defuse, alongside NetZIP/ICMSP.
+- **Positioning refinements from the 2026-07-06 literature refresh** →
+  (1) **TRACE joins ShadowServe/UCCL-Zip as a first-class attack surface**. Defusal line: "TRACE
+  needs new CXL-controller silicon at the receiver; we constrain to a single standard deflate
+  stream that already-shipped BF3s decode in hardware — and M1.6 measures how much of TRACE's
+  channel-major layout gain survives that commodity constraint." Either M1.6 outcome feeds the
+  paper: GREEN widens the frontier; RED becomes the measured "cost of commodity decode".
+  (2) **Reframe the codec story**: exponent entropy coding is now commodity knowledge (DietGPU,
+  ZipNN, DFloat11, Unweight, SplitZip, UCCL-Zip, ECF8's theory). Our contribution is explicitly NOT
+  a codec — it is (a) *where* to decode (shipped commodity DPU hardware, zero receiver GPU/SM cost,
+  zero new silicon) and (b) *when* to bother (the measured per-WR break-even frontier with
+  bypass-on-risk). Lead with those two questions; cite ECF8 to make the exponent-plane floors
+  principled rather than empirical.
+  (3) **Gate-novelty delta, sharpened against the two nearest neighbors** (E4): NetSenseML gates
+  *lossy gradient* compression during *training* by reacting to congestion heuristics; CIDR'26
+  "Waiting to Decompress" prices *LLMs-as-text-compressors* for cold *storage* over multi-year
+  horizons. WR-ZipGuard's gate decides per RDMA work request, on a *bit-exact* path, from a
+  *measured* device frontier (compress band × D_eff(chunk) × α(dtype) × link state) with a
+  conservative bypass — per-transfer wire-time profitability gating on a real DPU decompress path
+  remains unclaimed in the literature (three independent sweeps concur, 2026-07-06).
+  (4) **Quote SplitZip v3's numbers in related work**: its custom GPU codec reaches only α≈0.755
+  (bf16) / 0.877 (e5m2) vs our BF3-decodable 0.70 / 0.73 — the "fast custom codec" does not
+  dominate the ratio axis; it trades ratio for GPU throughput, reinforcing the off-GPU niche.
+  (5) **Lossy/verified alternatives get one shared defusal paragraph** (SpectrumKV, VeriCache,
+  KVTC, EVICPRESS, HACK): all either change bytes (accuracy governance burden) or spend receiver
+  GPU compute (VeriCache draft+verify); WR-ZipGuard is bit-exact on the wire with the receiver GPU
+  untouched — and it composes with them (a gate can front any of these as the lossy tier).
+  (6) **CXL substrate risk** (TraCT, SAC, CXL-SpecKV): concede the rack; keep the multi-rack /
+  cross-AZ / oversubscribed regime — which is exactly M3's measured profitable region anyway.
+  (7) **State the ecosystem-gap claim in its precise, attack-proof form** (2026-07-06 second
+  verification pass, prompted by "haven't the GPU-codec papers been merged?"): GPU-compression
+  papers HAVE merged into production stacks — but everything merged is **lossy** (LMCache/CacheGen
+  is its docs' only codec, quant+entropy coding; vLLM's native path is FP8 KV quantization;
+  KVTC→Dynamo KVBM is announced 2026-03 but not shipped, and lossy overall). What has never shipped
+  is *bit-exact lossless* KV compression in any serving/transfer stack; the lossless codecs
+  (DietGPU, UCCL-Zip, SplitZip, ZipNN, TRACE) are all unmerged research. Write it as **"what ships
+  is lossy; lossless remains unshipped"**, never as "no KV compression in production". Watch item:
+  if NVIDIA lands KVTC/nvCOMP-deflate in Dynamo KVBM, deflate-on-KV becomes mainstream practice —
+  that *helps* the narrative (deflate legitimized on KV) and does not touch the transfer-side
+  bit-exact gate; re-check before submission.
 
 ## Immediate Research Gate
 

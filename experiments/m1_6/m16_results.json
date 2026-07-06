@@ -1,0 +1,54 @@
+{
+  "milestone": "M1.6 — channel-major layout transforms (TRACE-inspired) under the BF3 single-standard-deflate-stream constraint",
+  "verdict": "RED",
+  "verdict_note": "RED per the PRE-REGISTERED worst-captured-model rule (bf16 alpha*=0.697 > 0.695; fp8_e5m2 alpha*=0.724 > 0.72 — both set by gpt2). The models DISAGREE beyond the 0.01 agreement bound (bf16 spread 0.025, e5m2 spread 0.020): on Qwen2.5-7B — the modern, deployment-representative architecture — the mechanism delivers a REAL gain (bf16 0.708->0.671, fp8_e5m2 0.732->0.704, the first fp8 transform win in this project). The architecture-dependence is itself the finding: per-channel scale structure is strong in GQA/RoPE/RMSNorm-era KV and weak in gpt2. Claimable multi-model numbers remain M1.5's (bf16 0.705-0.708, e5m2 0.731-0.732); Qwen-only numbers may be quoted as architecture-conditional.",
+  "criteria": {
+    "contract": "refine-logs/EVALUATION_CONTRACT_M1.6.md",
+    "green": {"bf16": 0.65, "fp8_e5m2": 0.70},
+    "yellow": {"bf16": 0.695, "fp8_e5m2": 0.72},
+    "rule": "best concat alpha, medians on captured KV, worst model across gpt2 + Qwen2.5-7B; synthetic never drives the verdict"
+  },
+  "alpha_concat_medians": {
+    "_doc": "alpha = compressed/original, deflate(zlib L6) on the WHOLE transformed buffer as ONE stream (BF3-decodable, M2-proven). raw = untransformed. byte_transpose = M1.5 baseline.",
+    "captured_gpt2": {
+      "bf16":     {"raw": 0.800, "byte_transpose": 0.705, "chan": 0.798, "chan_bt": 0.697, "chan_bt_delta": 0.719, "bt_delta": 0.722, "delta": 1.000, "best": 0.697, "best_method": "chan_bt"},
+      "fp8_e5m2": {"raw": 0.731, "byte_transpose": 0.731, "chan": 0.724, "chan_bt": 0.724, "chan_bt_delta": 0.796, "bt_delta": 0.792, "delta": 0.792, "best": 0.724, "best_method": "chan"},
+      "fp8_e4m3": {"raw": 0.834, "byte_transpose": 0.834, "chan": 0.832, "chan_bt": 0.832, "chan_bt_delta": 0.912, "bt_delta": 0.905, "delta": 0.905, "best": 0.832, "best_method": "chan"}
+    },
+    "captured_qwen2.5-7b": {
+      "bf16":     {"raw": 0.799, "byte_transpose": 0.708, "chan": 0.792, "chan_bt": 0.671, "chan_bt_delta": 0.692, "bt_delta": 0.725, "delta": 0.996, "best": 0.671, "best_method": "chan_bt"},
+      "fp8_e5m2": {"raw": 0.732, "byte_transpose": 0.732, "chan": 0.704, "chan_bt": 0.704, "chan_bt_delta": 0.788, "bt_delta": 0.792, "delta": 0.792, "best": 0.704, "best_method": "chan"},
+      "fp8_e4m3": {"raw": 0.837, "byte_transpose": 0.837, "chan": 0.826, "chan_bt": 0.826, "chan_bt_delta": 0.907, "bt_delta": 0.906, "delta": 0.906, "best": 0.826, "best_method": "chan"}
+    },
+    "synthetic_7b": {
+      "_doc": "mechanism control: standard-normal KV has NO per-channel scale structure, so chan_bt == byte_transpose here (0.702=0.702) — confirms the captured gains are real structure, not a harness artifact.",
+      "bf16":     {"raw": 0.792, "byte_transpose": 0.702, "chan_bt": 0.702, "best": 0.702},
+      "fp8_e5m2": {"raw": 0.715, "byte_transpose": 0.715, "chan": 0.716, "best": 0.715},
+      "fp8_e4m3": {"raw": 0.817, "byte_transpose": 0.817, "chan": 0.817, "best": 0.817}
+    }
+  },
+  "per_tensor_type_medians_chan_best": {
+    "_doc": "prefill only (gpt2 decode spans < 256KB chunk minimum). bf16 = chan_bt, fp8_e5m2 = chan.",
+    "gpt2":       {"bf16_K": 0.704, "bf16_V": 0.690, "e5m2_K": 0.732, "e5m2_V": 0.718},
+    "qwen2.5-7b": {"bf16_K": 0.670, "bf16_V": 0.677, "e5m2_K": 0.701, "e5m2_V": 0.707}
+  },
+  "transform_throughput_mbps_median": {
+    "byte_transpose": 2800, "chan": 2359, "chan_bt": 1447, "chan_bt_delta": 1298, "bt_delta": 2363, "delta": 13991,
+    "_doc": "single-thread numpy on the box; all permutation/prefix-sum class (DPU-ARM/FPGA far faster)"
+  },
+  "inverse_cost_class": {"chan": "permutation", "chan_bt": "permutation", "chan_bt_delta": "permutation+prefix_sum"},
+  "findings": [
+    "Channel-major reordering + byte-transpose (chan_bt) is the first transform to beat M1.5's byte_transpose on real KV — but only decisively on the modern model (Qwen2.5-7B bf16 0.671 vs 0.708; gpt2 only 0.697 vs 0.705).",
+    "chan is the FIRST transform that helps fp8 at all (e5m2: qwen 0.732->0.704, gpt2 0.731->0.724); M1.5's bit-split had only hurt it. 1-byte values can't be byte-transposed, but they CAN be reordered.",
+    "Delta coding HURTS on top of chan_bt for gpt2 (0.719 vs 0.697) and helps nothing enough elsewhere (qwen 0.692 vs 0.671): within-channel exponent sequences are not smooth enough for delta to beat deflate's own LZ matching.",
+    "fp8_e4m3 improves slightly (0.826-0.832) but remains far outside the 0.75 gate.",
+    "TRACE's remaining gap is priced: of TRACE's bf16 0.799->~0.53 total win, the single-deflate-stream-portable share is 0.799->0.671 (Qwen) / ->0.697 (gpt2); the rest (~0.14-0.17 alpha) requires their custom bit-plane entropy silicon.",
+    "All 3780 rows bit-exact (transform∘invert AND deflate roundtrip); 324 captured + 3456 synthetic."
+  ],
+  "provenance": {
+    "captured_gpt2": "myDevbox, 2026-07-06, run_m16.py capture --model gpt2 (prefill+decode, 512 tok + 64 gen), 180 rows, 0 failures",
+    "captured_qwen": "myDevbox, 2026-07-06, run_m16.py capture --model Qwen/Qwen2.5-7B --phases prefill --max-new-tokens 0, 144 rows, 0 failures",
+    "synthetic": "local, 2026-07-06, run_m16.py synthetic (7B config, full default grid), 3456 rows, 0 failures",
+    "analysis": "m16_outputs/layout_analysis.json (analyze_m16.py, pre-registered thresholds)"
+  }
+}

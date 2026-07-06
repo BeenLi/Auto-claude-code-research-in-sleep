@@ -139,6 +139,100 @@ pip + hf-mirror.com reachable, huggingface.co blocked → `HF_ENDPOINT=hf-mirror
 
 ---
 
+## M1.5 — Float-Split / Bit-Plane Preprocessing (tracker R014) — GREEN (bf16 rehabilitated)
+
+**Status (2026-06-25)**: **GREEN.** Tests whether an exponent-grouping layout transform *before*
+deflate (the DietGPU / UCCL-Zip / NetZIP / ZipNN mechanism) beats M1's raw-byte entropy floor and
+changes the dtype gate — under WR-ZipGuard's constraint that the receiver is **commodity BF3 doing one
+standard deflate decompress**. Code: `experiments/m1_5/` (49 unit tests); results
+`experiments/m1_5/m15_results.json` + `M1_5_REPORT.md`; contract `EVALUATION_CONTRACT_M1.5.md`.
+
+- **Motivation (user observation)**: M1's "BF16 provably can't compress" used the **order-0 byte
+  entropy of the RAW interleaved stream**, which does NOT bound the ratio after a structure-exposing
+  transform. Real GPU codecs group the low-entropy exponent apart from the near-random mantissa.
+- **Transforms** (`floatsplit.py`, bit-exact reversible, 49 tests incl. field-position pins + awkward
+  bit-packing lengths + mechanism): `byte_transpose` (SoA 2-byte de-interleave; pure permutation;
+  **no-op for 1-byte fp8**; the deployment candidate, off-GPU inverse) and `bitplane` (exact sign/exp/
+  mantissa field split; sub-byte gather; diagnostic). **Claimable α = `concat`** = transform then deflate
+  the WHOLE buffer as ONE stream (the bit-exact BF3 path from M2). `per-plane` (mantissa stored RAW) is
+  the DietGPU-style ceiling but is NOT BF3-claimable (N streams).
+- **Result (medians; α=compressed/original; gate 0.75; decided on CAPTURED KV):**
+
+  | dtype | raw α | byte_transpose | bitplane | exp-plane | gpt2 | qwen2.5-7b | synth | verdict |
+  |---|---|---|---|---|---|---|---|---|
+  | **bf16** | 0.79–0.80 | **0.70–0.71** | 0.70 | ~0.40 | 0.705 | 0.708 | 0.702 | **rehabilitated** ✅ |
+  | fp8_e4m3 | 0.82–0.84 | 0.82–0.84 (no-op) | 0.83–0.85 (worse) | ~0.70 | neutral | neutral | neutral | stays OUT |
+  | fp8_e5m2 | 0.72–0.73 | 0.73 (no-op) | 0.83–0.86 (**worse**) | ~0.76 | neutral | neutral | neutral | keep RAW |
+
+- **Key findings**:
+  1. **BF16 — the *default* KV dtype — is rehabilitated on real KV**: cheap byte-transpose drops it
+     0.79→~0.70 (gpt2 0.705, Qwen2.5-7B 0.708, synth 0.702), crossing 0.75. M1's "provably can't" was a
+     raw-byte-layout artifact. The win is **entirely the exponent plane** (high byte → ~0.40; low byte +
+     all mantissa incompressible ~1.0).
+  2. **The split does NOT help fp8**: byte_transpose is a no-op (1 byte); bit-split **regresses** both
+     formats (sub-byte packbits destroys deflate's byte-level LZ matching; fp8 mantissa is near-full
+     entropy). fp8_e5m2 keeps M1's raw path (0.73).
+  3. **byte_transpose is the deployment choice** (~2500–2750 MB/s software vs bitplane ~40–65 MB/s for
+     only +0.002–0.006). Independently cross-checked with a fresh from-scratch implementation
+     (bf16 0.792→0.704 bit-exact; single-deflate-stream roundtrip True; fp8 bit-split 0.716→0.845).
+- **Implication — widens the DTYPE set, NOT the bandwidth region**: profitable set goes "FP8_E5M2 only"
+  → "BF16 (byte-transpose) ~0.70 AND FP8_E5M2 (raw) ~0.73" (bf16 is the common default → higher
+  applicability). BUT bf16's ~30% wire saving ≈ fp8_e5m2's ~27% → the binding M3 constraint
+  `α<(1−α)·D_egress` barely moves; **still the narrow bandwidth-limited regime**. C2 survives (single
+  deflate stream); the receive-side **un-transpose must stay off-GPU** (host/DPU-ARM strided copy).
+- **Cannot claim / open**: α-only (T_xform cost + inverse placement/throughput on the real target
+  unmeasured — couples to M2's blocked DPU-ARM access; if inverse lands on GPU the differentiator is
+  void); fp8 captures use naive `astype` (saturation not yet reported); literature ANS ratios (bf16
+  ~0.64) need a non-deflate codec BF3 can't decode. Next: re-run M3 frontier with bf16 α≈0.70 (expected
+  marginal band shift); measure T-inverse off-GPU; fold T_xform into `profitability.py`.
+
+---
+
+## M1.6 — Channel-Major Layout Transforms, TRACE-inspired (tracker R015) — RED (pre-registered), architecture-dependent gain
+
+- **Date**: 2026-07-06 · **Trigger**: lit refresh surfaced TRACE (arXiv 2509.03377) — lossless bf16
+  KV **α≈0.53** via channel-major bit-plane layout in **custom CXL silicon**. TRACE's layout step is a
+  pure permutation → M1.6 measured how much survives the **single-standard-deflate-stream / BF3**
+  constraint. Contract pre-registered before code: `refine-logs/EVALUATION_CONTRACT_M1.6.md`
+  (GREEN bf16 ≤0.65 or e5m2 ≤0.70; YELLOW ≤0.695/≤0.72; worst captured model; synthetic never decides).
+- **Method**: `experiments/m1_6/` (69 unit tests; reuses m1/m1_5 harness verbatim). Transforms (all
+  bit-exact reversible, size-preserving, off-GPU inverse): `chan` (channel-major reorder keyed by
+  head_dim — the value layout is (…, token, head_dim) so viewing (rows, head_dim) and transposing makes
+  each channel contiguous), `chan_bt` (+M1.5 byte-transpose), `chan_bt_delta`/`bt_delta`/`delta`
+  (mod-256 byte delta), `byte_transpose` (M1.5 reference). Corpus: captured gpt2 (180 rows) +
+  Qwen2.5-7B (144 rows) on myDevbox + synthetic 7B control (3456 rows) local. **0 bit-exact failures.**
+- **Result (α medians, single deflate stream, captured KV)**:
+
+  | dtype | model | raw | M1.5 bt | **M1.6 best** | method |
+  |---|---|---|---|---|---|
+  | bf16 | gpt2 | 0.800 | 0.705 | **0.697** | chan_bt |
+  | bf16 | qwen2.5-7b | 0.799 | 0.708 | **0.671** | chan_bt |
+  | fp8_e5m2 | gpt2 | 0.731 | no-op | **0.724** | chan |
+  | fp8_e5m2 | qwen2.5-7b | 0.732 | no-op | **0.704** | chan |
+  | fp8_e4m3 | qwen2.5-7b | 0.837 | no-op | 0.826 (stays OUT) | chan |
+
+- **Verdict: RED per the pre-registered worst-model rule** (gpt2 sets α\*: bf16 0.697 > 0.695, e5m2
+  0.724 > 0.72 — missed by 0.002/0.004). **The models disagree beyond the 0.01 bound** (spread
+  0.025/0.020) and that is the finding: **per-channel scale structure is architecture-dependent** —
+  strong in modern GQA/RoPE Qwen KV (bf16 −0.037, e5m2 −0.028 = the first fp8 transform win,
+  **ANS-parity with UCCL-Zip's custom GPU codec: 0.704 vs 0.70**), weak in gpt2 (−0.008). Synthetic
+  control showed exactly zero chan gain (0.702 = 0.702) → captured gains are real structure, not
+  artifact. Delta coding HURTS (within-channel exponents not smooth enough to beat LZ matching).
+- **TRACE gap priced** (`experiments/m1_6/commodity_decode_cost.json`): of TRACE's bf16 0.80→0.53,
+  the deflate-stream-portable share is 0.80→0.671 (qwen); the remaining ~0.14 α = their custom
+  bit-plane entropy silicon. Also: SplitZip v3's custom GPU codec (bf16 0.755, e5m2 0.877) is WORSE
+  than our BF3-decodable path on ratio.
+- **E3 frontier refresh** (`experiments/m3/alpha_refresh.py` → `m3_outputs/alpha_refresh.json`):
+  B_crit@100Gbps-FPGA 17.2 → 18.7 (M1.5 bf16 0.708) → 19.4 (M1.6 worst 0.697) → 21.1 Gbps (qwen-only
+  0.671); free-compressor ceiling 50.4 → 61.9 Gbps. **M3 stays YELLOW at every new α** — the
+  narrow-bandwidth-regime conclusion is robust.
+- **Claim discipline**: multi-model claimable α remains M1.5's (bf16 0.705–0.708, e5m2 0.73);
+  qwen-only numbers are architecture-conditional. Follow-up (SHOULD): third modern model
+  (Llama-3.1-8B-class) to test whether gpt2 is the outlier before any re-registration; T_xform +
+  inverse placement still outside the break-even model (M1.5 open items unchanged).
+
+---
+
 ## M2 — BF3 Hardware Decompress Microbenchmark (tracker R004/R005)
 
 **Status (2026-06-16)**: **unblocked** — real BlueField-3 available on `bf3_server`

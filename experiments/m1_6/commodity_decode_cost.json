@@ -1,0 +1,39 @@
+{
+  "_doc": "E2 (lit refresh 2026-07-06): the 'cost of commodity decode' — WR-ZipGuard's BF3-decodable alpha (ONE standard deflate stream, shipped BlueField-3 hardware decompress, M2-proven bit-exact) vs published custom-decoder ceilings. alpha = compressed/original, lower is better. Paper-figure source.",
+  "ours_bf3_decodable": {
+    "_doc": "measured on captured KV (medians); provenance experiments/m1/m1_5/m1_6 results JSONs",
+    "bf16": {
+      "raw_deflate": {"gpt2": 0.800, "qwen2.5-7b": 0.799, "milestone": "M1"},
+      "byte_transpose_deflate": {"gpt2": 0.705, "qwen2.5-7b": 0.708, "milestone": "M1.5"},
+      "chan_bt_deflate": {"gpt2": 0.697, "qwen2.5-7b": 0.671, "milestone": "M1.6", "note": "architecture-dependent; multi-model claimable = worst model 0.697"}
+    },
+    "fp8_e5m2": {
+      "raw_deflate": {"gpt2": 0.731, "qwen2.5-7b": 0.732, "milestone": "M1"},
+      "chan_deflate": {"gpt2": 0.724, "qwen2.5-7b": 0.704, "milestone": "M1.6", "note": "first fp8 transform gain; worst model 0.724"}
+    },
+    "fp8_e4m3": {
+      "raw_deflate": {"gpt2": 0.834, "qwen2.5-7b": 0.837, "milestone": "M1"},
+      "chan_deflate": {"gpt2": 0.832, "qwen2.5-7b": 0.826, "milestone": "M1.6", "note": "stays far outside the 0.75 gate"}
+    }
+  },
+  "published_custom_decoder": {
+    "_doc": "NOT BF3-decodable (custom bitstream / custom silicon / GPU kernel). All verified against primary sources 2026-07-06 unless flagged.",
+    "TRACE": {"target": "bf16 KV", "alpha": 0.531, "decoder": "custom CXL-controller silicon (7nm SystemVerilog, 256 GB/s)", "source": "arXiv 2509.03377, IEEE TC in press", "verified": true},
+    "UCCL-Zip_v2": {"target": "KV/comm tensors", "alpha": {"bf16": 0.64, "fp8_e5m2": 0.70, "fp8_e4m3": 0.77, "fp16": 0.83, "fp32": 0.82}, "decoder": "GPU ANS (DietGPU), custom bitstream", "source": "arXiv 2604.17172v2", "verified": true},
+    "DFloat11": {"target": "bf16 WEIGHTS (not KV)", "alpha": 0.70, "decoder": "custom GPU kernel (SRAM LUT entropy decode)", "source": "arXiv 2504.11651, NeurIPS 2025", "verified": true},
+    "SplitZip_v3": {"target": "bf16 + e5m2 KV", "alpha": {"bf16": 0.755, "fp8_e5m2": 0.877}, "decoder": "GPU fixed-length top-16-exponent codec, custom bitstream (613/2182 GB/s)", "source": "arXiv 2605.01708v3", "verified": true},
+    "ZipNN": {"target": "bf16 weights", "alpha": 0.67, "decoder": "CPU/GPU Huffman on exponent bytes, custom container", "source": "prior review (M1.5 notes)", "verified": false}
+  },
+  "measured_order0_floors_raw_stream": {
+    "_doc": "M1 order-0 byte-entropy floors of the RAW interleaved stream; bounds raw-deflate only — layout transforms legally go below (M1.5/M1.6 do).",
+    "bf16": {"gpt2": 0.773, "qwen2.5-7b": 0.792},
+    "fp8_e5m2": {"qwen2.5-7b": 0.730},
+    "fp8_e4m3": {"qwen2.5-7b": 0.838}
+  },
+  "headline_gaps": [
+    "bf16: we pay +0.031 (qwen, 0.671 vs 0.64) to +0.057 (worst-model) vs UCCL-Zip's GPU ANS, and +0.14-0.17 vs TRACE's custom silicon — that premium buys zero new hardware and zero receiver GPU/SM cost.",
+    "fp8_e5m2 on the modern model: 0.704 vs UCCL-Zip's 0.70 — ANS PARITY through a commodity-decodable deflate stream.",
+    "SplitZip v3 (custom GPU codec) is WORSE than our BF3-decodable path on ratio: bf16 0.755 vs our 0.697-0.671; e5m2 0.877 vs our 0.724-0.704. It wins only on throughput.",
+    "DFloat11's 0.70 is on weights; our 0.671-0.697 on KV shows KV channel structure is at least as exploitable."
+  ]
+}
