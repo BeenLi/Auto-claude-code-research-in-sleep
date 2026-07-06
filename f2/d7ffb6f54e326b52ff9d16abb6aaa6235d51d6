@@ -1,0 +1,91 @@
+.gitignore
+  s_4fe9fdf95fc3bb::t_4b649f9214bc53 16
+AGENT.md
+  s_4fe9fdf95fc3bb::t_167f06a771dc04 38,51-54,56-57,61-63,66
+experiments/m1_5/.gitignore
+  s_4fe9fdf95fc3bb::t_bd610bc3190cde 1-5
+experiments/m1_5/M1_5_REPORT.md
+  s_4fe9fdf95fc3bb::t_c0e5c61e82d1b5 1-95
+experiments/m1_5/README.md
+  s_4fe9fdf95fc3bb::t_ea6c02b2b17c88 1-42
+experiments/m1_5/analyze_split.py
+  s_4fe9fdf95fc3bb::t_43fd59095d6001 1-160
+experiments/m1_5/floatsplit.py
+  s_4fe9fdf95fc3bb::t_8162239ed5686d 1-160
+experiments/m1_5/m15_results.json
+  s_4fe9fdf95fc3bb::t_622167f820dfae 1-199
+experiments/m1_5/run_split.py
+  s_4fe9fdf95fc3bb::t_2436c5c998ae70 1-271
+experiments/m1_5/split_measure.py
+  s_4fe9fdf95fc3bb::t_a0e21fe96a456f 1-107
+experiments/m1_5/tests/conftest.py
+  s_4fe9fdf95fc3bb::t_1e28e910194c36 1-12
+experiments/m1_5/tests/test_analyze_split.py
+  s_4fe9fdf95fc3bb::t_3ca450c6164d23 1-80
+experiments/m1_5/tests/test_floatsplit.py
+  s_4fe9fdf95fc3bb::t_4b364b855c642d 1-111
+experiments/m1_5/tests/test_run_split.py
+  s_4fe9fdf95fc3bb::t_72adf26af10e8a 1-69
+experiments/m1_5/tests/test_split_measure.py
+  s_4fe9fdf95fc3bb::t_9fb6c95f1ba5c6 1-65
+experiments/m1_6/.gitignore
+  s_4fe9fdf95fc3bb::t_ac9c0eca62b3ba 1-3
+experiments/m1_6/M1_6_REPORT.md
+  s_4fe9fdf95fc3bb::t_f19a57c59dcb42 1-77
+experiments/m1_6/README.md
+  s_4fe9fdf95fc3bb::t_ed094bdbd00c47 1-44
+experiments/m1_6/analyze_m16.py
+  s_4fe9fdf95fc3bb::t_513ef84611d55f 1-176
+experiments/m1_6/commodity_decode_cost.json
+  s_4fe9fdf95fc3bb::t_bf244e60ae8aaa 1-39
+experiments/m1_6/layout.py
+  s_4fe9fdf95fc3bb::t_d17b8f21e5bae5 1-110
+experiments/m1_6/m16_results.json
+  s_4fe9fdf95fc3bb::t_47deaf1ef2627e 1-54
+experiments/m1_6/measure_layout.py
+  s_4fe9fdf95fc3bb::t_3a93708857073d 1-82
+experiments/m1_6/run_m16.py
+  s_4fe9fdf95fc3bb::t_e198c35f5477e9 1-273
+experiments/m1_6/tests/conftest.py
+  s_4fe9fdf95fc3bb::t_80a6526ad013f6 1-12
+experiments/m1_6/tests/test_analyze_m16.py
+  s_4fe9fdf95fc3bb::t_cdd734ea08d42c 1-86
+experiments/m1_6/tests/test_layout.py
+  s_4fe9fdf95fc3bb::t_d51cf49da1fcba 1-152
+experiments/m1_6/tests/test_measure_layout.py
+  s_4fe9fdf95fc3bb::t_c5ed24c406d6c9 1-51
+experiments/m1_6/tests/test_run_m16.py
+  s_4fe9fdf95fc3bb::t_b0b3f6efccef9d 1-62
+experiments/m3/alpha_refresh.py
+  s_4fe9fdf95fc3bb::t_549466d8d9bbb6 1-67
+idea-stage/LITERATURE_REVIEW.md
+  s_4fe9fdf95fc3bb::t_1bf5b0fb8c8a52 62-119
+idea-stage/docs/research_contract.md
+  s_4fe9fdf95fc3bb::t_ad57a7ce90c1b5 162-217,250-288
+refine-logs/EVALUATION_CONTRACT_M1.5.md
+  s_4fe9fdf95fc3bb::t_5b866bf8f2e38d 1-89
+refine-logs/EVALUATION_CONTRACT_M1.6.md
+  s_4fe9fdf95fc3bb::t_37d0b6bb49ca96 1-97
+refine-logs/EXPERIMENT_LOG.md
+  s_4fe9fdf95fc3bb::t_6de2d7c8cbee09 142-235
+refine-logs/EXPERIMENT_TRACKER.md
+  s_4fe9fdf95fc3bb::t_4bb296e5478f38 19-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "f2d7ffb6f54e326b52ff9d16abb6aaa6235d51d6",
+  "prompts": {},
+  "sessions": {
+    "s_4fe9fdf95fc3bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "517cf874-ce8d-48eb-80e6-88b320929da8",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
