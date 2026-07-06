@@ -1,0 +1,49 @@
+AGENT.md
+  s_4fe9fdf95fc3bb::t_5e982d91cffafe 61,64
+experiments/m1/profitability.py
+  s_4fe9fdf95fc3bb::t_ffe6be786fdfa7 50-104
+experiments/m1/tests/test_profitability.py
+  s_4fe9fdf95fc3bb::t_3d3e0b2b2e5f85 74-140
+experiments/m4a_pre/README.md
+  s_4fe9fdf95fc3bb::t_7e2d2b78d9cf66 1-23
+experiments/m4a_pre/frontier_tinv.py
+  s_4fe9fdf95fc3bb::t_c44bb89865d0b8 1-78
+experiments/m4a_pre/golden/manifest.json
+  s_4fe9fdf95fc3bb::t_b9fee2092a0750 1-44
+experiments/m4a_pre/make_golden.py
+  s_4fe9fdf95fc3bb::t_beee655581e449 1-50
+experiments/m4a_pre/tinv_bench.c
+  s_4fe9fdf95fc3bb::t_9b725f84a6b39c 1-183
+experiments/m4a_pre/tinv_frontier.json
+  s_4fe9fdf95fc3bb::t_f3228212870f77 1-79
+experiments/m4a_pre/tinv_results.jsonl
+  s_4fe9fdf95fc3bb::t_924d0c219969a1 1-26
+idea-stage/LITERATURE_REVIEW.md
+  s_4fe9fdf95fc3bb::t_e6ba86294dbbda 86
+idea-stage/docs/research_contract.md
+  s_4fe9fdf95fc3bb::t_31470b2b21d935 267-270
+refine-logs/EVALUATION_CONTRACT_T_INVERSE.md
+  s_4fe9fdf95fc3bb::t_eddad72b8d1a65 1-83
+refine-logs/EXPERIMENT_LOG.md
+  s_4fe9fdf95fc3bb::t_92cb6b1795971f 248-278
+refine-logs/EXPERIMENT_TRACKER.md
+  s_4fe9fdf95fc3bb::t_d629472ab90c8b 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "e18dc094473dd2608271a7d6023a9d052f8f1d48",
+  "prompts": {},
+  "sessions": {
+    "s_4fe9fdf95fc3bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "517cf874-ce8d-48eb-80e6-88b320929da8",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
