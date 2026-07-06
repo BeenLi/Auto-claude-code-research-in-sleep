@@ -245,6 +245,37 @@ standard deflate decompress**. Code: `experiments/m1_5/` (49 unit tests); result
 
 ---
 
+## M4a-pre — T-inverse off-GPU placement + T_xform break-even folding (tracker R016)
+
+- **Context (2026-07-06):** bf3_client down (user-reported); **BF3 card on bf3_server ABSENT from
+  the PCIe bus since its 2026-07-01 reboot** (zero 15b3 devices in lspci/sysfs, kernel log shows no
+  enumeration this boot, bus rescan ineffective, rshim active but no /dev/rshim0 backend). The
+  requested "boot into DPU mode" is impossible until the card re-enumerates (host reboot / BMC
+  power-cycle / DC-ops reseat — user decision). DPU-ARM leg + M2 host-vs-DPU-memory ceiling test
+  remain BLOCKED. The **host-CPU leg needs no card**: bf3_server's 192-core x86 IS the receive host.
+- **Method:** pre-registered contract FIRST (`EVALUATION_CONTRACT_T_INVERSE.md`: R_f=3.75 GB/s
+  frontier rate, R_e=23.5 GB/s engine rate, GREEN/YELLOW/RED + bit-exact disqualifier). Fresh **C
+  implementation** (`experiments/m4a_pre/tinv_bench.c`, gcc -O3; bf3_server has no numpy/pip) of
+  bt⁻¹ (byte interleave) + chan⁻¹ (cache-blocked value transpose), correctness anchored to the
+  unit-tested Python reference via 6 golden-vector pairs — **bit-exact on macOS AND bf3_server**.
+  Multi-chunk thread parallelism (deployment model: concurrent WRs).
+- **Result — YELLOW (both paths):** @2MiB: bf16 chan_bt⁻¹ **2.04 GB/s 1T** (2 threads reach R_f,
+  12 reach R_e; linear to 16T=32.3); fp8 chan⁻¹ **1.39 GB/s 1T** (3 threads R_f, 16T=22.2 just
+  under R_e). Chunk size 256KB→2MB costs ~20% (cache). fp8's 1-byte transpose is *slower* per byte
+  than bf16's composed inverse (byte-granular gather vectorizes worse).
+- **T_xform folded into the break-even model** (`m1/profitability.py` `*_with_transform`, +8 TDD
+  tests, 120 pass): T_comp += S/X_fwd + S/X_inv (conservative additive). Scenarios
+  (`experiments/m4a_pre/tinv_frontier.json`, S=2MiB, C=100Gbps-FPGA, T_fixed=20µs):
+  **fp8_e5m2 raw 16.2 Gbps** vs chan+8T-inverse **10.7** / 16T **13.4 Gbps** → **on the B_crit axis
+  chan does NOT pay vs raw fp8 when the inverse runs on host CPU** — the α win (0.732→0.704) is
+  smaller than the inverse tax; it pays only if the inverse is ~free (ARM/engine/FPGA = measured
+  M4a/M4b design requirement). **bf16** (no raw fallback — raw bf16 never clears 0.75): FPGA-sender
+  + 8T inverse → **12.2 Gbps** (vs 17.9 hypothetical-free, −30%); software sender collapses
+  everything (≤3.9 Gbps) → transform must live in the sender FPGA.
+- **Takeaway for the paper:** the layout transforms widen the *dtype* set but charge a measured
+  receive-side CPU tax that narrows B_crit; the gate must price T_inv per-WR (it now can — closed
+  forms + measured X_inv exist). C2 survives with a core budget (2–3 cores at frontier rate).
+
 ## M2 — BF3 Hardware Decompress Microbenchmark (tracker R004/R005)
 
 **Status (2026-06-16)**: **unblocked** — real BlueField-3 available on `bf3_server`

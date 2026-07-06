@@ -264,7 +264,10 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   a codec — it is (a) *where* to decode (shipped commodity DPU hardware, zero receiver GPU/SM cost,
   zero new silicon) and (b) *when* to bother (the measured per-WR break-even frontier with
   bypass-on-risk). Lead with those two questions; cite ECF8 to make the exponent-plane floors
-  principled rather than empirical.
+  principled rather than empirical. Root the *transform* lineage at BPC (ISCA'16, DBX = delta +
+  bit-plane transpose + XOR feeding cheap hw encoders): TRACE = BPC's transposition idea +
+  float-field disaggregation + tensor-semantic channel reorder; M1.6 ports the only hardware-free
+  step (the reorder), and BPC-vs-deflate also explains why delta helps them but hurts us.
   (3) **Gate-novelty delta, sharpened against the two nearest neighbors** (E4): NetSenseML gates
   *lossy gradient* compression during *training* by reacting to congestion heuristics; CIDR'26
   "Waiting to Decompress" prices *LLMs-as-text-compressors* for cold *storage* over multi-year

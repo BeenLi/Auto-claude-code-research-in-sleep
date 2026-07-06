@@ -71,3 +71,70 @@ def test_invalid_params_raise():
         p.alpha_threshold(B=1e9, C=0, D=4e9, T_fixed=0.0, S=1e6)
     with pytest.raises(ValueError):
         p.alpha_threshold(B=1e9, C=2e9, D=4e9, T_fixed=0.0, S=0)
+
+
+# ---- transform-aware extension (T_xform folding, M4a preliminary #2) ----
+# t_comp gains two additive terms: S/X_fwd (sender transform) + S/X_inv
+# (receiver inverse), both in ORIGINAL bytes/s; X=inf means free/absent.
+
+INF = float("inf")
+
+
+def test_transform_times_reduce_to_base_when_free():
+    base = p.transfer_times(alpha=0.7, B=1e9, C=2e9, D=5e9, T_fixed=0.0, S=1_000_000)
+    ext = p.transfer_times_with_transform(
+        alpha=0.7, B=1e9, C=2e9, D=5e9, T_fixed=0.0, S=1_000_000, X_fwd=INF, X_inv=INF
+    )
+    assert ext == pytest.approx(base)
+
+
+def test_transform_threshold_reduces_to_base_when_free():
+    kw = dict(B=1e9, C=2e9, D=5e9, T_fixed=1e-5, S=1_000_000)
+    assert p.alpha_threshold_with_transform(X_fwd=INF, X_inv=INF, **kw) == pytest.approx(
+        p.alpha_threshold(**kw)
+    )
+
+
+def test_transform_costs_shrink_alpha_threshold():
+    kw = dict(B=1e9, C=2e9, D=5e9, T_fixed=0.0, S=1_000_000)
+    assert p.alpha_threshold_with_transform(X_fwd=2e9, X_inv=2e9, **kw) < p.alpha_threshold(**kw)
+
+
+def test_transform_times_add_exactly_the_two_terms():
+    S = 2_097_152
+    base_raw, base_comp = p.transfer_times(alpha=0.7, B=1e9, C=2e9, D=5e9, T_fixed=0.0, S=S)
+    raw, comp = p.transfer_times_with_transform(
+        alpha=0.7, B=1e9, C=2e9, D=5e9, T_fixed=0.0, S=S, X_fwd=4e9, X_inv=2e9
+    )
+    assert raw == pytest.approx(base_raw)
+    assert comp == pytest.approx(base_comp + S / 4e9 + S / 2e9)
+
+
+def test_bandwidth_threshold_equalizes_transfer_times():
+    kw = dict(alpha=0.704, C=12.5e9, D=3.3e9, T_fixed=2e-5, S=2_097_152, X_fwd=INF, X_inv=2e9)
+    b_crit = p.bandwidth_threshold_with_transform(**kw)
+    raw, comp = p.transfer_times_with_transform(B=b_crit, **kw)
+    assert raw == pytest.approx(comp, rel=1e-9)
+
+
+def test_bandwidth_threshold_monotone_in_inverse_throughput():
+    kw = dict(alpha=0.704, C=12.5e9, D=3.3e9, T_fixed=0.0, S=2_097_152, X_fwd=INF)
+    slow = p.bandwidth_threshold_with_transform(X_inv=1e9, **kw)
+    fast = p.bandwidth_threshold_with_transform(X_inv=8e9, **kw)
+    free = p.bandwidth_threshold_with_transform(X_inv=INF, **kw)
+    assert slow < fast < free
+
+
+def test_is_profitable_with_transform_brackets_threshold():
+    kw = dict(B=1e9, C=4e9, D=5e9, T_fixed=0.0, S=1_000_000, X_fwd=8e9, X_inv=8e9)
+    thr = p.alpha_threshold_with_transform(**kw)
+    assert p.is_profitable_with_transform(alpha=thr - 0.01, **kw)
+    assert not p.is_profitable_with_transform(alpha=thr + 0.01, **kw)
+
+
+def test_transform_invalid_params_raise():
+    kw = dict(alpha=0.7, B=1e9, C=2e9, D=5e9, T_fixed=0.0, S=1_000_000)
+    with pytest.raises(ValueError):
+        p.transfer_times_with_transform(X_fwd=0.0, X_inv=1e9, **kw)
+    with pytest.raises(ValueError):
+        p.transfer_times_with_transform(X_fwd=1e9, X_inv=-1.0, **kw)

@@ -1,0 +1,44 @@
+[
+ {
+  "tag": "bf16_chan_bt_h64_262144",
+  "dtype_c": "bf16",
+  "method": "chan_bt",
+  "head_dim": 64,
+  "bytes": 262144
+ },
+ {
+  "tag": "bf16_chan_bt_h128_262144",
+  "dtype_c": "bf16",
+  "method": "chan_bt",
+  "head_dim": 128,
+  "bytes": 262144
+ },
+ {
+  "tag": "bf16_chan_bt_h128_1048576",
+  "dtype_c": "bf16",
+  "method": "chan_bt",
+  "head_dim": 128,
+  "bytes": 1048576
+ },
+ {
+  "tag": "fp8_e5m2_chan_h64_262144",
+  "dtype_c": "fp8",
+  "method": "chan",
+  "head_dim": 64,
+  "bytes": 262144
+ },
+ {
+  "tag": "fp8_e5m2_chan_h128_262144",
+  "dtype_c": "fp8",
+  "method": "chan",
+  "head_dim": 128,
+  "bytes": 262144
+ },
+ {
+  "tag": "fp8_e5m2_chan_h128_1048576",
+  "dtype_c": "fp8",
+  "method": "chan",
+  "head_dim": 128,
+  "bytes": 1048576
+ }
+]

@@ -1,0 +1,79 @@
+{
+ "doc": "Transform-aware B_crit (Gbps, compressed-wire) at S=2MiB, C=100Gbps FPGA band, D=alpha*D_egress(188Gbps), T_fixed=20us; closed forms from m1/profitability.py (conservative additive model, no overlap).",
+ "scenarios": {
+  "fp8_e5m2_raw_no_transform": {
+   "alpha": 0.732,
+   "b_crit_gbps": 16.2
+  },
+  "fp8_e5m2_chan_sw_sender_inv1T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 1.39,
+   "b_crit_gbps": 1.9
+  },
+  "fp8_e5m2_chan_sw_sender_inv4T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 5.56,
+   "b_crit_gbps": 3.2
+  },
+  "fp8_e5m2_chan_sw_sender_inv8T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 11.12,
+   "b_crit_gbps": 3.7
+  },
+  "fp8_e5m2_chan_sw_sender_inv16T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 22.18,
+   "b_crit_gbps": 3.9
+  },
+  "fp8_e5m2_chan_fpga_sender_inv1T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 1.39,
+   "b_crit_gbps": 2.8
+  },
+  "fp8_e5m2_chan_fpga_sender_inv4T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 5.56,
+   "b_crit_gbps": 7.6
+  },
+  "fp8_e5m2_chan_fpga_sender_inv8T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 11.12,
+   "b_crit_gbps": 10.7
+  },
+  "fp8_e5m2_chan_fpga_sender_inv16T": {
+   "alpha": 0.704,
+   "x_inv_GBps": 22.18,
+   "b_crit_gbps": 13.4
+  },
+  "bf16_no_transform_reference": {
+   "alpha": 0.705,
+   "b_crit_gbps": 17.9,
+   "note": "hypothetical free transform; bf16 RAW does not clear 0.75 at all"
+  },
+  "bf16_bt_fpga_sender_inv1T": {
+   "alpha": 0.705,
+   "x_inv_GBps": 2.04,
+   "b_crit_gbps": 3.8
+  },
+  "bf16_bt_fpga_sender_inv4T": {
+   "alpha": 0.705,
+   "x_inv_GBps": 8.15,
+   "b_crit_gbps": 9.3
+  },
+  "bf16_bt_fpga_sender_inv8T": {
+   "alpha": 0.705,
+   "x_inv_GBps": 16.18,
+   "b_crit_gbps": 12.2
+  },
+  "bf16_bt_fpga_sender_inv16T": {
+   "alpha": 0.705,
+   "x_inv_GBps": 32.3,
+   "b_crit_gbps": 14.5
+  },
+  "bf16_bt_sw_sender_inv8T": {
+   "alpha": 0.705,
+   "x_inv_GBps": 16.18,
+   "b_crit_gbps": 2.7
+  }
+ }
+}
