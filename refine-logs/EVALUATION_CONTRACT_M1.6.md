@@ -5,9 +5,13 @@ gpt2 + Qwen2.5-7B KV) — **with a real, architecture-dependent gain on the mode
 worst-model clause excludes from the claim: qwen bf16 0.708→**0.671** (chan_bt), qwen fp8_e5m2
 0.732→**0.704** (chan, first fp8 transform win, ANS-parity with UCCL-Zip); gpt2 only 0.697/0.724
 (misses YELLOW by 0.002/0.004; cross-model spread 0.025/0.020 > the 0.01 agreement bound). Synthetic
-control confirmed zero artifact gain. All 3780 rows bit-exact. Claimable multi-model α remains
-M1.5's. See `experiments/m1_6/M1_6_REPORT.md`; follow-up: third modern model (Llama-3.1-8B-class) to
-test whether gpt2 is the outlier before any re-registration.
+control confirmed zero artifact gain. All rows bit-exact. Claimable multi-model α remains M1.5's.
+**Third-model extension RESOLVED (2026-07-06, Llama-3.1-8B, per the pre-registered rule below):
+fp8_e5m2 RE-REGISTERED as YELLOW (modern-arch scope) at α\*=0.704** — Llama 0.699 agrees with Qwen
+0.704 within 0.005, gpt2 confirmed the outlier. **bf16 NOT re-registered** — Llama 0.690 lands in
+the pre-registered in-between zone (clears YELLOW individually but 0.019 from Qwen > the 0.01
+bound); the three models form a gradient (0.697/0.690/0.671), not a clean modern/legacy split.
+See `experiments/m1_6/M1_6_REPORT.md`.
 **Code:** `experiments/m1_6/` (69 unit tests) · **Results:** `experiments/m1_6/m16_results.json`,
 `M1_6_REPORT.md`, `commodity_decode_cost.json`
 
@@ -95,3 +99,44 @@ Let α* = best concat α across M1.6 methods, medians on captured KV, both model
    SplitZip 0.755).
 3. M4a: the receive-side inverse is now (possibly) reorder∘transpose∘cumsum — same off-GPU placement
    question, slightly higher cost; measure there.
+
+## Third-model extension (pre-registered 2026-07-06, BEFORE the capture runs)
+
+**Question:** is gpt2 the architecture outlier (per-channel scale structure being a property of
+modern GQA/RoPE KV), or is the Qwen gain model-idiosyncratic?
+
+- **Model:** one Llama-3.1-8B-class modern GQA/RoPE model, captured with the *identical* harness and
+  parameters as gpt2/Qwen (seq 512, 64 decode tokens, layer fracs 0/0.5/1, chunks 256KB/1MB, all six
+  methods, deflate L6, bf16 + both fp8). Primary: `NousResearch/Meta-Llama-3.1-8B` (ungated mirror of
+  the gated meta-llama repo); fallback if unavailable via hf-mirror: `mistralai/Mistral-7B-v0.3`
+  (also GQA/RoPE). One model, chosen before seeing any numbers; no shopping for a third model after
+  results.
+- **Agreement test (per dtype, medians on captured KV, best method):** the new model *agrees with
+  Qwen* if |α_new − α_qwen| ≤ 0.01 (the existing agreement bound), and *sides with gpt2* if its best
+  α misses the YELLOW cutoff (bf16 > 0.695, e5m2 > 0.72).
+- **Re-registration rule:** IF the new model agrees with Qwen AND worst-of-{Qwen, new model} clears
+  the original thresholds (bf16 ≤ 0.65 GREEN / ≤ 0.695 YELLOW; e5m2 ≤ 0.70 GREEN / ≤ 0.72 YELLOW)
+  → re-register the layout claim **scoped to modern-architecture (GQA/RoPE) KV**, with gpt2 reported
+  as the measured architecture outlier, verdict labeled "GREEN/YELLOW (modern-arch scope)". The
+  all-models verdict of this contract **stays RED** — the re-registration is a new, narrower claim,
+  not a revision of this one.
+- IF the new model sides with gpt2, or lands in between (neither within 0.01 of Qwen nor past the
+  YELLOW cutoff) → **no re-registration**; the Qwen numbers remain a single-model
+  architecture-conditional observation and the paper says so.
+- Disqualifiers unchanged (any bit-exact failure; off-GPU-inverse class violation).
+
+**RESOLUTION (2026-07-06, capture ran same day on myDevbox; 288 rows, 0 bit-exact failures;
+`m16_outputs/three_model_analysis.json`):**
+
+| dtype | Llama-3.1-8B best | Qwen best | diff | agreement (≤0.01) | worst-of-modern | outcome |
+|---|---|---|---|---|---|---|
+| fp8_e5m2 | **0.699** (chan) | 0.704 | 0.005 | ✔ agrees | 0.704 | **RE-REGISTERED: YELLOW (modern-arch scope)** — 0.70 < 0.704 ≤ 0.72 |
+| bf16 | **0.690** (chan_bt) | 0.671 | 0.019 | ✘ (in-between: clears YELLOW individually, not within bound) | — | **NO re-registration** (strict rule; reported as observation) |
+
+gpt2 is confirmed as the architecture outlier for e5m2. For bf16 the three models form a gradient
+(gpt2 0.697 > Llama 0.690 > Qwen 0.671) rather than a clean modern/legacy split — the honest
+statement is "channel-major gain grows with architecture modernity" and only the e5m2 claim is
+registered. The re-registered claim: **on modern-architecture (GQA/RoPE) KV, fp8_e5m2 `chan` +
+single-stream deflate reaches α\*=0.704 (worst of Qwen2.5-7B/Llama-3.1-8B), BF3-decodable,
+bit-exact — ANS-parity with UCCL-Zip's custom-bitstream 0.70**. The all-models verdict of this
+contract remains RED, unchanged.

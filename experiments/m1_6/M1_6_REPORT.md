@@ -7,6 +7,12 @@ the finding: on **Qwen2.5-7B — the modern, deployment-representative architect
 delivers a real gain** (bf16 **0.708 → 0.671**, fp8_e5m2 **0.732 → 0.704**, the first fp8 transform
 win in this project). Per-channel scale structure is strong in GQA/RoPE-era KV and weak in gpt2.
 
+**Third-model update (same day):** Llama-3.1-8B was captured under the pre-registered extension rule
+(written before the run). Outcome: **fp8_e5m2 re-registered as YELLOW on modern-architecture KV at
+α\*=0.704** (Llama 0.699 within 0.005 of Qwen; gpt2 confirmed the outlier); **bf16 NOT re-registered**
+(Llama 0.690 clears YELLOW individually but sits 0.019 from Qwen — a gradient, not a clean split).
+The all-models verdict stays RED. Details below.
+
 ## Why this milestone exists
 
 The 2026-07-06 literature refresh surfaced **TRACE** (arXiv 2509.03377): lossless bf16 KV at
@@ -21,14 +27,16 @@ prefix-sum inverse.
 | dtype | source | raw | byte_transpose (M1.5) | **chan_bt / chan (M1.6)** | Δ vs M1.5 | best method |
 |---|---|---|---|---|---|---|
 | bf16 | gpt2 | 0.800 | 0.705 | **0.697** | −0.008 | chan_bt |
+| bf16 | **meta-llama-3.1-8b** | 0.799 | 0.709 | **0.690** | −0.019 | chan_bt |
 | bf16 | **qwen2.5-7b** | 0.799 | 0.708 | **0.671** | **−0.037** | chan_bt |
 | bf16 | synthetic | 0.792 | 0.702 | 0.702 | 0.000 (control ✓) | — |
 | fp8_e5m2 | gpt2 | 0.731 | 0.731 (no-op) | **0.724** | −0.007 | chan |
+| fp8_e5m2 | **meta-llama-3.1-8b** | 0.730 | 0.730 (no-op) | **0.699** | **−0.031** | chan |
 | fp8_e5m2 | **qwen2.5-7b** | 0.732 | 0.732 (no-op) | **0.704** | **−0.028** | chan |
 | fp8_e4m3 | qwen2.5-7b | 0.837 | 0.837 (no-op) | 0.826 | −0.011 (stays OUT) | chan |
 
-3780 rows (324 captured + 3456 synthetic), **0 bit-exact failures** (transform∘invert AND
-single-deflate-stream roundtrip asserted per chunk).
+4068 rows (612 captured across gpt2/Qwen2.5-7B/Llama-3.1-8B + 3456 synthetic), **0 bit-exact
+failures** (transform∘invert AND single-deflate-stream roundtrip asserted per chunk).
 
 **Reading the table:**
 1. **The mechanism is real and it is structure, not artifact.** The synthetic control (standard-normal
@@ -48,6 +56,28 @@ single-deflate-stream roundtrip asserted per chunk).
    bit-plane entropy silicon — that is the measured **cost of commodity decode** vs TRACE.
 6. Throughput: `chan_bt` ≈1450 MB/s single-thread numpy (vs byte_transpose 2800); still
    permutation-class — DPU-ARM/FPGA implementations are far faster. Inverse = strided copy, off-GPU.
+
+## Third-model extension: Llama-3.1-8B (pre-registered rule, resolved 2026-07-06)
+
+The extension rule was written into `EVALUATION_CONTRACT_M1.6.md` *before* the capture ran
+(model fixed in advance: `NousResearch/Meta-Llama-3.1-8B`, the ungated mirror; identical harness
+and parameters; agreement bound ±0.01 vs Qwen per dtype; re-register scoped to modern-architecture
+KV iff agreement AND worst-of-modern clears the original thresholds). 288 rows, 0 bit-exact failures.
+
+| dtype | Llama best | Qwen best | diff | outcome |
+|---|---|---|---|---|
+| fp8_e5m2 | **0.699** (chan) | 0.704 | 0.005 ✔ | **RE-REGISTERED: YELLOW (modern-arch scope), α\*=worst-of-modern=0.704** |
+| bf16 | **0.690** (chan_bt) | 0.671 | 0.019 ✘ | NO re-registration (in-between zone; observation only) |
+
+- **The registered narrow claim:** on modern-architecture (GQA/RoPE) KV, `chan` + single-stream
+  deflate reaches **fp8_e5m2 α\*=0.704, BF3-decodable, bit-exact — ANS-parity with UCCL-Zip's
+  custom-bitstream 0.70**. gpt2 (0.724) is reported as the measured architecture outlier.
+- **bf16 is a gradient, not a split:** gpt2 0.697 > Llama 0.690 > Qwen 0.671. Both modern models
+  individually clear the 0.695 YELLOW cutoff, but the 0.019 spread exceeds the pre-set agreement
+  bound, so no bf16 claim is registered — the honest sentence is "the channel-major gain grows with
+  architecture modernity", and M1.5's byte-transpose numbers remain the claimable bf16 α.
+- Llama's K compresses better than its V (bf16 0.685/0.696) — the reverse of gpt2. Per-tensor
+  structure is itself architecture-dependent; the gate never needs to know which, it measures.
 
 ## Implications for WR-ZipGuard
 
@@ -69,8 +99,10 @@ single-deflate-stream roundtrip asserted per chunk).
 - T_xform (now reorder + transpose) and the receive-side inverse remain **outside the break-even
   model**; inverse placement/throughput on the real target unmeasured (couples to M2's DPU-ARM block).
 - fp8 captures still use the naive `astype` quantizer (M1.5 caveat, unchanged).
-- gpt2-vs-qwen disagreement rests on two models; a third modern model would resolve whether the
-  worst-model rule is binding on an outlier.
+- ~~gpt2-vs-qwen disagreement rests on two models~~ **Resolved**: Llama-3.1-8B captured same day
+  under the pre-registered extension → e5m2 claim re-registered on modern-arch scope; bf16 remains
+  unregistered (gradient across architectures). A fourth model could tighten the bf16 question but
+  no further capture is planned before M4a.
 
 Code: `experiments/m1_6/` (69 unit tests) · results `m16_results.json`, `commodity_decode_cost.json`
 · contract `refine-logs/EVALUATION_CONTRACT_M1.6.md` · frontier refresh

@@ -1,7 +1,14 @@
 {
   "milestone": "M1.6 — channel-major layout transforms (TRACE-inspired) under the BF3 single-standard-deflate-stream constraint",
   "verdict": "RED",
-  "verdict_note": "RED per the PRE-REGISTERED worst-captured-model rule (bf16 alpha*=0.697 > 0.695; fp8_e5m2 alpha*=0.724 > 0.72 — both set by gpt2). The models DISAGREE beyond the 0.01 agreement bound (bf16 spread 0.025, e5m2 spread 0.020): on Qwen2.5-7B — the modern, deployment-representative architecture — the mechanism delivers a REAL gain (bf16 0.708->0.671, fp8_e5m2 0.732->0.704, the first fp8 transform win in this project). The architecture-dependence is itself the finding: per-channel scale structure is strong in GQA/RoPE/RMSNorm-era KV and weak in gpt2. Claimable multi-model numbers remain M1.5's (bf16 0.705-0.708, e5m2 0.731-0.732); Qwen-only numbers may be quoted as architecture-conditional.",
+  "verdict_note": "RED per the PRE-REGISTERED worst-captured-model rule (bf16 alpha*=0.697 > 0.695; fp8_e5m2 alpha*=0.724 > 0.72 — both set by gpt2). The models DISAGREE beyond the 0.01 agreement bound (bf16 spread 0.025, e5m2 spread 0.020): on Qwen2.5-7B — the modern, deployment-representative architecture — the mechanism delivers a REAL gain (bf16 0.708->0.671, fp8_e5m2 0.732->0.704, the first fp8 transform win in this project). The architecture-dependence is itself the finding: per-channel scale structure is strong in GQA/RoPE/RMSNorm-era KV and weak in gpt2. Claimable multi-model numbers remain M1.5's (bf16 0.705-0.708, e5m2 0.731-0.732). THIRD-MODEL RESOLUTION (same day, pre-registered rule): Llama-3.1-8B confirms gpt2 is the architecture outlier for fp8_e5m2 (0.699, within 0.005 of Qwen's 0.704) -> RE-REGISTERED narrow claim: fp8_e5m2 chan YELLOW at alpha*=0.704 scoped to modern-architecture (GQA/RoPE) KV. bf16 lands in the pre-registered in-between zone (0.690: clears YELLOW individually but 0.019 from Qwen > 0.01 agreement bound) -> NO bf16 re-registration; both modern models clearing 0.695 individually is reported as an observation only.",
+  "third_model_extension": {
+    "rule": "pre-registered in EVALUATION_CONTRACT_M1.6.md BEFORE the capture ran (agreement bound 0.01 vs Qwen per dtype; re-register scoped to modern-arch KV iff agree AND worst-of-modern clears original thresholds)",
+    "model": "NousResearch/Meta-Llama-3.1-8B (ungated mirror of meta-llama/Llama-3.1-8B; 32 layers, 8 KV heads, head_dim 128)",
+    "fp8_e5m2": {"llama": 0.699, "qwen": 0.704, "diff": 0.005, "agrees": true, "worst_of_modern": 0.704, "resolution": "RE-REGISTERED: YELLOW (modern-arch scope), method chan"},
+    "bf16": {"llama": 0.690, "qwen": 0.671, "diff": 0.019, "agrees": false, "sides_with_gpt2": false, "resolution": "in-between zone -> NO re-registration (rule is strict; both clear YELLOW individually — observation only)"},
+    "gpt2_status": "confirmed architecture outlier for e5m2; for bf16 the three models form a gradient (gpt2 0.697 > llama 0.690 > qwen 0.671) rather than a clean modern/legacy split"
+  },
   "criteria": {
     "contract": "refine-logs/EVALUATION_CONTRACT_M1.6.md",
     "green": {"bf16": 0.65, "fp8_e5m2": 0.70},
@@ -20,6 +27,11 @@
       "fp8_e5m2": {"raw": 0.732, "byte_transpose": 0.732, "chan": 0.704, "chan_bt": 0.704, "chan_bt_delta": 0.788, "bt_delta": 0.792, "delta": 0.792, "best": 0.704, "best_method": "chan"},
       "fp8_e4m3": {"raw": 0.837, "byte_transpose": 0.837, "chan": 0.826, "chan_bt": 0.826, "chan_bt_delta": 0.907, "bt_delta": 0.906, "delta": 0.906, "best": 0.826, "best_method": "chan"}
     },
+    "captured_meta-llama-3.1-8b": {
+      "bf16":     {"raw": 0.799, "byte_transpose": 0.709, "chan": 0.794, "chan_bt": 0.690, "chan_bt_delta": 0.714, "bt_delta": 0.725, "delta": 1.000, "best": 0.690, "best_method": "chan_bt"},
+      "fp8_e5m2": {"raw": 0.730, "byte_transpose": 0.730, "chan": 0.699, "chan_bt": 0.699, "chan_bt_delta": 0.785, "bt_delta": 0.793, "delta": 0.793, "best": 0.699, "best_method": "chan"},
+      "fp8_e4m3": {"raw": 0.829, "byte_transpose": 0.829, "chan": 0.819, "chan_bt": 0.819, "chan_bt_delta": 0.901, "bt_delta": 0.898, "delta": 0.898, "best": 0.819, "best_method": "chan"}
+    },
     "synthetic_7b": {
       "_doc": "mechanism control: standard-normal KV has NO per-channel scale structure, so chan_bt == byte_transpose here (0.702=0.702) — confirms the captured gains are real structure, not a harness artifact.",
       "bf16":     {"raw": 0.792, "byte_transpose": 0.702, "chan_bt": 0.702, "best": 0.702},
@@ -30,7 +42,8 @@
   "per_tensor_type_medians_chan_best": {
     "_doc": "prefill only (gpt2 decode spans < 256KB chunk minimum). bf16 = chan_bt, fp8_e5m2 = chan.",
     "gpt2":       {"bf16_K": 0.704, "bf16_V": 0.690, "e5m2_K": 0.732, "e5m2_V": 0.718},
-    "qwen2.5-7b": {"bf16_K": 0.670, "bf16_V": 0.677, "e5m2_K": 0.701, "e5m2_V": 0.707}
+    "qwen2.5-7b": {"bf16_K": 0.670, "bf16_V": 0.677, "e5m2_K": 0.701, "e5m2_V": 0.707},
+    "meta-llama-3.1-8b": {"bf16_K": 0.685, "bf16_V": 0.696, "e5m2_K": 0.692, "e5m2_V": 0.705}
   },
   "transform_throughput_mbps_median": {
     "byte_transpose": 2800, "chan": 2359, "chan_bt": 1447, "chan_bt_delta": 1298, "bt_delta": 2363, "delta": 13991,
@@ -42,13 +55,16 @@
     "chan is the FIRST transform that helps fp8 at all (e5m2: qwen 0.732->0.704, gpt2 0.731->0.724); M1.5's bit-split had only hurt it. 1-byte values can't be byte-transposed, but they CAN be reordered.",
     "Delta coding HURTS on top of chan_bt for gpt2 (0.719 vs 0.697) and helps nothing enough elsewhere (qwen 0.692 vs 0.671): within-channel exponent sequences are not smooth enough for delta to beat deflate's own LZ matching.",
     "fp8_e4m3 improves slightly (0.826-0.832) but remains far outside the 0.75 gate.",
-    "TRACE's remaining gap is priced: of TRACE's bf16 0.799->~0.53 total win, the single-deflate-stream-portable share is 0.799->0.671 (Qwen) / ->0.697 (gpt2); the rest (~0.14-0.17 alpha) requires their custom bit-plane entropy silicon.",
-    "All 3780 rows bit-exact (transform∘invert AND deflate roundtrip); 324 captured + 3456 synthetic."
+    "TRACE's remaining gap is priced: of TRACE's bf16 0.799->~0.53 total win, the single-deflate-stream-portable share is 0.799->0.671 (Qwen) / ->0.690 (Llama) / ->0.697 (gpt2); the rest (~0.14-0.17 alpha) requires their custom bit-plane entropy silicon.",
+    "All 4068 rows bit-exact (transform∘invert AND deflate roundtrip); 612 captured + 3456 synthetic.",
+    "Third model (Llama-3.1-8B): e5m2 chan 0.730->0.699 lands within 0.005 of Qwen -> gpt2 confirmed as the e5m2 architecture outlier; RE-REGISTERED narrow claim fp8_e5m2 YELLOW alpha*=0.704 on modern-arch KV. bf16 forms a gradient (0.697/0.690/0.671) not a clean split -> no bf16 re-registration per the strict pre-registered agreement bound.",
+    "Llama K compresses better than V (bf16 0.685/0.696, e5m2 0.692/0.705) — opposite of gpt2 (V better); per-tensor structure is itself architecture-dependent."
   ],
   "provenance": {
     "captured_gpt2": "myDevbox, 2026-07-06, run_m16.py capture --model gpt2 (prefill+decode, 512 tok + 64 gen), 180 rows, 0 failures",
     "captured_qwen": "myDevbox, 2026-07-06, run_m16.py capture --model Qwen/Qwen2.5-7B --phases prefill --max-new-tokens 0, 144 rows, 0 failures",
+    "captured_llama": "myDevbox, 2026-07-06, run_m16.py capture --model NousResearch/Meta-Llama-3.1-8B (defaults; decode spans <256KB so rows are prefill-only), 288 rows, 0 failures",
     "synthetic": "local, 2026-07-06, run_m16.py synthetic (7B config, full default grid), 3456 rows, 0 failures",
-    "analysis": "m16_outputs/layout_analysis.json (analyze_m16.py, pre-registered thresholds)"
+    "analysis": "m16_outputs/layout_analysis.json (two-model verdict) + m16_outputs/three_model_analysis.json (with Llama; analyze_m16.py, pre-registered thresholds)"
   }
 }

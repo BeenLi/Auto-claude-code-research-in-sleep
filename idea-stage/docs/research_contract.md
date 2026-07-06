@@ -211,7 +211,13 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   (`experiments/m1_6/commodity_decode_cost.json`). **M3 frontier stays YELLOW at every new α**
   (B_crit@100G 17.2→≤21.1 Gbps; ceiling 50→62 Gbps; `experiments/m3/m3_outputs/alpha_refresh.json`).
   Claimable multi-model α remains M1.5's; qwen-only numbers quoted as architecture-conditional.
-  Follow-up: third modern model (Llama-3.1-8B-class) to test whether gpt2 is the outlier.
+  **Third-model extension resolved same day (Llama-3.1-8B, rule pre-registered before capture):
+  e5m2 chan 0.730→0.699 agrees with Qwen (±0.005) → gpt2 confirmed the outlier → RE-REGISTERED
+  narrow claim: fp8_e5m2 YELLOW on modern-architecture (GQA/RoPE) KV, α\*=worst-of-modern=0.704,
+  BF3-decodable single deflate stream, ANS-parity with UCCL-Zip's custom codec (0.70). bf16 NOT
+  re-registered — Llama 0.690 clears YELLOW individually but sits 0.019 from Qwen (gradient
+  0.697/0.690/0.671, not a clean split); claimable bf16 stays M1.5's byte-transpose 0.705–0.709
+  (now three-model). All-models M1.6 verdict stays RED.**
 - Largest remaining evidence gap: M4a in-pipeline prototype (staging cost, off-GPU inverse
   placement — now chan⁻¹∘bt⁻¹) and M4b FPGA compress for the measured end-to-end speedup; SHOULD:
   third-model M1.6 capture, T_xform in the break-even model.

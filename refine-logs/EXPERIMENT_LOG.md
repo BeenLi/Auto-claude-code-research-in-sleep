@@ -230,6 +230,18 @@ standard deflate decompress**. Code: `experiments/m1_5/` (49 unit tests); result
   qwen-only numbers are architecture-conditional. Follow-up (SHOULD): third modern model
   (Llama-3.1-8B-class) to test whether gpt2 is the outlier before any re-registration; T_xform +
   inverse placement still outside the break-even model (M1.5 open items unchanged).
+- **Third-model extension RESOLVED (2026-07-06, same day):** rule pre-registered in the contract
+  BEFORE the capture (model fixed in advance: `NousResearch/Meta-Llama-3.1-8B`, ungated mirror;
+  agreement bound ±0.01 vs Qwen per dtype). Run: myDevbox, identical harness/params, 288 rows,
+  0 bit-exact failures (`m16_outputs/three_model_analysis.json`, 4068 rows total).
+  Results: **e5m2 chan 0.730→0.699** — within 0.005 of Qwen's 0.704 → gpt2 confirmed the outlier →
+  **RE-REGISTERED narrow claim: fp8_e5m2 YELLOW (modern-arch GQA/RoPE scope), α\*=worst-of-modern
+  =0.704, BF3-decodable, ANS-parity with UCCL-Zip**. **bf16 chan_bt 0.709→0.690** — clears the
+  0.695 YELLOW cutoff individually but 0.019 from Qwen > 0.01 bound → in-between zone →
+  **NO bf16 re-registration** (three models form a gradient 0.697/0.690/0.671, "gain grows with
+  architecture modernity"; claimable bf16 stays M1.5's byte-transpose). All-models verdict stays
+  RED. Llama nuance: K compresses better than V (reverse of gpt2) — per-tensor structure is also
+  architecture-dependent; the gate measures rather than assumes.
 
 ---
 
