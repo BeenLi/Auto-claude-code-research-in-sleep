@@ -1,0 +1,25 @@
+AGENT.md
+  s_4fe9fdf95fc3bb::t_6553f79ff3d37d 62,64,67
+idea-stage/LITERATURE_REVIEW.md
+  s_4fe9fdf95fc3bb::t_c29d86996d0721 31
+idea-stage/docs/research_contract.md
+  s_4fe9fdf95fc3bb::t_de6acc99419633 298-318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "e0d49115226496fd8fcac3ec1601e253352f8eff",
+  "prompts": {},
+  "sessions": {
+    "s_4fe9fdf95fc3bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "517cf874-ce8d-48eb-80e6-88b320929da8",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
