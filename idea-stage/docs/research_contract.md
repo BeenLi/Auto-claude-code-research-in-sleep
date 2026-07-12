@@ -295,6 +295,27 @@ Novelty/competitive risk: next-gen **BF4** may add hardware compress, which woul
   if NVIDIA lands KVTC/nvCOMP-deflate in Dynamo KVBM, deflate-on-KV becomes mainstream practice —
   that *helps* the narrative (deflate legitimized on KV) and does not touch the transfer-side
   bit-exact gate; re-check before submission.
+- **NetZIP defusal, sharpened by full-text verification (2026-07-09; 3-way independent extraction
+  of the published PDF, negatives grep-verified)** → NetZIP's bump-in-the-wire "works" because it
+  never enters the verbs contract: (a) compression sits between the DMA engine and the Protocol
+  Engine (Fig. 8) — upstream of wire-header/ICRC generation, so the transport runs natively on
+  compressed bytes; (b) strictly per-4KB-packet self-contained compression (delta base value
+  appended per packet) — no message reassembly, no boundary problem; (c) tensor-awareness is a
+  software crutch: a custom header (1-bit compress flag + 15-bit layer ID) injected by a MODIFIED
+  NCCL in ncclIbIsend() — "transparent" only above NCCL. What the paper never addresses (zero
+  whole-word occurrences): the fabric itself (TCP/RoCE/IB unnamed), ICRC coexistence,
+  retransmission-on-compressed-stream, one-sided placement (compressed wire length vs decompressed
+  DMA length/offset), completion semantics, memory registration. Its gate is payload-type
+  flag-driven, not data/profitability-driven (only a never-triggered >4KB overflow fallback). Its
+  FPGA prototype has NO RDMA stack (paper's own admission: no open-source FPGA NIC with full RDMA
+  in 2025) — two-node numbers use payload-shrinking emulation; 35% headline is SimAI-only; ASIC
+  figures are Kuon–Rose projections; and its BlueField-2 Arm-detour attempt made communication 11x
+  WORSE (their data independently confirms our R016 "inline or die" requirement). Attack-proof
+  phrasing: **"NetZIP compresses upstream of the transport engine and thus never faces the verbs
+  contract; our contribution begins exactly where NetZIP stops"** — dual-length accounting through
+  RETH/PSN/retransmission/placement/CQE, ordering-safe dual-path (gate) pipeline, validated on a
+  real RoCE stack (Coyote v2-class vehicles now exist where 2025 had none). Full fact sheet with
+  quotes: Obsidian WR-ZipGuard notes + RDMA teaching notes (003 互联基础设施/rdma).
 
 ## Immediate Research Gate
 
