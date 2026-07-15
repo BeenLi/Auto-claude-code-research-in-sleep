@@ -84,6 +84,13 @@ Research Contract update triggers:
 - `refine-logs/FINAL_PROPOSAL.md` or `refine-logs/EXPERIMENT_PLAN.md` generated/updated
 - Baseline reproduced, major result obtained, Mx Go/No-Go completed, or `/result-to-claim` resolves claim support
 
+Obsidian vault mirror duty (WR-ZipGuard; vault dir = `/Users/bytedance/Library/Mobile Documents/iCloud~md~obsidian/Documents/ob-career/002-notes/007 ideas/WR-ZipGuard/`, full rules in that dir's CLAUDE.md):
+- Trigger: any milestone completes, or a report is produced/updated (`experiments/mN/*_REPORT.md`, `refine-logs/` uppercase docs). Wrap-up MUST then:
+  1. Update/create the condensed mirror note in vault `实验镜像/` (one note per milestone; status header must list `依赖假设: A-x` ledger IDs).
+  2. Update affected entries in vault `假设与决策账本.md`: fill 事实状态 truthfully (record re-verdicts with date + old→new); add newly introduced premises as new entries with 理解状态 = ❓. NEVER set 理解状态 to ✅ — that flip is user-only.
+  3. If a conclusion was re-judged, sync the matching row in vault `WR-ZipGuard 项目速览（2026-07）.md`.
+- When citing a ledger entry whose 理解状态 is ❓ in any reasoning/plan/report, explicitly mark it "基于未确认前提 A-x".
+
 On new session or post-compaction recovery:
 1. Read ## Pipeline Status
 2. Read idea-stage/docs/research_contract.md (the active idea's focused context)
