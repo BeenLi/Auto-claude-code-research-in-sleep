@@ -1,0 +1,2 @@
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]Loading weights:  26%|██▌       | 76/291 [00:00<00:00, 759.34it/s]Loading weights:  71%|███████▏  | 208/291 [00:00<00:00, 1074.03it/s]Loading weights: 100%|██████████| 291/291 [00:00<00:00, 1116.07it/s]
+{'rows_written': 144, 'bit_exact_failures': 0, 'model': 'NousResearch/Meta-Llama-3.1-8B', 'n_layers': 32, 'out_path': 'e0_outputs/e0_llama31_8b.jsonl'}

@@ -1,0 +1,2 @@
+Loading weights:   0%|          | 0/339 [00:00<?, ?it/s]Loading weights:  39%|███▉      | 132/339 [00:00<00:00, 1295.27it/s]Loading weights:  77%|███████▋  | 262/339 [00:00<00:00, 1200.07it/s]Loading weights: 100%|██████████| 339/339 [00:00<00:00, 1359.01it/s]
+{'rows_written': 72, 'bit_exact_failures': 0, 'model': 'Qwen/Qwen2.5-7B', 'n_layers': 28, 'out_path': 'e0_outputs/e0_qwen7b.jsonl'}

@@ -1,0 +1,312 @@
+{
+ "milestone": "E0 — hardware-encoder-constrained alpha pre-check (ISCAS 2027 topic gate)",
+ "verdict": "STRONG_GO",
+ "verdict_note": "Both claimable dtype paths clear the pre-registered strict gates under the HW-dyn proxy V3 (level-1 match effort + independent 32KB blocks): bf16 chan_bt worst-of-modern 0.690->0.708 (delta +0.018), fp8_e5m2 chan worst-of-modern 0.704->0.721 (delta +0.017); the conservative all-model bf16 byte_transpose path also clears (0.709->0.726). V0 reproduces every locked M1.5/M1.6 median within +-0.005; synthetic control shows zero chan artifact; 0 bit-exact failures across 312 captured rows + 384 synthetic rows. Decomposition: 32KB independent blocking is nearly free (+0.000..0.004); the entire penalty is level-1 match effort (~+0.02); static Huffman (V4/V5) is catastrophic (bf16 0.81, e5m2 0.97-1.02) -> DYNAMIC HUFFMAN IS A MEASURED HARDWARE DESIGN REQUIREMENT. e5m2 raw hits exactly 0.750 under V3 -> the chan transform becomes MORE necessary under hardware constraints. Topic A (KV compression egress datapath on VCU118) is GO pending user sign-off.",
+ "paths": {
+  "bf16": {
+   "method": "chan_bt",
+   "alpha_v0": 0.6902070045471191,
+   "alpha_v3": 0.7079334259033203,
+   "delta_v3": 0.017726421356201172,
+   "passes": true,
+   "passes_weak": true
+  },
+  "fp8_e5m2": {
+   "method": "chan",
+   "alpha_v0": 0.7037925720214844,
+   "alpha_v3": 0.7206687927246094,
+   "delta_v3": 0.016876220703125,
+   "passes": true,
+   "passes_weak": true
+  }
+ },
+ "claim_stats": {
+  "bf16|byte_transpose|V0": 0.7087497711181641,
+  "bf16|byte_transpose|V1": 0.7272796630859375,
+  "bf16|byte_transpose|V2": 0.7124934196472168,
+  "bf16|byte_transpose|V3": 0.7260684967041016,
+  "bf16|byte_transpose|V4": 0.8405017852783203,
+  "bf16|byte_transpose|V5": 0.7845630645751953,
+  "bf16|chan|V0": 0.7938594818115234,
+  "bf16|chan|V1": 0.8023347854614258,
+  "bf16|chan|V2": 0.7942256927490234,
+  "bf16|chan|V3": 0.8036155700683594,
+  "bf16|chan|V4": 0.9886155128479004,
+  "bf16|chan|V5": 0.9853911399841309,
+  "bf16|chan_bt|V0": 0.6902070045471191,
+  "bf16|chan_bt|V1": 0.7092938423156738,
+  "bf16|chan_bt|V2": 0.6905927658081055,
+  "bf16|chan_bt|V3": 0.7079334259033203,
+  "bf16|chan_bt|V4": 0.8147029876708984,
+  "bf16|chan_bt|V5": 0.7603888511657715,
+  "bf16|raw|V0": 0.7999916076660156,
+  "bf16|raw|V1": 0.8076324462890625,
+  "bf16|raw|V2": 0.8009185791015625,
+  "bf16|raw|V3": 0.8075027465820312,
+  "bf16|raw|V4": 1.001199722290039,
+  "bf16|raw|V5": 0.9972019195556641,
+  "fp8_e5m2|byte_transpose|V0": 0.7317886352539062,
+  "fp8_e5m2|byte_transpose|V1": 0.7539577484130859,
+  "fp8_e5m2|byte_transpose|V2": 0.731170654296875,
+  "fp8_e5m2|byte_transpose|V3": 0.7499504089355469,
+  "fp8_e5m2|byte_transpose|V4": 1.0185050964355469,
+  "fp8_e5m2|byte_transpose|V5": 1.0187339782714844,
+  "fp8_e5m2|chan|V0": 0.7037925720214844,
+  "fp8_e5m2|chan|V1": 0.7294082641601562,
+  "fp8_e5m2|chan|V2": 0.7014350891113281,
+  "fp8_e5m2|chan|V3": 0.7206687927246094,
+  "fp8_e5m2|chan|V4": 0.9660358428955078,
+  "fp8_e5m2|chan|V5": 0.9609279632568359,
+  "fp8_e5m2|chan_bt|V0": 0.7037925720214844,
+  "fp8_e5m2|chan_bt|V1": 0.7294082641601562,
+  "fp8_e5m2|chan_bt|V2": 0.7014350891113281,
+  "fp8_e5m2|chan_bt|V3": 0.7206687927246094,
+  "fp8_e5m2|chan_bt|V4": 0.9660358428955078,
+  "fp8_e5m2|chan_bt|V5": 0.9609279632568359,
+  "fp8_e5m2|raw|V0": 0.7317886352539062,
+  "fp8_e5m2|raw|V1": 0.7539577484130859,
+  "fp8_e5m2|raw|V2": 0.731170654296875,
+  "fp8_e5m2|raw|V3": 0.7499504089355469,
+  "fp8_e5m2|raw|V4": 1.0185050964355469,
+  "fp8_e5m2|raw|V5": 1.0187339782714844
+ },
+ "v0_reproduction": {
+  "ok": true,
+  "failures": []
+ },
+ "gates": {
+  "alpha": 0.75,
+  "delta_strict": 0.03,
+  "delta_weak": 0.05
+ },
+ "e0b_netzip_on_kv": {
+  "_doc": "NetZIP Zenodo artifact algorithm (port certified byte-identical vs their torch code) on the same captured bf16 KV. Medians per (model,situation,codec); worst_of_all = max across gpt2/qwen2.5-7b/meta-llama-3.1-8b. DECLARED ADAPTATIONS: cross-iteration diff arms N/A for KV; min base = same buffer's 1st percentile.",
+  "key_finding": "The artifact's diff_min arm (float32 subtract of 1st-percentile base, re-cast bf16) is NOT bit-exact invertible on KV-like data: 61.7% of values fail best-effort recovery, 26.2% carry >1% relative error (quantization in disguise). Its exactly-invertible, KV-applicable arms are byte_grouped (== our M1.5 byte_transpose; zlib-6 medians 0.705-0.709 IDENTICAL to ours - mechanism cross-validated) and bit_grouped (0.705-0.745, never better). Under NetZIP's own level-1 LZ4 default: original 1.000 (lz4 no-op on KV, reconfirms M1/NE-2), byte_grouped 0.846-0.851 -> their lightweight-codec design collapses on KV without deflate-class entropy coding. No channel-major arm exists in their algorithm; our chan/chan_bt (0.671-0.704 zlib-6) strictly beats their lossless arms on KV.",
+  "diff_min_invertibility_check": {
+   "fraction_not_bit_exact": 0.6169,
+   "max_rel_err": 1.0,
+   "frac_rel_err_gt_1pct": 0.2619,
+   "note": "synthetic standard-normal bf16 262144 values, best-effort inverse (add base, recast)"
+  },
+  "medians": {
+   "original": {
+    "lz4-1": {
+     "worst_of_all": 1.0001,
+     "per_model": {
+      "gpt2": 1.0001,
+      "meta-llama-3.1-8b": 1.0001,
+      "qwen2.5-7b": 1.0001
+     }
+    },
+    "zlib-1": {
+     "worst_of_all": 0.8076,
+     "per_model": {
+      "gpt2": 0.8076,
+      "meta-llama-3.1-8b": 0.8063,
+      "qwen2.5-7b": 0.8071
+     }
+    },
+    "zlib-6": {
+     "worst_of_all": 0.8,
+     "per_model": {
+      "gpt2": 0.8,
+      "meta-llama-3.1-8b": 0.7986,
+      "qwen2.5-7b": 0.7989
+     }
+    },
+    "zstd-1": {
+     "worst_of_all": 0.7871,
+     "per_model": {
+      "gpt2": 0.7871,
+      "meta-llama-3.1-8b": 0.785,
+      "qwen2.5-7b": 0.7863
+     }
+    }
+   },
+   "byte_grouped": {
+    "lz4-1": {
+     "worst_of_all": 0.8505,
+     "per_model": {
+      "gpt2": 0.8462,
+      "meta-llama-3.1-8b": 0.8505,
+      "qwen2.5-7b": 0.85
+     }
+    },
+    "zlib-1": {
+     "worst_of_all": 0.7272,
+     "per_model": {
+      "gpt2": 0.7268,
+      "meta-llama-3.1-8b": 0.7272,
+      "qwen2.5-7b": 0.7272
+     }
+    },
+    "zlib-6": {
+     "worst_of_all": 0.7087,
+     "per_model": {
+      "gpt2": 0.7052,
+      "meta-llama-3.1-8b": 0.7087,
+      "qwen2.5-7b": 0.7084
+     }
+    },
+    "zstd-1": {
+     "worst_of_all": 0.6899,
+     "per_model": {
+      "gpt2": 0.6899,
+      "meta-llama-3.1-8b": 0.6866,
+      "qwen2.5-7b": 0.6867
+     }
+    }
+   },
+   "bit_grouped": {
+    "lz4-1": {
+     "worst_of_all": 0.7962,
+     "per_model": {
+      "gpt2": 0.7962,
+      "meta-llama-3.1-8b": 0.7643,
+      "qwen2.5-7b": 0.7937
+     }
+    },
+    "zlib-1": {
+     "worst_of_all": 0.7657,
+     "per_model": {
+      "gpt2": 0.7657,
+      "meta-llama-3.1-8b": 0.7259,
+      "qwen2.5-7b": 0.7452
+     }
+    },
+    "zlib-6": {
+     "worst_of_all": 0.7447,
+     "per_model": {
+      "gpt2": 0.7447,
+      "meta-llama-3.1-8b": 0.7051,
+      "qwen2.5-7b": 0.7221
+     }
+    },
+    "zstd-1": {
+     "worst_of_all": 0.7594,
+     "per_model": {
+      "gpt2": 0.7526,
+      "meta-llama-3.1-8b": 0.7201,
+      "qwen2.5-7b": 0.7594
+     }
+    }
+   },
+   "diff_min_encoded": {
+    "lz4-1": {
+     "worst_of_all": 0.9981,
+     "per_model": {
+      "gpt2": 0.9981,
+      "meta-llama-3.1-8b": 0.9968,
+      "qwen2.5-7b": 0.9104
+     }
+    },
+    "zlib-1": {
+     "worst_of_all": 0.6689,
+     "per_model": {
+      "gpt2": 0.6689,
+      "meta-llama-3.1-8b": 0.6639,
+      "qwen2.5-7b": 0.6233
+     }
+    },
+    "zlib-6": {
+     "worst_of_all": 0.6558,
+     "per_model": {
+      "gpt2": 0.6558,
+      "meta-llama-3.1-8b": 0.651,
+      "qwen2.5-7b": 0.6076
+     }
+    },
+    "zstd-1": {
+     "worst_of_all": 0.6533,
+     "per_model": {
+      "gpt2": 0.6383,
+      "meta-llama-3.1-8b": 0.6533,
+      "qwen2.5-7b": 0.4564
+     }
+    }
+   },
+   "diff_min_byte_grouped": {
+    "lz4-1": {
+     "worst_of_all": 0.6677,
+     "per_model": {
+      "gpt2": 0.6578,
+      "meta-llama-3.1-8b": 0.6677,
+      "qwen2.5-7b": 0.5231
+     }
+    },
+    "zlib-1": {
+     "worst_of_all": 0.5856,
+     "per_model": {
+      "gpt2": 0.5729,
+      "meta-llama-3.1-8b": 0.5856,
+      "qwen2.5-7b": 0.5182
+     }
+    },
+    "zlib-6": {
+     "worst_of_all": 0.5517,
+     "per_model": {
+      "gpt2": 0.541,
+      "meta-llama-3.1-8b": 0.5517,
+      "qwen2.5-7b": 0.4915
+     }
+    },
+    "zstd-1": {
+     "worst_of_all": 0.5556,
+     "per_model": {
+      "gpt2": 0.5478,
+      "meta-llama-3.1-8b": 0.5556,
+      "qwen2.5-7b": 0.3556
+     }
+    }
+   },
+   "diff_min_bit_grouped": {
+    "lz4-1": {
+     "worst_of_all": 0.6287,
+     "per_model": {
+      "gpt2": 0.6049,
+      "meta-llama-3.1-8b": 0.6287,
+      "qwen2.5-7b": 0.451
+     }
+    },
+    "zlib-1": {
+     "worst_of_all": 0.5975,
+     "per_model": {
+      "gpt2": 0.5848,
+      "meta-llama-3.1-8b": 0.5975,
+      "qwen2.5-7b": 0.4215
+     }
+    },
+    "zlib-6": {
+     "worst_of_all": 0.5646,
+     "per_model": {
+      "gpt2": 0.5476,
+      "meta-llama-3.1-8b": 0.5646,
+      "qwen2.5-7b": 0.3843
+     }
+    },
+    "zstd-1": {
+     "worst_of_all": 0.5662,
+     "per_model": {
+      "gpt2": 0.5605,
+      "meta-llama-3.1-8b": 0.5662,
+      "qwen2.5-7b": 0.4156
+     }
+    }
+   }
+  }
+ },
+ "provenance": {
+  "contract": "refine-logs/EVALUATION_CONTRACT_E0.md (pre-registered 2026-07-15 before any number)",
+  "corpora": {
+   "gpt2": "e0_outputs/e0_gpt2.jsonl (96 rows)",
+   "qwen2.5-7b": "e0_outputs/e0_qwen7b.jsonl (72 rows)",
+   "meta-llama-3.1-8b": "e0_outputs/e0_llama31_8b.jsonl (144 rows)",
+   "synthetic": "e0_outputs/e0_synth.jsonl (384 rows)",
+   "netzip": "e0_outputs/netzip_*.jsonl (432+288+576 rows)"
+  },
+  "capture_protocol": "identical to m1_6 (prefill, seq_len 512, layer_fracs 0/0.5/1, K+V, chunks 256KB/1MB, <=3/config), HF offline from cache, myDevbox",
+  "netzip_artifact": "github.com/ece-fast-lab/MICRO-2025-NetZIP @ Zenodo 10.5281/zenodo.16976212 (MIT); port equivalence: check_netzip_equivalence.py all OK",
+  "date": "2026-07-15",
+  "unit_tests": 61
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "gpt2|bf16|byte_transpose": 0.705,
+ "gpt2|bf16|chan_bt": 0.697,
+ "gpt2|bf16|raw": 0.8,
+ "gpt2|fp8_e5m2|chan": 0.724,
+ "gpt2|fp8_e5m2|raw": 0.731,
+ "meta-llama-3.1-8b|bf16|byte_transpose": 0.709,
+ "meta-llama-3.1-8b|bf16|chan_bt": 0.69,
+ "meta-llama-3.1-8b|bf16|raw": 0.799,
+ "meta-llama-3.1-8b|fp8_e5m2|chan": 0.699,
+ "meta-llama-3.1-8b|fp8_e5m2|raw": 0.73,
+ "qwen2.5-7b|bf16|byte_transpose": 0.708,
+ "qwen2.5-7b|bf16|chan_bt": 0.671,
+ "qwen2.5-7b|bf16|raw": 0.799,
+ "qwen2.5-7b|fp8_e5m2|chan": 0.704,
+ "qwen2.5-7b|fp8_e5m2|raw": 0.732
+}

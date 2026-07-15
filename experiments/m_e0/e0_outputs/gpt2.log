@@ -1,0 +1,107 @@
+Traceback (most recent call last):
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+        pool_request.request
+    )
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 101, in handle_request
+    raise exc
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 78, in handle_request
+    stream = self._connect(request)
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 124, in _connect
+    stream = self._network_backend.connect_tcp(**kwargs)
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpcore/_backends/sync.py", line 207, in connect_tcp
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/usr/local/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectTimeout: [Errno 110] Connection timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m_e0/run_e0.py", line 257, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m_e0/run_e0.py", line 244, in main
+    summary = capture_real_kv(
+        model_name=args.model, out_path=args.out, dtypes=args.dtypes, chunk_sizes=args.chunk_sizes,
+        methods=args.methods, layer_fracs=args.layer_fracs, phases=args.phases, seq_len=args.seq_len,
+        max_new_tokens=args.max_new_tokens, max_chunks_per_config=args.max_chunks_per_config,
+    )
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m_e0/run_e0.py", line 137, in capture_real_kv
+    tok = AutoTokenizer.from_pretrained(model_name)
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/transformers/models/auto/tokenization_auto.py", line 842, in from_pretrained
+    return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/transformers/tokenization_utils_base.py", line 1673, in from_pretrained
+    for template in list_repo_templates(
+                    ~~~~~~~~~~~~~~~~~~~^
+        pretrained_model_name_or_path,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        token=token,
+        ^^^^^^^^^^^^
+    ):
+    ^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/transformers/utils/hub.py", line 149, in list_repo_templates
+    for entry in hf_api().list_repo_tree(
+                 ~~~~~~~~~~~~~~~~~~~~~~~^
+        repo_id=repo_id,
+        ^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        token=token,
+        ^^^^^^^^^^^^
+    )
+    ^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/huggingface_hub/hf_api.py", line 3922, in list_repo_tree
+    for path_info in paginate(path=tree_url, headers=headers, params={"recursive": recursive, "expand": expand}):
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/huggingface_hub/utils/_pagination.py", line 35, in paginate
+    r = session.get(path, params=params, headers=headers)
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1053, in get
+    return self.request(
+           ~~~~~~~~~~~~^
+        "GET",
+        ^^^^^^
+    ...<7 lines>...
+        extensions=extensions,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+        request,
+    ...<2 lines>...
+        history=[],
+    )
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+        request,
+        follow_redirects=follow_redirects,
+        history=history,
+    )
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/data00/home/wanli.99/wr-zipguard/experiments/m1/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectTimeout: [Errno 110] Connection timed out
