@@ -1,0 +1,83 @@
+experiments/m_e0/E0_REPORT.md
+  s_730f6dc8c15bb7::t_55ad96f36a27ad 1-80
+experiments/m_e0/README.md
+  s_730f6dc8c15bb7::t_8f5abe17bf6bc9 1-28
+experiments/m_e0/analyze_e0.py
+  s_730f6dc8c15bb7::t_bc71a43df44b5d 1-148
+experiments/m_e0/check_netzip_equivalence.py
+  s_730f6dc8c15bb7::t_213ac7f99a4330 1-61
+experiments/m_e0/e0_codecs.py
+  s_730f6dc8c15bb7::t_160fbedc4bcf17 1-69
+experiments/m_e0/e0_outputs/e0_gpt2.jsonl
+  s_730f6dc8c15bb7::t_0ad5050f9802bf 1-96
+experiments/m_e0/e0_outputs/e0_llama31_8b.jsonl
+  s_730f6dc8c15bb7::t_94c31657ebd958 1-144
+experiments/m_e0/e0_outputs/e0_qwen7b.jsonl
+  s_730f6dc8c15bb7::t_26dfddac14dbf8 1-72
+experiments/m_e0/e0_outputs/e0_synth.jsonl
+  s_730f6dc8c15bb7::t_149bc375200d2b 1-384
+experiments/m_e0/e0_outputs/e0_verdict.json
+  s_730f6dc8c15bb7::t_1f0e92f32e5aca 1-276
+experiments/m_e0/e0_outputs/gpt2.log
+  s_730f6dc8c15bb7::t_822b60869c175d 1-107
+experiments/m_e0/e0_outputs/llama.log
+  s_730f6dc8c15bb7::t_cedf16c607897e 1-2
+experiments/m_e0/e0_outputs/netzip_gpt2.jsonl
+  s_730f6dc8c15bb7::t_5b43accf99840d 1-432
+experiments/m_e0/e0_outputs/netzip_llama31_8b.jsonl
+  s_730f6dc8c15bb7::t_b58554d1ac0af1 1-576
+experiments/m_e0/e0_outputs/netzip_qwen7b.jsonl
+  s_730f6dc8c15bb7::t_52d4f9fe2eaa66 1-288
+experiments/m_e0/e0_outputs/qwen7b.log
+  s_730f6dc8c15bb7::t_b00b9b8befbd49 1-2
+experiments/m_e0/e0_results.json
+  s_730f6dc8c15bb7::t_1c9a02766efcf2 1-312
+experiments/m_e0/locked_reference.json
+  s_730f6dc8c15bb7::t_e795b00dd40889 1-17
+experiments/m_e0/measure_e0.py
+  s_730f6dc8c15bb7::t_78fa7ddbac5d52 1-41
+experiments/m_e0/netzip_kv.py
+  s_730f6dc8c15bb7::t_253d81b868aee6 1-116
+experiments/m_e0/run_e0.py
+  s_730f6dc8c15bb7::t_f36ccde08ace09 1-257
+experiments/m_e0/run_netzip.py
+  s_730f6dc8c15bb7::t_1a8bb37c99748f 1-98
+experiments/m_e0/tests/conftest.py
+  s_730f6dc8c15bb7::t_a9cb8a0ffa1033 1-13
+experiments/m_e0/tests/test_analyze_e0.py
+  s_730f6dc8c15bb7::t_4ec23748dd4037 1-168
+experiments/m_e0/tests/test_e0_codecs.py
+  s_730f6dc8c15bb7::t_170cf4f1d543bd 1-129
+experiments/m_e0/tests/test_measure_e0.py
+  s_730f6dc8c15bb7::t_a68574b27c9f6d 1-46
+experiments/m_e0/tests/test_netzip_kv.py
+  s_730f6dc8c15bb7::t_53c654aad78cb0 1-86
+experiments/m_e0/tests/test_run_e0.py
+  s_730f6dc8c15bb7::t_bbe638840af6f4 1-49
+experiments/m_e0/tests/test_run_netzip.py
+  s_730f6dc8c15bb7::t_53998a0a9f45c6 1-23
+idea-stage/evidence/2026-07-15-iscas-survey/README.md
+  s_730f6dc8c15bb7::t_4b1ac315193470 1-55
+idea-stage/evidence/2026-07-15-iscas-survey/survey-workflow-reports.json
+  s_730f6dc8c15bb7::t_f905c1c29e835d 1-959
+refine-logs/EVALUATION_CONTRACT_E0.md
+  s_730f6dc8c15bb7::t_65b1ca2bf28b3a 1-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "70cc0890a3b14a2b071e2370a1b2891841281836",
+  "prompts": {},
+  "sessions": {
+    "s_730f6dc8c15bb7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2140b9a7-5123-45b5-b7a9-148e9e81be37",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
