@@ -82,9 +82,9 @@
   </tr>
   <tr>
     <td><span class="slt">C</span></td><td>doorbell L0 + 内存胶水</td>
-    <td><span class="st todo">未开始</span></td>
-    <td>报告待建</td>
-    <td>垫片 RTL 与驱动方无关(仿真 TB / 板上 jtag_axi 同一份);SQ 位域打包是首个预期故障点</td>
+    <td><span class="st pass">PASS · 07-17</span></td>
+    <td><a href="https://claude.ai/code/artifact/325d9489-6908-4831-9c7c-0713ff603199">🧪 Stage C 报告</a></td>
+    <td>一次 AXI-Lite 写走完 WRITE 全环(64B/8K/12K,TX→RX 直连自话);帧与 Stage B golden 逐字节一致(ICRC 同值);MIDDLE 首覆盖 + 非对齐 placement(偏移 8,两拍跨字);逐包 ACK 事实;对抗审查 2 发现已修(提交时刻快照 + TB retrans 模型拍偏移)</td>
   </tr>
   <tr>
     <td><span class="slt">D</span></td><td>载体集成 + 综合</td>
@@ -109,6 +109,8 @@
   <tr><td class="mono">07-16</td><td><strong>代码基线钉死</strong>:fns @ coyote-TCP-RDMA <code>20633d03</code>;自带 TB 弃用,自建 TB 为 golden 激励原型;RETRANS_EN 本分支默认开(勘误)</td><td>Stage A 实验(报告 §4/§6)</td></tr>
   <tr><td class="mono">07-17</td><td><strong>Stage C 三条硬规范确立</strong>:SQ 打包按 txMeta 结构体声明序(raddr 在前);WQE 提交后 payload 主动推流;大 WR 在 doorbell 内预切分 FIRST/…/LAST</td><td>Stage B 实验(报告 §6 B2/B3/B4)</td></tr>
   <tr><td class="mono">07-17</td><td><strong>crc_drop 计数器在本分支恒 0</strong>(crc.hpp:39 无条件 DISABLE_CRC_CHECK,RX 不校验 ICRC);TX 侧 ICRC 真实且经参考实现互证</td><td>Stage B 实验(报告 §6 B5)</td></tr>
+  <tr><td class="mono">07-17</td><td><strong>L0 边界确立</strong>:WRITE-only、pusher 源地址 64B 对齐、doorbell 忙时软件轮询 busy;吞吐/延迟扫频不归 L0(JTAG/AXI-Lite 逐条驱动)。集成单元 = <code>roce_l0_top</code>(一 AXI-Lite 从口 + 一对 512b AXIS + mem 口)</td><td>Stage C 实验(报告 §6/§7)</td></tr>
+  <tr><td class="mono">07-17</td><td><strong>提交时刻快照纪律</strong>:metaIntf beat 与多段 WR 的 pid/vfid/last 必须在提交时锁存(允许合法的 WQE 预编程);<strong>响应方逐包 ACK</strong>(>PMTU 每 4096B 一个 48B ACK)→ 对端合并 ACK 情形归 CX-5 互操作检查单</td><td>Stage C 审查 C-R1 + 实验发现 C4</td></tr>
 </table></div>
 
 <div class="rules"><strong>报告纪律(各阶段报告共同遵守):</strong>① 报告结构 = 回答什么问题 / 原理 / 装置(Setup)/ 做了什么 / 结果怎么看 / 发现与有效性边界 / 结论与移交;② 数字与输出必须可溯源到 myDevbox 工件;③ 发现回填手册故障表,决策回填手册 §6 并在本页摘要登记;④ PASS 判定对照手册通过标准逐条勾对,并经独立复核。</div>

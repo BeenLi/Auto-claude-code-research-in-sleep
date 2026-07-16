@@ -308,7 +308,7 @@ L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
 
 <!-- ============================ §5 ============================ -->
 <h2 id="sec-5"><span class="secno">§5</span>集成阶段与测试通路</h2>
-<p class="lede">五个阶段,每阶段五件套:目标 / 前置 / 操作 / 通过标准 / 常见故障。严格 stage-gate:上一阶段的通过标准没绿,不进下一阶段。Stage A–D 零板卡依赖,今天就能开工;Stage E 等 DAC 线 + hw_server。<strong>每个阶段的实验独立成报告</strong>(结构:回答什么问题 / 原理 / 装置 / 做了什么 / 结果怎么看 / 发现与边界 / 结论与移交),入口见 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《阶段索引》</a>;已完成:<a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">🧪 Stage A 报告(PASS)</a> · <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 报告(PASS)</a>。本手册是标准,报告是证据。</p>
+<p class="lede">五个阶段,每阶段五件套:目标 / 前置 / 操作 / 通过标准 / 常见故障。严格 stage-gate:上一阶段的通过标准没绿,不进下一阶段。Stage A–D 零板卡依赖,今天就能开工;Stage E 等 DAC 线 + hw_server。<strong>每个阶段的实验独立成报告</strong>(结构:回答什么问题 / 原理 / 装置 / 做了什么 / 结果怎么看 / 发现与边界 / 结论与移交),入口见 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《阶段索引》</a>;已完成:<a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">🧪 Stage A 报告(PASS)</a> · <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 报告(PASS)</a> · <a href="https://claude.ai/code/artifact/325d9489-6908-4831-9c7c-0713ff603199">🧪 Stage C 报告(PASS)</a>。本手册是标准,报告是证据。</p>
 
 <!-- Stage A -->
 <div class="stage" id="stage-a">
@@ -365,7 +365,9 @@ L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
 <!-- Stage C -->
 <div class="stage" id="stage-c">
   <div class="stage-head"><div class="stage-letter">C</div><div><h3>doorbell L0 + 内存胶水</h3><div class="stage-sub">零硬件 · 预计 1–2 周</div></div></div>
-  <div class="stage-body"><dl class="fivepart">
+  <div class="stage-body">
+  <div class="callout pass"><span class="tag">已完成 · 07-17</span>全部通过标准达成(64B/8K/12K 三规模全环、帧与 Stage B golden 逐字节一致、计数器 AXI-Lite 互证),外加 MIDDLE 首覆盖、非对齐 placement、魔数警戒、mid-WR 突变探针四项超标证据,见 <a href="https://claude.ai/code/artifact/325d9489-6908-4831-9c7c-0713ff603199">🧪 Stage C 实验报告</a>(含完整寄存器映射 = Stage E 的 run_hw_axi 驱动文档)。集成单元 <code>roce_l0_top</code> 三模块入库 <code>platform-stage/stage_c_sim/</code>;工件 myDevbox:<code>~/roce-rtl-sim/rtl/l0/</code>。实际未踩中本表预测故障(三条硬规范前置生效);新增两行实测条目见下。</div>
+  <dl class="fivepart">
     <dt>目标</dt><dd>造齐"surrounding modules":AXI-Lite doorbell 垫片(L0)+ QP 配置写入器 + staging 内存,仿真级全链路由一次 AXI-Lite 写(板上由 JTAG-to-AXI Master 驱动,见 Stage D/E)发起。垫片逻辑与"谁驱动 AXI-Lite"无关——同一份 RTL 在仿真里由 TB 驱动、板上由 <code>jtag_axi</code> 驱动。</dd>
     <dt>前置</dt><dd>Stage B 通过 ✓(golden 帧库 + 校验脚本已入库 <code>platform-stage/stage_b_sim/</code>)。<strong>三条硬规范(Stage B 报告 §7)</strong>:① SQ 打包按 txMeta 结构体声明序(raddr@[119:56] 在前);② WQE 提交后 payload 主动推流;③ 大 WR 预切分 FIRST/MIDDLE/LAST。</dd>
     <dt>操作</dt><dd><ol>
@@ -380,7 +382,9 @@ L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
       <tr><td>WR 推入后无反应</td><td>SQ 位域打包与 roce_stack.sv 期望不符(VITIS_HLS 布局有 32-bit 偏移)</td><td>§8 速查表逐位核;先在 TB 里 assert 打包函数</td></tr>
       <tr><td>payload 取数长度错</td><td>vaddr/len/ctl 字段序或位宽</td><td>对照 <code>rd_cmd_data</code> 解包代码(vaddr[0+:VADDR], len[VADDR+:LEN], ctl)</td></tr>
       <tr><td>QP 建立后首包即被丢</td><td>QP 状态/PSN 初值未配或不一致</td><td>两侧(同一栈内 TX/RX)PSN 初值一致性检查</td></tr>
-      <tr><td>QP 配置写入后 QP 始终不进 READY_SEND、无任何报错</td><td><code>qpContext.virtual_address</code> 恰为魔数 <code>0xDEADBEEF</code>/<code>0xFEEDBEEF</code>——本分支把 vaddr 复用作"只更新 rkey / 只更新 remote PSN"的带内操作码,命中即静默降级为部分更新(<code>ib_transport_protocol.cpp:2120-2131</code>)</td><td>QP 配置写入器避开这两个值;按三表语义写(state/MSN/conn,rkey 实际存 MSN 表,详见 Stage A 报告发现 5)</td></tr>
+      <tr><td>QP 配置写入后 QP 始终不进 READY_SEND、无任何报错</td><td><code>qpContext.virtual_address</code> 恰为魔数 <code>0xDEADBEEF</code>/<code>0xFEEDBEEF</code>——本分支把 vaddr 复用作"只更新 rkey / 只更新 remote PSN"的带内操作码,命中即静默降级为部分更新(<code>ib_transport_protocol.cpp:2120-2131</code>)</td><td>QP 配置写入器避开这两个值;按三表语义写(state/MSN/conn,rkey 实际存 MSN 表,详见 Stage A 报告发现 5)。Stage C 已内建 STATUS 警戒位(命中置位,W1C)</td></tr>
+      <tr><td><strong>(实测·审查抓获)</strong>多段 WR 进行中主机改写 WQE/QP 寄存器 → 在途段 BTH 目的 QP 漂移 / last 位丢失(无 CQE),或 metaIntf beat 在 valid 期间被改</td><td>寄存器组合直驱 dreq/beat,违反 valid 期间数据稳定纪律;串行化 TB 踩不中,Stage D/E 的 PCIe/脚本主机可以</td><td>提交时刻快照(doorbell 敲响锁 pid/vfid/last,SUBMIT 锁 184b)——Stage C 已内建并以 mid-WR 突变探针回归;驱动侧因此可合法预编程下一个 WQE</td></tr>
+      <tr><td><strong>(实测·行为事实)</strong>>PMTU 消息 ACK 帧数 = 数据包数(逐包 ACK,8K→2、12K→3),CQE 仍只一个</td><td>本分支响应方逐包回 ACK,不合并</td><td>非故障;环回无害。对端(CX-5)可能合并 ACK → 请求方 ACK 消化逻辑归互操作检查单验证</td></tr>
     </table></div></dd>
   </dl></div>
 </div>

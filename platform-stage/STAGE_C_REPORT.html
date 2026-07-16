@@ -1,0 +1,320 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage C 实验报告 · doorbell L0 + 内存胶水</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.8; margin: 0; font-size: 15px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  main { max-width: 920px; margin: 0 auto; padding: 36px 24px 96px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 27px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 68ch; margin: 0 0 14px; }
+  .verdict { display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: .08em; color: var(--pass); background: var(--pass-soft); border: 1px solid color-mix(in srgb, var(--pass) 40%, transparent); border-radius: 6px; padding: 3px 12px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+  pre code { background: none; padding: 0; }
+  h2 { font-size: 19px; margin: 48px 0 12px; padding-top: 14px; border-top: 2px solid var(--line); }
+  h2 .no { font-family: var(--mono); color: var(--accent-ink); margin-right: 8px; font-size: 15px; }
+  h3 { font-size: 15.5px; margin: 26px 0 8px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .callout.pass { border-left-color: var(--pass); }
+  .callout.pass .tag { color: var(--pass); }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.warn .tag { color: var(--warn); }
+  .finding { margin: 18px 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .finding .fid { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .finding .ftitle { font-weight: 700; }
+  .finding p { margin: 8px 0 0; font-size: 14px; }
+  .figbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 18px 0; overflow-x: auto; }
+  .figcap { font-size: 12.5px; color: var(--muted); margin-top: 10px; font-family: var(--mono); }
+  .st { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+  .st.pass { color: var(--pass); background: var(--pass-soft); font-weight: 700; }
+  .st.fixed { color: var(--warn); background: var(--warn-soft); font-weight: 700; }
+  ul, ol { padding-left: 1.4em; }
+  li { margin: 5px 0; }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+  .toc { font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 18px; margin: 20px 0; }
+  .toc a { border-bottom: none; }
+  .toc span { color: var(--muted); margin: 0 6px; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 实验报告</div>
+  <h1>Stage C:doorbell L0 + 内存胶水 —— 一次 AXI-Lite 写,走完 WRITE 全环</h1>
+  <p class="hero-sub">自造三件 surrounding modules(AXI-Lite doorbell 垫片、URAM staging、placement 写入器),把 Stage B 验证过的 <code>roce_stack</code> 变成"寄存器可驱动"的部件:主机侧只做 AXI-Lite 读写(= 板上 <code>run_hw_axi</code> 的动作),TX→RX 直连环回,单栈自话完成 取数→分段→打包→回灌→放置→ACK→CQE。</p>
+  <span class="verdict">PASS · 2026-07-17</span>
+</header>
+
+<div class="toc">
+  <a href="#s1">1 回答什么问题</a><span>·</span>
+  <a href="#s2">2 原理</a><span>·</span>
+  <a href="#s3">3 装置</a><span>·</span>
+  <a href="#s4">4 做了什么</a><span>·</span>
+  <a href="#s5">5 结果怎么看</a><span>·</span>
+  <a href="#s6">6 发现与边界</a><span>·</span>
+  <a href="#s7">7 结论与移交</a>
+</div>
+
+<h2 id="s1"><span class="no">§1</span>回答什么问题</h2>
+<p>Stage B 证明了协议引擎本身正确,但驱动它的是 TB 直插 metaIntf 的"上帝之手"。Stage C 回答三个问题:</p>
+<ol>
+  <li><strong>主机视角够不够?</strong> 板上唯一的驱动通道是 JTAG-to-AXI(用户约束:无 PCIe)。一次 AXI-Lite 写发起的 WR,能否走完全环并且<em>仅凭 AXI-Lite 读回</em>(计数器 / CQE / placement 数据)判定正确?</li>
+  <li><strong>自造的 surrounding modules 对不对?</strong> fns README 明说周边模块需用户自造。doorbell 预切分、payload 主动推流、非对齐 placement——这三件正是 Stage B 三条硬规范(B2/B3/B4)的落实处。落实得对不对,用 golden 传递性检验:同签名输入,输出帧必须与 Stage B 逐字节一致。</li>
+  <li><strong>>PMTU 的完整覆盖。</strong> Stage B 只测了 FIRST/LAST(8KB);MIDDLE(12KB 中段)从未在 RTL 上跑过——切分 FSM 与栈内 PSN/placement 追踪在三段情形下是否正确?</li>
+</ol>
+
+<h2 id="s2"><span class="no">§2</span>原理</h2>
+<h3>L0 doorbell:寄存器堆替代 WQE-fetch 机器</h3>
+<p>真 RNIC 的前端是"host DRAM 放 SQ ring + doorbell 通知 + 硬件 DMA 取 WQE";<code>roce_stack</code> 的 <code>s_rdma_sq</code> 是推入式 metaIntf 流,没有取数机器。L0 用 AXI-Lite 寄存器堆补位:WQE 字段各占一个寄存器,写 <code>DOORBELL</code> 寄存器即提交。这决定了它<strong>与驱动方无关</strong>——仿真里 TB 写,板上 <code>jtag_axi</code> 写,同一份 RTL。也决定了它测不了吞吐(逐条敲门被 AXI-Lite/JTAG 速度主导),这是手册早已声明的 L0 边界。</p>
+<h3>golden 传递性:三级同帧</h3>
+<p>Stage A(csim)→ Stage B(RTL 直驱)→ Stage C(AXI-Lite 全链)用同一套签名值(QPN/PSN/RKEY/RADDR/payload)。协议引擎是确定性的:若周边模块无损地重现了 Stage B 的输入时序语义,输出帧必须逐字节相同,ICRC 相同。任何一字节漂移都指向新造模块的缺陷。这比自造期望值严苛得多,也是"三条硬规范是否真正落实"的最强检验。</p>
+<h3>TX→RX 直连:Stage E 的仿真彩排</h3>
+<p>Stage B 的回灌是捕获后手工注入;Stage C 直接把 <code>m_axis_tx</code> 连到 <code>s_axis_rx</code>——这正是 QSFP0═DAC═QSFP1 环回的仿真化身。单栈自话:请求方发 WRITE,响应方(同一栈)收包、放置、回 ACK;ACK 环回给请求方,出 CQE。全程无人工干预,事件链的每一环都在计数器上留痕。</p>
+<h3>非对齐 placement:协议决定地址,胶水消化偏移</h3>
+<p>placement 的目的地址来自 RETH VA(协议侧语义),内存胶水无权要求对齐。签名 RADDR <code>0x334455667788</code> mod 256KiB = <code>0x27788</code>,字内偏移 8——每个 64B 密集数据拍要按字节旋转后分裂成 56/8 两拍跨字写(字节使能)。发送侧则相反:payload 源地址由软件控制,L0 约束其 64B 对齐,省去读侧桶形移位。</p>
+
+<h2 id="s3"><span class="no">§3</span>装置(Setup)</h2>
+
+<div class="figbox">
+<svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,monospace" font-size="11.5">
+  <defs>
+    <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/>
+    </marker>
+    <marker id="arrA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--accent)"/>
+    </marker>
+  </defs>
+  <!-- TB host -->
+  <rect x="14" y="120" width="132" height="86" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="80" y="150" text-anchor="middle" fill="var(--accent-ink)" font-weight="bold">TB = host</text>
+  <text x="80" y="168" text-anchor="middle" fill="var(--accent-ink)">AXI-Lite 主机任务</text>
+  <text x="80" y="186" text-anchor="middle" fill="var(--accent-ink)">(板上: jtag_axi)</text>
+  <!-- doorbell -->
+  <rect x="196" y="84" width="176" height="160" rx="8" fill="var(--surface-2)" stroke="var(--ink)"/>
+  <text x="284" y="108" text-anchor="middle" fill="var(--ink)" font-weight="bold">rdma_doorbell_l0</text>
+  <text x="284" y="128" text-anchor="middle" fill="var(--muted)">寄存器堆 0x00–0xB0</text>
+  <text x="284" y="146" text-anchor="middle" fill="var(--muted)">QP/conn 写入器(快照)</text>
+  <text x="284" y="164" text-anchor="middle" fill="var(--muted)">WQE 切分 FSM</text>
+  <text x="284" y="182" text-anchor="middle" fill="var(--muted)">FIRST/MIDDLE/LAST</text>
+  <text x="284" y="200" text-anchor="middle" fill="var(--muted)">计数器 ×11 + 魔数警戒</text>
+  <text x="284" y="226" text-anchor="middle" fill="var(--muted)">staging 窗口译码</text>
+  <!-- roce_stack -->
+  <rect x="470" y="84" width="180" height="160" rx="8" fill="var(--surface-2)" stroke="var(--ink)"/>
+  <text x="560" y="110" text-anchor="middle" fill="var(--ink)" font-weight="bold">roce_stack</text>
+  <text x="560" y="128" text-anchor="middle" fill="var(--muted)">(Stage B 验证,含</text>
+  <text x="560" y="144" text-anchor="middle" fill="var(--muted)">STAGE-B FIX + icrc)</text>
+  <text x="560" y="170" text-anchor="middle" fill="var(--muted)">rocev2_ip · rdma_flow</text>
+  <text x="560" y="188" text-anchor="middle" fill="var(--muted)">mux_retrans · trimmer</text>
+  <!-- staging -->
+  <rect x="196" y="290" width="300" height="86" rx="8" fill="var(--surface-2)" stroke="var(--ink)"/>
+  <text x="346" y="314" text-anchor="middle" fill="var(--ink)" font-weight="bold">rdma_uram_staging(512b × 4096 = 256 KiB)</text>
+  <text x="346" y="334" text-anchor="middle" fill="var(--muted)">A口: host 窗口(预载/读回)</text>
+  <text x="346" y="352" text-anchor="middle" fill="var(--muted)">B口: pusher 读 + placement 写(写优先仲裁)</text>
+  <!-- retrans model -->
+  <rect x="700" y="290" width="164" height="66" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="5 4"/>
+  <text x="782" y="316" text-anchor="middle" fill="var(--muted)">retrans buffer</text>
+  <text x="782" y="334" text-anchor="middle" fill="var(--muted)">行为模型(TB)</text>
+  <!-- loopback -->
+  <path d="M650 120 H 820 V 200 H 650" fill="none" stroke="var(--accent)" stroke-width="1.8" marker-end="url(#arrA)"/>
+  <text x="742" y="112" text-anchor="middle" fill="var(--accent-ink)" font-weight="bold">m_axis_tx → s_axis_rx 直连环回</text>
+  <text x="742" y="176" text-anchor="middle" fill="var(--accent-ink)">(= QSFP0═DAC═QSFP1)</text>
+  <!-- arrows -->
+  <line x1="146" y1="163" x2="192" y2="163" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="169" y="155" text-anchor="middle" fill="var(--muted)">AXI-Lite</text>
+  <line x1="372" y1="120" x2="466" y2="120" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="419" y="112" text-anchor="middle" fill="var(--muted)">qp / conn / sq</text>
+  <line x1="466" y1="160" x2="372" y2="160" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="419" y="152" text-anchor="middle" fill="var(--muted)">m_rdma_ack</text>
+  <line x1="284" y1="244" x2="284" y2="286" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="256" y="268" text-anchor="middle" fill="var(--muted)">A口窗口</text>
+  <path d="M420 290 V 262 H 500 V 248" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="452" y="257" fill="var(--muted)">payload 推流</text>
+  <path d="M610 248 V 268 H 496 V 302" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="620" y="266" fill="var(--muted)">wr_req + 数据 → placement</text>
+  <path d="M650 226 H 700 V 290" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <text x="700" y="256" fill="var(--muted)">mem 口</text>
+</svg>
+<div class="figcap">图 1 · Stage C 装置:主机(TB / 板上 jtag_axi)只触碰 AXI-Lite;doorbell 拆出控制面,staging 承担数据面两端(源与目的);TX→RX 直连使单栈同时扮演请求方与响应方。虚线 = 本阶段留在 TB 的 retrans buffer 行为模型。</div>
+</div>
+
+<h3>组件与角色</h3>
+<div class="tablebox"><table>
+  <tr><th>部件</th><th>性质</th><th>职责</th></tr>
+  <tr><td class="mono">rdma_doorbell_l0.sv</td><td>新 RTL(可综合)</td><td>AXI-Lite 从口;QP/conn 配置写入器(提交时刻 184b 快照);WQE 预切分 FSM(硬规范③);魔数警戒位;11 个计数器读回;staging 窗口译码</td></tr>
+  <tr><td class="mono">rdma_uram_staging.sv</td><td>新 RTL(可综合)</td><td>URAM 512b×4096 真双口;A口 = host 窗口;B口 = payload 推流引擎(硬规范②)+ 非对齐 placement 写入器(两拍跨字,写优先仲裁)</td></tr>
+  <tr><td class="mono">roce_l0_top.sv</td><td>新 RTL(可综合)</td><td>垫片 + 栈的顶层 = Stage D 塞进 app_block 的单元;READ 不支持(计数并吞掉 fetch 命令)</td></tr>
+  <tr><td class="mono">tb_stage_c.sv</td><td>TB</td><td>AXI-Lite 主机任务(= run_hw_axi 逐字排练);TX→RX 直连;TX 帧记录;retrans buffer 行为模型;自检(placement 读回比对 + 计数器断言)</td></tr>
+  <tr><td class="mono">check_stage_c.py</td><td>离线校验</td><td>帧重组 + ICRC 独立复算 + 对拍 Stage B golden;12KB 走结构化校验(opcode/PSN/RETH/payload)</td></tr>
+  <tr><td class="mono">roce_stack + HLS RTL</td><td>复用(Stage B)</td><td>协议引擎,含 STAGE-B FIX(SQ 重打包按结构体声明序)与 SIM_ZERO_INIT 补丁,一字未动</td></tr>
+</table></div>
+
+<h3>寄存器映射(AXI-Lite,24b 地址;<code>addr[23]=1</code> → staging 窗口)</h3>
+<div class="tablebox"><table>
+  <tr><th>地址</th><th>寄存器</th><th>说明</th></tr>
+  <tr><td class="mono">0x000 / 0x004</td><td class="mono">ID / STATUS</td><td>ID=0x0C1A_0001;STATUS = {warn_magic, db_busy},bit1 写 1 清零(W1C)</td></tr>
+  <tr><td class="mono">0x010–0x02C</td><td class="mono">QP_*, QP_SUBMIT</td><td>state/qpn/rpsn/lpsn/rkey/vaddr(48b 分两写);SUBMIT 时打 184b 快照推 <code>s_rdma_qp_interface</code>;vaddr 命中 0xDEADBEEF/0xFEEDBEEF 置警戒位(带内部分更新魔数,手册 Stage C 故障表)</td></tr>
+  <tr><td class="mono">0x030–0x04C</td><td class="mono">CONN_*, CONN_SUBMIT</td><td>local qpn / remote qpn / remote IP(128b 四写)/ UDP port;SUBMIT 快照推 conn 表</td></tr>
+  <tr><td class="mono">0x050–0x070</td><td class="mono">WQE_*, DOORBELL</td><td>opcode/qpn(pid+vfid)/laddr/raddr(各 48b)/len/ctrl(last);写 DOORBELL 启动切分 FSM(忙时静默忽略——软件先轮询 busy)</td></tr>
+  <tr><td class="mono">0x080–0x0AC</td><td class="mono">CNT_*, LAST_ACK</td><td>栈五计数器(ibv_tx/rx, crc_drop, psn_drop, retrans)+ 垫片六计数器(sq/cqe/wr_req/rd_req/tx_frm/rx_frm)+ 原始 32b ack_t</td></tr>
+  <tr><td class="mono">0x800000+</td><td class="mono">STAGING 窗口</td><td>256 KiB 逐字读写(wstrb 字节使能);payload 预载与 placement 读回都走这里</td></tr>
+</table></div>
+
+<h3>签名值与测试用例</h3>
+<p>签名全套沿用 Stage A/B:QPN <code>0x11</code>(pid 17)、PSN₀ <code>0x80ce4e</code>、RKEY <code>0x1234abcd</code>、RADDR <code>0x334455667788</code>、UDP <code>0xc000</code>、本地 IP <code>0x0b01d4d1</code>;payload = <code>0xA0+i</code>(64B)/ <code>i%256</code>(8K/12K)。placement 落点 <code>0x27788</code>(字内偏移 8,非对齐)。</p>
+<div class="tablebox"><table>
+  <tr><th>用例</th><th>覆盖</th><th>判定手段</th></tr>
+  <tr><td class="mono">c_write64</td><td>WRITE_ONLY 全环 + golden 传递性</td><td>帧 vs Stage B write64 F0 逐字节;ACK vs rx_loop F1 逐字节;placement 读回;计数器断言</td></tr>
+  <tr><td class="mono">c_write8k</td><td>切分 FIRST/LAST(硬规范③)</td><td>两数据帧 vs Stage B write8k F0/F1 逐字节;8KB placement 读回</td></tr>
+  <tr><td class="mono">c_write12k</td><td>FIRST/<strong>MIDDLE</strong>/LAST(新覆盖)+ mid-WR 突变探针</td><td>结构化校验(opcode 06/07/08、PSN 连续、RETH 仅 FIRST、DMALen=4096/命令、payload、ICRC);探针后 CQE 与 ack.pid 仍正确</td></tr>
+  <tr><td class="mono">c_magic</td><td>魔数警戒位</td><td>vaddr=0xDEADBEEF → warn=1;W1C 清零;干净 vaddr 不置位</td></tr>
+</table></div>
+
+<h2 id="s4"><span class="no">§4</span>做了什么</h2>
+<ol>
+  <li><strong>设计冻结。</strong>寄存器映射 + 三模块边界 + 三条 L0 约束:payload 源地址 64B 对齐(软件可控,省读侧桶形移位)、READ 不支持、doorbell 忙时打门被忽略(软件轮询 <code>STATUS.busy</code>)。切分 FSM 的每段严格按 Stage B 语义:<code>CMD 被接受 → payload 全推完 → 下一段 CMD</code>,len 为每命令段长(B4),local/remote 地址每段 +4096。</li>
+  <li><strong>RTL 三模块 + TB + 离线校验器</strong>一次成形(约 1100 行)。placement 写入器按"任意字节偏移"设计:每拍按 <code>ptr[5:0]</code> 旋转 + 字节使能,跨字则两拍(B口写优先,pusher 让行)。</li>
+  <li><strong>对抗审查先于首跑。</strong>9 个并行 agent(5 个视角审查:契约缝落实 / xsim 地雷 / AXI-Lite 协议 / 数据通路算术 / TB 与校验器;每条候选发现再派怀疑者对抗验证)。产出:2 条确认(C-R1、C-R2,均 minor,见 §6)、2 条驳回(其中"偏移 40"的驳回顺带抓到一处注释算术错误——正确值是 8)。首跑<em>之前</em>能修的都修了。</li>
+  <li><strong>编译一雷:</strong><code>LIBRARY_PATH</code>(crt1.o,Stage B 老雷)——远端 Stage B 脚本早有 export,但入库副本漂移丢了这行。双向同步修复。</li>
+  <li><strong>首跑即全绿。</strong>c_write64 一次通过全部自检;随后 8k/12k/magic 与三份离线 golden 校验一次通过。这不是运气:Stage B 把三条契约缝提前变成了硬规范,golden 工具箱直接复用。</li>
+  <li><strong>审查修复 + 回归。</strong>落实 C-R1(doorbell/QP/conn 快照)与 C-R2(TB retrans 模型补拍偏移,Stage B TB 同源缺陷一并修);c_write12k 增加 mid-WR 突变探针;全部 4 用例 + 3 份 golden + Stage B write64/rx_loop 回归重跑,全绿。</li>
+</ol>
+
+<h2 id="s5"><span class="no">§5</span>结果怎么看</h2>
+
+<h3>c_write64:全环时间线与判定输出</h3>
+<pre><code>[  486ns] QP + conn programmed over AXI-Lite
+[  878ns] payload preloaded (64 bytes over AXI-Lite)
+[  986ns] WQE submitted + doorbell struck (len=64)
+[ 1914ns] CHECK cqe: reached 1 after 58 AXI-Lite polls PASS   ← doorbell→CQE ≈ 0.93 µs(含轮询开销)
+[ 4426ns] CHECK placement: 64 bytes at 0x27788 bit-exact PASS ← AXI-Lite 逐字读回比对
+          CHECK sq=1 / wr_req=1 / cqe=1 / ack opcode=0x11 pid=17 / tx=rx=2  全 PASS
+RESULT c_write64: PASS (0 errors, 2 tx frames)</code></pre>
+<p>读法:整个用例从激励到判定<strong>没有一处绕过 AXI-Lite</strong>——这正是 Q1 要的"板上视角自足"。两帧 = WRITE(124B)+ 响应方 ACK(48B);环回后请求方消化 ACK 出 CQE,链条闭合。</p>
+
+<h3>golden 传递性(离线,check_stage_c.py)</h3>
+<pre><code>c_write64: 2 frames captured (1 data, 1 ack)
+  PASS  icrc frame0 (124B)  ccbeb072 vs ccbeb072   ← 与 Stage B/csim 同值,三级同帧
+  PASS  data==StageB write64 F0   124B vs 124B     ← 逐字节一致
+  PASS  ack==StageB rx_loop F1    48B vs 48B       ← ACK 也逐字节一致
+c_write8k:  4 frames (2 data, 2 ack) — data0/data1 == StageB write8k F0/F1, ICRC ×4 PASS
+c_write12k: 6 frames (3 data, 3 ack) — F0 op 0x06 / F1 op 0x07 / F2 op 0x08,
+  PSN 80ce4e→4f→50 连续,RETH 仅 F0(VA=0x334455667788, DMALen=4096/命令),
+  payload 3×4096B 逐字节,ICRC ×6 全 PASS</code></pre>
+<p>读法:<code>ccbeb072</code> 与 Stage B 报告里的值相同——AXI-Lite 全链没有引入任何一个字节的漂移,三条硬规范全部落实(Q2)。12KB 的 MIDDLE 是首次 RTL 覆盖(Q3):栈对无 RETH 的中段照样连续放置,PSN 语义正确。</p>
+
+<h3>计数器读数(全部经 AXI-Lite 读回)</h3>
+<div class="tablebox"><table>
+  <tr><th>计数器</th><th>c_write64</th><th>c_write8k</th><th>c_write12k</th><th>读法</th></tr>
+  <tr><td class="mono">ibv_tx / ibv_rx(栈)</td><td class="num">2 / 2</td><td class="num">4 / 4</td><td class="num">6 / 6</td><td>栈自计 = 垫片帧计(tx_frm/rx_frm 同值)→ 两套观测互证</td></tr>
+  <tr><td class="mono">sq(段数)</td><td class="num">1</td><td class="num">2</td><td class="num">3</td><td>切分 FSM 段数正确</td></tr>
+  <tr><td class="mono">wr_req(placement 命令)</td><td class="num">1</td><td class="num">2</td><td class="num">3</td><td>每段一条放置命令</td></tr>
+  <tr><td class="mono">cqe</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td>整消息一个 CQE(last 门控,B8 再证)</td></tr>
+  <tr><td class="mono">crc/psn_drop/retrans/rd_req</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td>rd_req=0 再证 B3(WRITE 不触发取数命令)</td></tr>
+</table></div>
+<p>注意 8K 是 4 帧、12K 是 6 帧:<strong>响应方逐包 ACK</strong>(每个数据包一个 ACK),不是合并 ACK——见发现 C4。</p>
+
+<h3>c_magic 与突变探针</h3>
+<pre><code>c_magic:   warn set → W1C cleared → clean vaddr no warn   (3 CHECK 全 PASS)
+c_write12k(探针): doorbell 敲响后立刻改写 WQE_QPN=63 / WQE_CTRL.last=0
+           → 后两段仍按快照 pid=17 / last=1 发出,CQE 照常,ack.pid=17</code></pre>
+
+<h2 id="s6"><span class="no">§6</span>发现与有效性边界</h2>
+
+<div class="finding"><span class="fid">C1</span><span class="ftitle">全环打通,板上视角自足。</span><span class="st pass">核心结论</span>
+<p>一次 AXI-Lite 写发起的 WR 在 64B/8KB/12KB 三个规模走完 取数→分段→打包→回灌→放置→ACK→CQE;激励与判定全部经 AXI-Lite(= 板上 run_hw_axi 能做的动作集合)。doorbell→CQE ≈ 0.93µs(58 次轮询,64B)。</p></div>
+
+<div class="finding"><span class="fid">C2</span><span class="ftitle">golden 传递性成立:AXI-Lite 全链零字节漂移。</span><span class="st pass">Q2 判定</span>
+<p>c_write64 数据帧与 Stage B write64 F0 逐字节一致(ICRC 同为 <code>ccbeb072</code>),ACK 与 rx_loop F1 一致;c_write8k 两数据帧与 write8k F0/F1 一致。三条硬规范(结构体声明序打包 / 主动推流 / 预切分)在自造 RTL 中全部正确落实。</p></div>
+
+<div class="finding"><span class="fid">C3</span><span class="ftitle">MIDDLE(0x07)首次 RTL 覆盖:无 RETH 中段连续放置正确。</span><span class="st pass">新覆盖</span>
+<p>12KB → FIRST/MIDDLE/LAST,PSN 连续(80ce4e/4f/50),RETH 仅在 FIRST(DMALen=4096 = 每命令长度,B4 语义三段情形下再证),12288B placement 位精确——栈内部用 FIRST 的 RETH 状态为后续段推进写指针。</p></div>
+
+<div class="finding"><span class="fid">C4</span><span class="ftitle">响应方逐包 ACK,非合并。</span><span class="st pass">行为事实</span>
+<p>8KB 两数据包配两个 ACK,12KB 三配三;CQE 仍只有一个。线上开销:>PMTU 消息每 4096B 多一个 48B ACK 帧(环回场景无害)。<strong>CX-5 互操作观察项</strong>:IBTA 允许合并 ACK,对端很可能不逐包回——请求方一侧的 ACK 消化逻辑届时要靠 coalesced ACK 再验(检查单已有此项)。</p></div>
+
+<div class="finding"><span class="fid">C5</span><span class="ftitle">非对齐 placement 方案验证:旋转 + 字节使能 + 两拍跨字。</span><span class="st pass">数据通路</span>
+<p>落点 0x27788(字内偏移 8):每 64B 密集拍分裂 56/8 写入相邻两字,B口写优先、pusher 让行,三个规模位精确。<strong>遗留:</strong>URAM 双口 + 逐字节使能的综合推断(URAM288 BWE)待 Stage D 用真实综合确认;行为仿真不构成证据。</p></div>
+
+<div class="finding"><span class="fid">C6</span><span class="ftitle">审查 C-R1(已修):提交时刻快照,挡住 mid-WR 寄存器突变。</span><span class="st fixed">审查→修复</span>
+<p>原实现中 dreq 的 pid/vfid/last 与 qp/conn 的 184b beat 由寄存器组合直驱——多段 WR 进行中(或 metaIntf ready 迟滞时)主机改写寄存器会污染在途消息/beat,违反 valid 期间数据稳定纪律。串行化的 TB 与 JTAG 时标踩不中,但 Stage D/E 的 PCIe/脚本主机可以。修复:doorbell 敲响时快照 pid/vfid/last,SUBMIT 时快照 184b;c_write12k 加突变探针(敲门后立刻改写 pid=63/last=0)验证快照生效——顺带解锁了合法的"WQE 预编程"用法。</p></div>
+
+<div class="finding"><span class="fid">C7</span><span class="ftitle">审查 C-R2(已修):TB retrans 模型多拍写全部落在同一 64B 窗口。</span><span class="st fixed">审查→修复</span>
+<p>行为模型存储侧缺拍偏移(读侧有),>64B 的重传缓冲存储会塌缩成最后一拍——一旦发生重传回放,回放帧是垃圾,把可诊断的重传事件变成脏帧迷雾。<strong>Stage B TB 同源缺陷</strong>(从未被激发,不影响任何已记录判定)一并修复;Stage B write64/rx_loop 回归通过。残留:Stage B TB 的 cmd/数据同沿竞态未合并进单进程(Stage C TB 已合并),记录在案。</p></div>
+
+<div class="finding"><span class="fid">C8</span><span class="ftitle">流程发现:入库脚本漂移 + 一处注释算术错误。</span><span class="st fixed">已修</span>
+<p>(a) 远端 run_xsim.sh 的 <code>LIBRARY_PATH</code> 修复未回流入库副本 → Stage C 首编译踩同一雷;已双向同步。(b) "落点偏移 40"应为 8(0x27788 mod 64)——审查驳回其功能影响时抓到,注释已正。教训:远端修的每一行必须当天回流仓库。</p></div>
+
+<h3>有效性边界</h3>
+<ul>
+  <li><strong>L0 范围:</strong>RDMA WRITE only;READ 的取数命令被计数吞掉;不支持 SEND/IMM。吞吐/延迟扫频不在本阶段(JTAG/AXI-Lite 逐条驱动,payload 预载 8KB 就占 ~25µs 仿真时)。</li>
+  <li><strong>pusher 源地址 64B 对齐</strong>是 L0 约束(仿真有断言);doorbell 忙时打门被静默忽略(软件轮询 busy)。<code>WQE_OPCODE</code> 寄存器是登记项、不驱动线(切分 FSM 决定 opcode)——审查判为文档疣,已在映射表标注。</li>
+  <li><strong>环回是自话:</strong>单栈同时当请求方与响应方,PSN 初值天然一致;双栈/真对端的 PSN 不一致、乱序、丢包等在 Stage E(环回仍自话)与 CX-5 互操作阶段才有意义。RX 侧 ICRC 校验在本分支被编译殿(B5)——环回里 TX ICRC 正确性靠离线复算兜底。</li>
+  <li><strong>retrans buffer 仍是 TB 模型;</strong>B9(请求方定时重传在 RTL 窗口未观察到)仍开放——本轮环回 ACK 即时返回,retrans=0 属预期,不构成对 B9 的解答。</li>
+  <li><strong>行为仿真不证 PPA:</strong>URAM 推断、250MHz 时序、FIFO 替身换真 IP,全部归 Stage D。</li>
+</ul>
+
+<h2 id="s7"><span class="no">§7</span>结论与移交</h2>
+<div class="callout pass"><span class="tag">PASS 判定</span>对照手册 Stage C 通过标准逐条:① 一次模拟 AXI-Lite 写发起的 WR 走完"取数→分段→打包→回灌→放置→ACK→m_rdma_ack"全环 ✓(三规模);② 输出帧与 Stage B golden 逐字节一致 ✓(64B/8KB 直接对拍,12KB 结构化 + ICRC);③ 计数器经 AXI-Lite 可读且数值正确 ✓(栈五 + 垫片六,两套互证)。另加四项超出标准的证据:MIDDLE 覆盖、非对齐 placement、魔数警戒、mid-WR 突变探针。</div>
+
+<h3>移交 Stage D(载体集成 + 综合)</h3>
+<ol>
+  <li><strong>集成单元就是 <code>roce_l0_top</code>:</strong>一个 AXI-Lite 从口(接 jtag_axi)、一对 512b AXIS(接 CMAC 胶水)、一组 mem 口(retrans buffer 再安置:URAM/DDR4 选型)。</li>
+  <li><strong>载体决策先行</strong>(手册 §5-D 第一件事):rev100 Corundum 拆 PCIe 依赖 vs 裸 CMAC shell。</li>
+  <li><strong>综合观察项:</strong>URAM 双口 + 字节使能推断(C5);HLS Fmax 估计 151.9MHz vs 250 目标的 post-route 裁决(Stage B 移交项);FIFO 行为替身换 axis_data_fifo 真 IP。</li>
+  <li><strong>寄存器映射即驱动文档:</strong>TB 的 cfg_qp_conn/preload/submit_wqe/poll_cqe 序列可逐行翻译成 run_hw_axi tcl(Stage E 的脚本骨架已经在 TB 里排练完毕)。</li>
+</ol>
+<h3>挂账</h3>
+<ul>
+  <li>B9(定时重传观察)仍开放:建议 Stage D 行为仿真时对 <code>transport_timer</code> 抓 VCD,或断开环回制造 ACK 缺失。</li>
+  <li>C4 的 coalesced ACK 情形归 CX-5 互操作检查单。</li>
+</ul>
+
+<div class="footnote">
+  <p>工件:myDevbox <code>~/roce-rtl-sim/</code>(rtl/l0/ 三模块、tb/tb_stage_c.sv、out/ 全部日志与帧捕获);仓库 <code>platform-stage/stage_c_sim/</code>(源 + run_xsim_c.sh + check_stage_c.py)。对抗审查:9 agent(5 视角 + 4 怀疑者),2 确认 2 驳回,确认项均已修复并回归。</p>
+  <p>文档家族:🔌 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">集成手册</a> · 📇 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">阶段索引</a> · 🧪 <a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">Stage A 报告</a> · 🧪 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">Stage B 报告</a></p>
+  <p>WR-ZipGuard · Platform Stage · Stage C 实验报告 · 2026-07-17</p>
+</div>
+</main>

@@ -5,6 +5,7 @@ set -o pipefail
 TEST="${1:-write64}"
 cd "$(dirname "$0")"
 source ~/xlnx_env.sh
+export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LIBRARY_PATH:-}
 mkdir -p out
 
 echo "== xvlog: packages + interfaces =="

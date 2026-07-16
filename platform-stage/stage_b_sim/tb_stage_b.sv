@@ -224,14 +224,22 @@ module tb_stage_b;
                      mem_rd_cmd.data[63:0], mem_rd_cmd.data[95:64]);
         end
     end
-    // sink retrans-buffer writes
+    // sink retrans-buffer writes; wr_off tracks the beat offset within a
+    // multi-beat store (Stage C review C-R2: was missing, so >64B stores
+    // collapsed onto one 64B window — never exercised in Stage B passes)
     assign axis_mem_wr.tready = 1'b1;
+    int wr_off = 0;
     always_ff @(posedge clk) begin
         if (rstn && axis_mem_wr.tvalid && wrq.size() > 0) begin
             for (int i = 0; i < 64; i++)
                 if (axis_mem_wr.tkeep[i])
-                    rbuf[(wrq[0].addr & (MEM_BYTES-1)) + i] <= axis_mem_wr.tdata[i*8 +: 8];
-            if (axis_mem_wr.tlast) void'(wrq.pop_front());
+                    rbuf[((wrq[0].addr & (MEM_BYTES-1)) + wr_off*64 + i) & (MEM_BYTES-1)]
+                        <= axis_mem_wr.tdata[i*8 +: 8];
+            if (axis_mem_wr.tlast) begin
+                void'(wrq.pop_front());
+                wr_off <= 0;
+            end else
+                wr_off <= wr_off + 1;
         end
     end
     // serve one retrans-buffer read
