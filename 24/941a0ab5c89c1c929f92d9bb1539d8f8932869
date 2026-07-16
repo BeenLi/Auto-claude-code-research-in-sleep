@@ -1,0 +1,43 @@
+platform-stage/stage_b_sim/run_xsim.sh
+  s_715084d5235126::t_ad797ff147736c 8
+platform-stage/stage_c_sim/check_stage_c.py
+  s_715084d5235126::t_20c4890704a508 1-106
+platform-stage/stage_c_sim/rdma_uram_staging.sv
+  s_715084d5235126::t_7e78c68314c5d8 1-241
+platform-stage/stage_c_sim/roce_l0_top.sv
+  s_715084d5235126::t_3fe10a69a70eda 1-124
+platform-stage/stage_c_sim/run_xsim_c.sh
+  s_715084d5235126::t_f5720b0efcd0a8 1-31
+AGENT.md
+  s_715084d5235126::t_8fb6f616b35e01 79,90,93
+platform-stage/PLATFORM_INTEGRATION_GUIDE.html
+  s_715084d5235126::t_879a8fb0467290 311,368-370,385-387
+platform-stage/STAGE_C_REPORT.html
+  s_715084d5235126::t_8cf843e977e187 1-320
+platform-stage/STAGE_LOG.html
+  s_715084d5235126::t_3d95e97bfdd5e2 85-87,112-113
+platform-stage/stage_b_sim/tb_stage_b.sv
+  s_715084d5235126::t_c49b3d75d1618f 227-229,231,236-242
+platform-stage/stage_c_sim/rdma_doorbell_l0.sv
+  s_715084d5235126::t_74c6ed9aa3a941 1-449
+platform-stage/stage_c_sim/tb_stage_c.sv
+  s_715084d5235126::t_896433c1fef43b 1-458
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "24941a0ab5c89c1c929f92d9bb1539d8f8932869",
+  "prompts": {},
+  "sessions": {
+    "s_715084d5235126": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9fbfcae-b60c-4e33-a6d7-0d0466d8f7fb",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
