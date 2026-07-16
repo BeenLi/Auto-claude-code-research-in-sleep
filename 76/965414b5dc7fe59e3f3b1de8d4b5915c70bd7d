@@ -1,0 +1,43 @@
+platform-stage/LEARNING_ROADMAP.html
+  s_715084d5235126::t_4baf08c57469c0 1-245
+platform-stage/STAGE_A_REPORT.html
+  s_715084d5235126::t_823e386f2f40ea 1-272
+platform-stage/stage_b_sim/axis_fifo_stubs.sv
+  s_715084d5235126::t_53a641b86d2305 1-83
+platform-stage/stage_b_sim/axis_meta_fifo_stubs.sv
+  s_715084d5235126::t_7be090d6c351af 1-61
+platform-stage/stage_b_sim/check_golden_icrc.py
+  s_715084d5235126::t_cf7d539283ebde 1-96
+platform-stage/stage_b_sim/gen_neg_frame.py
+  s_715084d5235126::t_7c8c0c8fe11321 1-48
+platform-stage/stage_b_sim/run_xsim.sh
+  s_715084d5235126::t_93f8a7b6d03044 1-30
+platform-stage/stage_b_sim/tb_stage_b.sv
+  s_715084d5235126::t_ecfb381cedee7e 1-469
+AGENT.md
+  s_715084d5235126::t_76daf61075481c 38,57-71,74-79,90,93
+platform-stage/PLATFORM_INTEGRATION_GUIDE.html
+  s_715084d5235126::t_f2c51384757467 1-524
+platform-stage/STAGE_B_REPORT.html
+  s_715084d5235126::t_73504dbc403299 1-261
+platform-stage/STAGE_LOG.html
+  s_715084d5235126::t_91733a12d7567a 1-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "76965414b5dc7fe59e3f3b1de8d4b5915c70bd7d",
+  "prompts": {},
+  "sessions": {
+    "s_715084d5235126": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9fbfcae-b60c-4e33-a6d7-0d0466d8f7fb",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
