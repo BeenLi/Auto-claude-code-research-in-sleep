@@ -338,7 +338,7 @@ L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
 <div class="stage" id="stage-b">
   <div class="stage-head"><div class="stage-letter">B</div><div><h3>roce_stack 独立 RTL 仿真</h3><div class="stage-sub">零硬件 · 实际 1 天 · <strong>PASS 2026-07-17</strong></div></div></div>
   <div class="stage-body">
-  <div class="callout pass"><span class="tag">已完成</span>全部通过标准达成,九个发现(含三处包装层契约缝与 RX-不校验-ICRC 勘误)见 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 实验报告</a>。仿真器定案 xsim;工件 myDevbox:<code>~/roce-rtl-sim/</code>,TB/脚本入库 <code>platform-stage/stage_b_sim/</code>。</div>
+  <div class="callout pass"><span class="tag">已完成</span>全部通过标准达成,九个发现(含三处包装层契约缝与 RX-不校验-ICRC 勘误)见 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 实验报告</a>。仿真器定案 xsim;工件与 TB/脚本统一在代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>roce-rtl-sim/</code>;myDevbox <code>~/roce-rtl-sim</code> 为符号链接)。</div>
   <dl class="fivepart">
     <dt>目标</dt><dd>在 RTL 层把"SQ 命令 → 合法 RoCE 帧 → 回灌 → 放置 + ACK"整环仿真通,建立 golden 帧库。</dd>
     <dt>前置</dt><dd>Stage A 通过;确定仿真器(xsim 或 Verilator;metaIntf/AXI4S 是 SV interface,Verilator 需确认支持度,不行就 xsim)。</dd>
@@ -366,7 +366,7 @@ L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
 <div class="stage" id="stage-c">
   <div class="stage-head"><div class="stage-letter">C</div><div><h3>doorbell L0 + 内存胶水</h3><div class="stage-sub">零硬件 · 预计 1–2 周</div></div></div>
   <div class="stage-body">
-  <div class="callout pass"><span class="tag">已完成 · 07-17</span>全部通过标准达成(64B/8K/12K 三规模全环、帧与 Stage B golden 逐字节一致、计数器 AXI-Lite 互证),外加 MIDDLE 首覆盖、非对齐 placement、魔数警戒、mid-WR 突变探针四项超标证据,见 <a href="https://claude.ai/code/artifact/325d9489-6908-4831-9c7c-0713ff603199">🧪 Stage C 实验报告</a>(含完整寄存器映射 = Stage E 的 run_hw_axi 驱动文档)。集成单元 <code>roce_l0_top</code> 三模块入库 <code>platform-stage/stage_c_sim/</code>;工件 myDevbox:<code>~/roce-rtl-sim/rtl/l0/</code>。实际未踩中本表预测故障(三条硬规范前置生效);新增两行实测条目见下。</div>
+  <div class="callout pass"><span class="tag">已完成 · 07-17</span>全部通过标准达成(64B/8K/12K 三规模全环、帧与 Stage B golden 逐字节一致、计数器 AXI-Lite 互证),外加 MIDDLE 首覆盖、非对齐 placement、魔数警戒、mid-WR 突变探针四项超标证据,见 <a href="https://claude.ai/code/artifact/325d9489-6908-4831-9c7c-0713ff603199">🧪 Stage C 实验报告</a>(含完整寄存器映射 = Stage E 的 run_hw_axi 驱动文档)。集成单元 <code>roce_l0_top</code> 三模块在代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>roce-rtl-sim/rtl/l0/</code>)。实际未踩中本表预测故障(三条硬规范前置生效);新增两行实测条目见下。</div>
   <dl class="fivepart">
     <dt>目标</dt><dd>造齐"surrounding modules":AXI-Lite doorbell 垫片(L0)+ QP 配置写入器 + staging 内存,仿真级全链路由一次 AXI-Lite 写(板上由 JTAG-to-AXI Master 驱动,见 Stage D/E)发起。垫片逻辑与"谁驱动 AXI-Lite"无关——同一份 RTL 在仿真里由 TB 驱动、板上由 <code>jtag_axi</code> 驱动。</dd>
     <dt>前置</dt><dd>Stage B 通过 ✓(golden 帧库 + 校验脚本已入库 <code>platform-stage/stage_b_sim/</code>)。<strong>三条硬规范(Stage B 报告 §7)</strong>:① SQ 打包按 txMeta 结构体声明序(raddr@[119:56] 在前);② WQE 提交后 payload 主动推流;③ 大 WR 预切分 FIRST/MIDDLE/LAST。</dd>
