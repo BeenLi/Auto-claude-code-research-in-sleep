@@ -1,0 +1,245 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoCE 平台学习导览</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.75; margin: 0; font-size: 15.5px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  main { max-width: 860px; margin: 0 auto; padding: 36px 24px 96px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 29px; line-height: 1.3; margin: 0 0 12px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 62ch; margin: 0 0 8px; }
+  .hero-sub a { font-weight: 600; }
+  h2 { font-size: 20px; margin: 48px 0 8px; letter-spacing: -.005em; }
+  h2 .tno { font-family: var(--mono); color: var(--accent-ink); font-size: 14px; margin-right: 10px; }
+  p { margin: 10px 0; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.8px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  td.mono { font-family: var(--mono); font-size: 12.8px; }
+  tr:last-child td { border-bottom: none; }
+  .track { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 20px 0; overflow: hidden; }
+  .track-head { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  .track-badge { font-family: var(--mono); font-weight: 700; font-size: 15px; color: var(--accent-ink); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 7px; padding: 5px 11px; flex: none; }
+  .track-head h2 { margin: 0; font-size: 17px; }
+  .track-head .gate { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .item { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .item:last-child { border-bottom: none; }
+  .item h3 { margin: 0 0 6px; font-size: 15.5px; display: flex; align-items: baseline; gap: 10px; }
+  .item h3 .ino { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); flex: none; }
+  .facet { display: grid; grid-template-columns: 74px 1fr; gap: 3px 14px; font-size: 14px; margin-top: 6px; }
+  .facet .fk { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 3px; white-space: nowrap; }
+  .facet .fv.ex { color: var(--ink); }
+  .facet .fv.ex::before { content: "▸ "; color: var(--pass); }
+  .why { color: var(--muted); }
+  .quick { border: 1px solid color-mix(in srgb, var(--pass) 40%, transparent); background: var(--pass-soft); border-radius: 10px; padding: 16px 20px; margin: 22px 0; }
+  .quick .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--pass); display: block; margin-bottom: 6px; }
+  ol.qsteps { margin: 6px 0 0; padding-left: 20px; }
+  ol.qsteps li { margin: 5px 0; }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 导览</div>
+  <h1>RoCE 平台学习导览</h1>
+  <p class="hero-sub">这是一张<strong>地图,不是教材</strong>:按"哪个集成阶段需要先会什么"组织四条学习轨道,每项只回答三件事——学什么、为什么此刻学、动手做什么——然后把你送到正确的深读入口:<a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">《VCU118 RoCE 平台集成手册》</a>对应章节、仓库源码路径、或你自己的 Obsidian 协议笔记。</p>
+</header>
+
+<div class="quick">
+  <span class="tag">第一周怎么走(单人推荐序)</span>
+  <ol class="qsteps">
+    <li><strong>T2-1</strong> 起手:把 <code>rocev2</code> csim 环境搭起来(边搭边补 HLS 概念)——这同时就是集成手册的 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-a">Stage A</a>;</li>
+    <li>等综合/仿真跑的间隙读 <strong>T1</strong>(协议三件:帧格式 → PSN/ACK → WRITE 分段);</li>
+    <li>csim 通了之后进 <strong>T3</strong>(代码结构),按数据流顺序读,别按目录顺序读;</li>
+    <li><strong>T4</strong>(Corundum)推迟到 Stage C 后半段再开——太早读记不住。</li>
+  </ol>
+</div>
+
+<h2 style="font-size:17px;">轨道 × 阶段对照</h2>
+<div class="tablebox"><table>
+  <tr><th>集成阶段</th><th>进场前需要</th><th>对应轨道项</th></tr>
+  <tr><td><a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-a">Stage A · csim 冒烟</a></td><td>HLS 工程能建、csim 能跑</td><td class="mono">T2-1, T2-2</td></tr>
+  <tr><td><a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-b">Stage B · 独立 RTL 仿真</a></td><td>能逐字段校验 RoCE 帧、懂 PSN/ACK</td><td class="mono">T1-1…T1-3, T3-1, T3-2</td></tr>
+  <tr><td><a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-c">Stage C · doorbell + 内存</a></td><td>接口位域与 metaIntf 握手吃透</td><td class="mono">T3-3, T3-4</td></tr>
+  <tr><td><a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-d">Stage D · app_block 集成</a></td><td>Corundum 数据面结构与构建参数</td><td class="mono">T4-1, T4-2</td></tr>
+  <tr><td><a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-e">Stage E · 上板环回</a></td><td>JTAG-to-AXI / hw_server 排障(无 PCIe)</td><td class="mono">T4-3</td></tr>
+</table></div>
+
+<!-- ==================== T1 ==================== -->
+<div class="track" id="t1">
+  <div class="track-head"><span class="track-badge">T1</span><h2>RoCE v2 协议</h2><span class="gate">解锁 Stage B</span></div>
+
+  <div class="item" id="t1-1">
+    <h3><span class="ino">T1-1</span>帧格式:Eth/IP/UDP:4791/BTH/RETH + ICRC</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>一个 RoCE v2 包每一层的字段与取值;ICRC 的"不变量"规则(哪些字段被掩码后参与 CRC)。</span>
+      <span class="fk">为什么</span><span class="why">Stage B 的核心工作就是逐字段校验 <code>m_axis_tx</code> 输出帧;ICRC 错 = 静默丢包,是全平台最阴的故障模式。</span>
+      <span class="fk">动手</span><span class="fv ex">用 Wireshark 打开任一 RoCE v2 抓包(或 Stage B 产出的 golden pcap),手工核对 BTH 的 opcode/PSN/destQP 与 RETH 的 vaddr/rkey/DMALen;再手算一帧 ICRC 与工具比对。</span>
+      <span class="fk">入口</span><span>手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#proto-frame">§2.1 帧格式</a> · 源码 <code>hdl/common/icrc.sv</code>, <code>hls/crc/</code> · Obsidian <code>003互联基础设施/rdma</code>(ib_pack.h 逐字段笔记)</span>
+    </div>
+  </div>
+
+  <div class="item" id="t1-2">
+    <h3><span class="ino">T1-2</span>RC 状态机:PSN / ACK / NAK / go-back-N</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>PSN 逐包递增与接收侧严格按序校验;ACK 累积确认与 AETH/MSN;NAK 触发条件与 go-back-N 重传;ACK 时钟化信用流控。</span>
+      <span class="fk">为什么</span><span class="why">Stage B 的负测试(跳 PSN → NAK)和 Stage E 的"一丢即挂"现象都由它解释;将来 dual-length 研究段改的就是这套记账。</span>
+      <span class="fk">动手</span><span class="fv ex">在 myDevbox 上起 Soft-RoCE(rxe)+ tcpdump,发一个跨 PMTU 的 ib_write,观察真实 FIRST/MIDDLE/LAST 序列与 ACK 的 PSN/MSN 演进。</span>
+      <span class="fk">入口</span><span>手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#proto-rc">§2.2 RC 语义</a> · 源码 <code>hls/ib_transport_protocol/</code>(状态机本体)· Obsidian rxe 笔记(内核参考实现)</span>
+    </div>
+  </div>
+
+  <div class="item" id="t1-3">
+    <h3><span class="ino">T1-3</span>WRITE 解剖 × PMTU 分段 × WRITE_WITH_IMM</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>WRITE_ONLY / FIRST-MIDDLE-LAST 的 opcode 序列;FIRST/MIDDLE 严格 = PMTU(本栈 4096);RETH 只在首包;普通 WRITE 无响应端 CQE,WITH_IMM 才有。</span>
+      <span class="fk">为什么</span><span class="why">Stage B 通过标准里"≥PMTU 多包切分正确"就是它;WITH_IMM 是未来对 stock 网卡做压缩实验的接收通知设计,要从第一天留口。</span>
+      <span class="fk">动手</span><span class="fv ex">拿 12KB 消息手画包序列(含每包长度与 PSN),再与 Stage B 仿真输出对照;找出 len 恰为 n×4096 时的边界情况。</span>
+      <span class="fk">入口</span><span>手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#proto-write">§2.3 WRITE 解剖</a> · <code>hls/fns_config.hpp</code>(PMTU 常量)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== T2 ==================== -->
+<div class="track" id="t2">
+  <div class="track-head"><span class="track-badge">T2</span><h2>Vitis HLS 流程</h2><span class="gate">解锁 Stage A</span></div>
+
+  <div class="item" id="t2-1">
+    <h3><span class="ino">T2-1</span>HLS 工程三件套:csim → cosim → export,与 dataflow/接口 pragma</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>csim(C 级功能验证)/ cosim(RTL 联合仿真)/ export(打包成 IP)的分工;<code>DATAFLOW</code> 进程流水;<code>ap_ctrl_none</code> 自由运行核与纯 AXI4-Stream 口意味着什么。</span>
+      <span class="fk">为什么</span><span class="why">rocev2 是 HLS 核,Stage A 全程在这套流程里;将来的 DCL gzip CU(<code>gzip_compress_multicore_stream.cpp</code>)也是 ap_ctrl_none 纯流式——同一套心智模型。</span>
+      <span class="fk">动手</span><span class="fv ex">把 <code>hls/rocev2</code> 的 csim 跑通(= Stage A 的操作 1–2),记录 2025.2 与 2022.2 的行为差异进决策日志。</span>
+      <span class="fk">入口</span><span>手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-a">Stage A</a> · <code>hls/rocev2/CMakeLists.txt</code> + <code>make.tcl.in</code>(仓库自带构建流程,以它为准)</span>
+    </div>
+  </div>
+
+  <div class="item" id="t2-2">
+    <h3><span class="ino">T2-2</span>自带仿真基建:newFakeDram 与 simSwitch</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>仓库自带的假 DRAM 模型与模拟交换如何把"内存侧 + 网络侧"都在 csim 里闭环——这是不上板做全协议仿真的关键。</span>
+      <span class="fk">为什么</span><span class="why">Stage A/B 的测例都构建在它们之上;读懂它们 = 知道 csim 的可信边界在哪(哪些行为是模型的,哪些是核的)。</span>
+      <span class="fk">动手</span><span class="fv ex">在 csim 里发一个单 WRITE,dump 输出帧字节并与 §2.1 表逐项核对(= Stage A 通过标准)。</span>
+      <span class="fk">入口</span><span><code>hls/rocev2/newFakeDram.hpp</code>, <code>simSwitch.hpp</code> · 手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#code-fns">§3.1</a></span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== T3 ==================== -->
+<div class="track" id="t3">
+  <div class="track-head"><span class="track-badge">T3</span><h2>fns 代码结构</h2><span class="gate">解锁 Stage B / C</span></div>
+
+  <div class="item" id="t3-1">
+    <h3><span class="ino">T3-1</span>rocev2.cpp 顶层:按数据流读,不按目录读</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>HLS 顶层的 dataflow 进程连线:入包解析 → 传输状态机 → 内存命令生成 → 出包组装;各 hls::stream 的语义。</span>
+      <span class="fk">为什么</span><span class="why">Stage B 的 testbench 要在正确的位置观察/注入;将来 codec 与 dual-length 的改动点也要在这张图上标。</span>
+      <span class="fk">动手</span><span class="fv ex">读完画一张数据流图(进程 × stream 连线),标出:PSN 在哪生成、ICRC 在哪插入、RETH 在哪组装——三处坐标以后反复要用。</span>
+      <span class="fk">入口</span><span><code>hls/rocev2/rocev2.cpp .hpp</code> · 手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#code-fns">§3.1 导读表</a></span>
+    </div>
+  </div>
+
+  <div class="item" id="t3-2">
+    <h3><span class="ino">T3-2</span>ib_transport_protocol:传输状态机本体</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>opcode 序列生成/校验、PSN 记账、AETH 组装的具体实现;<code>RETRANS_RETRY_CNT</code>、<code>RDMA_DEFAULT_PORT</code> 等常量;<code>RETRANS_EN</code> 注释掉意味着哪些代码路径失活。</span>
+      <span class="fk">为什么</span><span class="why">这是"协议正确性"所在地,Stage B 负测试的预期行为要从这里读出来,不能猜。</span>
+      <span class="fk">动手</span><span class="fv ex">从源码回答三问:收到重复 PSN 的包,代码走哪条路?NAK 在哪生成?无重传模式下 NAK 之后发起侧的状态是什么(→ 解释"一丢即挂")?</span>
+      <span class="fk">入口</span><span><code>hls/ib_transport_protocol/</code> · 手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#sec-6">§6 雷 #2</a></span>
+    </div>
+  </div>
+
+  <div class="item" id="t3-3">
+    <h3><span class="ino">T3-3</span>roce_stack.sv 包装层:集成边界与位域打包</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>SV 顶层每个口的语义(SQ 推入/ack/内存命令/QP 配置/计数器);VITIS_HLS 与非 VITIS 两种 SQ 位域布局的差异(qpn 从 bit 32 起!)。</span>
+      <span class="fk">为什么</span><span class="why">Stage C 的 doorbell 垫片直接对着它写;位域打包错是 Stage C 故障表第一名。</span>
+      <span class="fk">动手</span><span class="fv ex">照 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#sec-8">§8 速查表</a>写一个打包函数 + assert 自检(TB 里跑),再接 FIFO。</span>
+      <span class="fk">入口</span><span><code>hdl/common/roce_stack.sv</code> · 手册 §8.1–8.3</span>
+    </div>
+  </div>
+
+  <div class="item" id="t3-4">
+    <h3><span class="ino">T3-4</span>L2/L3 胶水:ipv4 / udp / arp_server / mac_ip_encode</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>封装链路上 IP/UDP 头在哪组装、ARP 应答与静态 MAC 的两种做法;为什么反向可达(ACK 回程)必须双向配置。</span>
+      <span class="fk">为什么</span><span class="why">Stage C/D 的"帧发得出去但 ACK 回不来 → 无限重传假死"这类故障全在这层。</span>
+      <span class="fk">动手</span><span class="fv ex">决定环回阶段的方案(建议:静态 MAC/IP 表,跳过 arp_server)并在 TB 里验证 TX/RX 双向帧头正确。</span>
+      <span class="fk">入口</span><span><code>hls/{ipv4,udp,arp_server,mac_ip_encode}</code> · 手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-c">Stage C</a></span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== T4 ==================== -->
+<div class="track" id="t4">
+  <div class="track-head"><span class="track-badge">T4</span><h2>Corundum 内部</h2><span class="gate">解锁 Stage D / E</span></div>
+
+  <div class="item" id="t4-1">
+    <h3><span class="ino">T4-1</span>mqnic 数据面架构与 app_block 挂点</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>Corundum 的 TX/RX 数据面分层;app_block 三层流接口(direct/sync/if)各在哪个位置截获;<code>APP_AXIS_SYNC_ENABLE</code> 等构建参数;<code>s_axil_app_ctrl</code> 的地址空间。</span>
+      <span class="fk">为什么</span><span class="why">Stage D 的全部集成动作都发生在 app_block 里;流口位置选错(direct vs sync)会白做。</span>
+      <span class="fk">动手</span><span class="fv ex">读 mqnic_app_block 文档 + 端口表,写一页纸集成说明:我们的注入 mux、RX 过滤器、AXI-Lite 空间各接哪根线、开哪些参数。</span>
+      <span class="fk">入口</span><span>Corundum <code>docs/source/modules/mqnic_app_block.rst</code> · 手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#code-corundum">§3.2</a> + <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#sec-8">§8.4</a></span>
+    </div>
+  </div>
+
+  <div class="item" id="t4-2">
+    <h3><span class="ino">T4-2</span>Corundum 仿真框架(cocotb)与 VCU118 工程</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>fpga_100g 工程结构、testbench 组织方式、如何把自定义 app_block 挂进现有仿真;rev100 bitstream 的构建复现路径。</span>
+      <span class="fk">为什么</span><span class="why">Stage D 的通过标准要求"Corundum testbench 框架里 WRITE 环回帧不变形"——不重造仿真环境,借它现成的。</span>
+      <span class="fk">动手</span><span class="fv ex">先原样重建一次 rev100(验证工程可复现),再跑一次 Corundum 自带 testbench 认识输出格式。</span>
+      <span class="fk">入口</span><span><code>fpga/mqnic/VCU118/fpga_100g/</code>(Corundum 仓库)· 手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-d">Stage D</a></span>
+    </div>
+  </div>
+
+  <div class="item" id="t4-3">
+    <h3><span class="ino">T4-3</span>JTAG-to-AXI · hw_server 与板级排障路径(无 PCIe)</h3>
+    <div class="facet">
+      <span class="fk">学什么</span><span>Xilinx <code>jtag_axi</code> Master IP + Vivado <code>run_hw_axi</code>(create_hw_axi_txn / run_hw_axi)如何驱动/读回 AXI-Lite 寄存器,零驱动零 PCIe;CMAC 状态/统计寄存器读法;"链路层 → MAC 层 → 栈入口 → ICRC → PSN"的二分排障法(每层有计数器)。</span>
+      <span class="fk">为什么</span><span class="why">当前板不插 PCIe 槽、仅 JTAG 连电脑(用户约束 07-16),敲 doorbell/写 WQE/读计数器全走 <code>run_hw_axi</code>;这条链路是 Stage E 唯一的 host 触达方式。</span>
+      <span class="fk">动手</span><span class="fv ex">DAC 未到前就完成:台面供电 + JTAG(USB)+ hw_server 通、刷写、<code>run_hw_axi</code> 读一个已知常量寄存器自检、再读五个调试计数器(应全 0)——把 Stage E 的"前置"清掉。<strong>不碰</strong> PCIe/驱动/BAR(那是 §7 的后续流程)。</span>
+      <span class="fk">入口</span><span>手册 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#stage-e">Stage E</a> · <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986#sec-6">§6 雷 #5/#8</a> · Xilinx PG174(JTAG-to-AXI Master)</span>
+    </div>
+  </div>
+</div>
+
+<div class="footnote">
+  <p>配套执行手册:<a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">《VCU118 RoCE 平台集成手册》</a>(架构 / 协议入门 / 代码导读 / 五阶段测试通路 / 接口速查)。深层协议材料:Obsidian <code>003互联基础设施/rdma</code>。CX-5 互操作与 BALBOA 对比(后置):仓库 <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code>。</p>
+  <p>WR-ZipGuard · Platform Stage · 导览 v1.0 · 2026-07-16</p>
+</div>
+</main>

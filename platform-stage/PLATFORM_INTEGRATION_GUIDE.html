@@ -1,0 +1,524 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VCU118 RoCE 平台集成手册</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4; --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.75; margin: 0; font-size: 15.5px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { display: flex; max-width: 1180px; margin: 0 auto; gap: 40px; padding: 0 24px; }
+  nav.toc { width: 236px; flex: none; position: sticky; top: 0; align-self: flex-start; max-height: 100vh; overflow-y: auto; padding: 32px 0 32px; font-size: 13px; }
+  nav.toc .toc-title { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  nav.toc a { display: block; color: var(--muted); border: none; padding: 3.5px 0 3.5px 12px; border-left: 2px solid var(--line); line-height: 1.5; }
+  nav.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+  nav.toc a.sub { padding-left: 26px; font-size: 12.5px; }
+  main { flex: 1; min-width: 0; max-width: 820px; padding: 32px 0 96px; }
+  @media (max-width: 1020px) { nav.toc { display: none; } }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 40px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 12px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 60ch; margin: 0; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; font-family: var(--mono); font-size: 12px; }
+  .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; color: var(--muted); }
+  .chip.hot { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--accent-ink); }
+  h2 { font-size: 21px; margin: 56px 0 6px; scroll-margin-top: 24px; letter-spacing: -.005em; text-wrap: balance; }
+  h2 .secno { font-family: var(--mono); color: var(--accent-ink); font-size: 15px; margin-right: 10px; }
+  h3 { font-size: 16.5px; margin: 30px 0 8px; scroll-margin-top: 24px; }
+  p { margin: 10px 0; }
+  .lede { color: var(--muted); margin: 0 0 18px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.6; }
+  pre code { background: none; padding: 0; font-size: 12.8px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.8px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.8px; }
+  tr:last-child td { border-bottom: none; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--muted); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14.2px; }
+  .callout.pass { border-left-color: var(--pass); background: var(--pass-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.fail { border-left-color: var(--fail); background: var(--fail-soft); }
+  .callout.acc  { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px; }
+  .callout.pass .tag { color: var(--pass); } .callout.warn .tag { color: var(--warn); }
+  .callout.fail .tag { color: var(--fail); } .callout.acc .tag { color: var(--accent-ink); }
+  .stage { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 26px 0; overflow: hidden; }
+  .stage-head { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .stage-letter { font-family: var(--mono); font-weight: 700; font-size: 22px; color: var(--accent-ink); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 8px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .stage-head h3 { margin: 0; font-size: 17px; }
+  .stage-head .stage-sub { font-size: 12.5px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .stage-body { padding: 6px 20px 18px; }
+  .fivepart dt { font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; margin-top: 16px; }
+  .fivepart dd { margin: 6px 0 0 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  li::marker { color: var(--muted); }
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 18px 0; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 720px; width: 100%; height: auto; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 18px; font-size: 14px; margin: 12px 0; }
+  .kv .k { font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: nowrap; padding-top: 1px; }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+  .num { font-variant-numeric: tabular-nums; }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="目录">
+  <div class="toc-title">目录</div>
+  <a href="#sec-0">§0 总览与决策记录</a>
+  <a href="#sec-1">§1 平台架构</a>
+  <a href="#sec-2">§2 RoCE v2 协议入门</a>
+  <a class="sub" href="#proto-frame">帧格式与 ICRC</a>
+  <a class="sub" href="#proto-rc">RC 语义:PSN / ACK / NAK</a>
+  <a class="sub" href="#proto-write">WRITE 解剖与 WRITE-only</a>
+  <a href="#sec-3">§3 组件与代码导读</a>
+  <a class="sub" href="#code-fns">fpga-network-stack</a>
+  <a class="sub" href="#code-corundum">Corundum app_block</a>
+  <a href="#sec-4">§4 学习导览</a>
+  <a href="#sec-5">§5 集成阶段与测试通路</a>
+  <a class="sub" href="#stage-a">Stage A · csim 冒烟</a>
+  <a class="sub" href="#stage-b">Stage B · 独立 RTL 仿真</a>
+  <a class="sub" href="#stage-c">Stage C · doorbell + 内存</a>
+  <a class="sub" href="#stage-d">Stage D · app_block 集成</a>
+  <a class="sub" href="#stage-e">Stage E · 上板环回</a>
+  <a href="#sec-6">§6 已知雷与决策记录</a>
+  <a href="#sec-7">§7 后续路标</a>
+  <a href="#sec-8">§8 附录:接口速查表</a>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">WR-ZipGuard · Platform Stage</div>
+  <h1>VCU118 RoCE 平台集成手册</h1>
+  <p class="hero-sub">单板 VCU118 上,以 Corundum NIC 为载体、fpga-network-stack <code>roce_stack</code> 为传输引擎、软件 doorbell 为前端,QSFP0═DAC═QSFP1 环回跑通 RDMA WRITE 的立即执行手册。</p>
+  <div class="meta-row">
+    <span class="chip hot">平台优先 · 2026-07-16</span>
+    <span class="chip">板卡 VCU118 (XCVU9P)</span>
+    <span class="chip">RDMA WRITE only</span>
+    <span class="chip">单板环回</span>
+    <span class="chip">v1.0</span>
+  </div>
+</header>
+
+<!-- ============================ §0 ============================ -->
+<h2 id="sec-0"><span class="secno">§0</span>总览与决策记录</h2>
+<p><strong>决策(2026-07-16):平台优先。</strong>原"ISCAS 2027 投稿(2026-10-13)前不动平台工程"的红线由项目负责人解除;已知后果——ISCAS 的实测-PPA 门槛可能赶不上、论文顺延——已确认接受。自此主线切换为搭建 RDMA 研究平台。</p>
+<p><strong>本文档的范围:单台 VCU118 把 RoCE WRITE 链路跑通。</strong>即:软件通过 PCIe BAR 发起 Work Request → <code>roce_stack</code> 生成合法 RoCE v2 帧(含 ICRC)→ 经 Corundum 数据面从 QSFP0 发出 → DAC 线环回 QSFP1 → RX 路径解析、放置 payload、产生 ACK → 回到 TX 侧完成确认。全程 bit-exact 可验。</p>
+<p>以下内容<strong>刻意后置</strong>,不在本文档展开:</p>
+<ul>
+  <li><strong>ConnectX-5 互操作</strong>(实验室已有卡)——14 项工程检查单与建链细节见仓库 <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code> Part B;</li>
+  <li><strong>BALBOA 发表数字对比</strong>——三层对比表见同一文档 Part A;</li>
+  <li><strong>codec 插入(transform + deflate)与 dual-length verbs 研究段</strong>——平台跑通后的研究阶段(<a href="#sec-7">§7</a>)。</li>
+</ul>
+<div class="callout acc"><span class="tag">事实基线</span>本手册中的接口位域、文件路径、常量与行为断言,均来自 2026-07-16 前后对一手来源的核验(源码逐文件 grep、官方文档、BALBOA 论文全文深读)。个别来自论文图表像素测量的数值一律标注"约"。未核实处明确写"以仓库为准"。</div>
+
+<!-- ============================ §1 ============================ -->
+<h2 id="sec-1"><span class="secno">§1</span>平台架构</h2>
+<p class="lede">一句话:把 <code>roce_stack</code> 当一颗"协议引擎芯片"用——README 原话是"RoCE 周边模块需用户自行提供以集成进自己的项目",我们的周边模块 = 软件 doorbell 垫片 + 内存胶水 + Corundum app_block 注入/截获。</p>
+
+<div class="diagram">
+<svg viewBox="0 0 960 430" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12">
+  <defs>
+    <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/>
+    </marker>
+  </defs>
+  <!-- Host -->
+  <rect x="12" y="40" width="150" height="120" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="87" y="64" text-anchor="middle" fill="var(--ink)" font-weight="700">PC · Vivado</text>
+  <text x="87" y="86" text-anchor="middle" fill="var(--muted)" font-size="11">hw_server</text>
+  <text x="87" y="104" text-anchor="middle" fill="var(--muted)" font-size="11">run_hw_axi</text>
+  <text x="87" y="122" text-anchor="middle" fill="var(--muted)" font-size="11">写 payload+WQE · 读计数器</text>
+  <text x="87" y="147" text-anchor="middle" fill="var(--accent-ink)" font-size="11">JTAG / UART (USB)</text>
+  <!-- FPGA outline -->
+  <rect x="196" y="14" width="750" height="330" rx="12" fill="none" stroke="var(--accent)" stroke-dasharray="6 4"/>
+  <text x="212" y="36" fill="var(--accent-ink)" font-weight="700" font-size="12">VCU118 · Corundum shell(rev100 bitstream 载体)</text>
+  <!-- app block outline -->
+  <rect x="212" y="48" width="540" height="256" rx="10" fill="none" stroke="var(--muted)" stroke-dasharray="3 4"/>
+  <text x="228" y="68" fill="var(--muted)" font-size="11">mqnic_app_block(自定义逻辑活动区)</text>
+  <!-- doorbell shim -->
+  <rect x="228" y="82" width="150" height="88" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="303" y="104" text-anchor="middle" fill="var(--ink)" font-weight="700">JTAG→AXI Master</text>
+  <text x="303" y="122" text-anchor="middle" fill="var(--muted)" font-size="11">+ Doorbell 垫片 L0</text>
+  <text x="303" y="140" text-anchor="middle" fill="var(--muted)" font-size="11">AXI-Lite → metaIntf</text>
+  <text x="303" y="157" text-anchor="middle" fill="var(--muted)" font-size="11">WR 寄存器 · QP 配置</text>
+  <!-- roce stack -->
+  <rect x="418" y="82" width="176" height="150" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="506" y="106" text-anchor="middle" fill="var(--accent-ink)" font-weight="700">roce_stack</text>
+  <text x="506" y="126" text-anchor="middle" fill="var(--muted)" font-size="11">HLS rocev2 + ICRC</text>
+  <text x="506" y="144" text-anchor="middle" fill="var(--muted)" font-size="11">分段 · PSN · ACK/NAK</text>
+  <text x="506" y="162" text-anchor="middle" fill="var(--muted)" font-size="11">512-bit AXI4S</text>
+  <text x="506" y="188" text-anchor="middle" fill="var(--muted)" font-size="10">計數器: rx/tx pkg,</text>
+  <text x="506" y="202" text-anchor="middle" fill="var(--muted)" font-size="10">crc_drop, psn_drop, retrans</text>
+  <!-- ip glue -->
+  <rect x="634" y="82" width="100" height="88" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="684" y="110" text-anchor="middle" fill="var(--ink)" font-weight="700" font-size="11.5">IP/UDP/ARP</text>
+  <text x="684" y="128" text-anchor="middle" fill="var(--muted)" font-size="11">静态 MAC</text>
+  <text x="684" y="146" text-anchor="middle" fill="var(--muted)" font-size="11">UDP 4791</text>
+  <!-- staging mem -->
+  <rect x="228" y="216" width="150" height="88" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="303" y="240" text-anchor="middle" fill="var(--ink)" font-weight="700">Staging 内存</text>
+  <text x="303" y="260" text-anchor="middle" fill="var(--muted)" font-size="11">URAM(先)/ DDR4 MIG</text>
+  <text x="303" y="278" text-anchor="middle" fill="var(--muted)" font-size="11">payload 取数 + 放置</text>
+  <!-- corundum tx/rx -->
+  <rect x="778" y="82" width="150" height="88" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="853" y="106" text-anchor="middle" fill="var(--ink)" font-weight="700">CMAC ×2</text>
+  <text x="853" y="126" text-anchor="middle" fill="var(--muted)" font-size="11">100G CAUI-4</text>
+  <text x="853" y="144" text-anchor="middle" fill="var(--muted)" font-size="11">sync_tx 注入 / rx 过滤</text>
+  <!-- loopback -->
+  <rect x="778" y="216" width="150" height="88" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="853" y="244" text-anchor="middle" fill="var(--ink)" font-weight="700">QSFP0 ═ QSFP1</text>
+  <text x="853" y="264" text-anchor="middle" fill="var(--accent-ink)" font-size="11">DAC 环回(在途)</text>
+  <text x="853" y="282" text-anchor="middle" fill="var(--muted)" font-size="11">两端皆本板 CMAC</text>
+  <!-- arrows -->
+  <line x1="162" y1="100" x2="228" y2="112" stroke="var(--muted)" marker-end="url(#arr)"/>
+  <line x1="378" y1="118" x2="418" y2="118" stroke="var(--muted)" marker-end="url(#arr)"/>
+  <line x1="594" y1="118" x2="634" y2="118" stroke="var(--muted)" marker-end="url(#arr)"/>
+  <line x1="734" y1="118" x2="778" y2="118" stroke="var(--muted)" marker-end="url(#arr)"/>
+  <line x1="853" y1="170" x2="853" y2="216" stroke="var(--muted)" marker-end="url(#arr)"/>
+  <line x1="418" y1="200" x2="378" y2="248" stroke="var(--muted)" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <text x="360" y="212" fill="var(--muted)" font-size="10">rd_req / wr_req</text>
+  <line x1="303" y1="170" x2="303" y2="216" stroke="var(--muted)" marker-end="url(#arr)"/>
+  <!-- ack back -->
+  <path d="M 506 232 L 506 322 L 303 322 L 303 304" fill="none" stroke="var(--muted)" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <text x="420" y="338" fill="var(--muted)" font-size="10">m_rdma_ack(CQE 测点)</text>
+  <!-- captions -->
+  <text x="12" y="392" fill="var(--muted)" font-size="11">数据流:PC 经 JTAG 用 run_hw_axi 写 payload 入 staging、写 WQE 字段、敲 doorbell → 垫片推入 s_rdma_sq → roce_stack 自动取 payload、分段、打包(BTH/RETH + ICRC)→ app_block 注入 CMAC → DAC 环回;</text>
+  <text x="12" y="412" fill="var(--muted)" font-size="11">RX 反向:app_block 过滤 UDP:4791 → roce_stack 校验 ICRC/PSN → wr_req 放置 payload → 生成 ACK → m_rdma_ack 上报;PC 经 JTAG 读回 placement + 计数器。无 PCIe / 无驱动。</text>
+</svg>
+</div>
+
+<h3>关键设计事实(全部已在源码核实)</h3>
+<ul>
+  <li><strong>当前物理设置:板不插 PCIe 槽,台面独立供电,仅 JTAG + UART(USB)连电脑</strong>(用户约束 2026-07-16)。所以 doorbell / 写 WQE / 写 payload / 读回全部走调试链路,不走 PCIe。走 PCIe 的完整 verb(host DMA、SQ ring、驱动)= <a href="#sec-7">§7</a> 的后续流程,本文档不实现。</li>
+  <li><strong>SQ 是推入式,不含 WQE-fetch 机器。</strong><code>s_rdma_sq</code> 是 metaIntf 流,协议引擎不会主动去 host 内存取 WQE——真实 RNIC 的"doorbell 通知 + 硬件 DMA 取 WQE"前端在 Coyote 里由 shell + 驱动代劳。我们分两档补:<strong>L0(本文档范围)= JTAG-to-AXI Master(Xilinx <code>jtag_axi</code> IP)驱动 AXI-Lite 垫片</strong>:host 侧 Vivado <code>hw_server</code> 的 <code>run_hw_axi</code> 直写 WR 字段寄存器 + 敲 doorbell,零 PCIe、零驱动;<strong>L1(后置,走 PCIe)</strong>host DRAM 放 SQ ring + producer-index doorbell + app_block DMA 取 WQE。L0 足够单 WRITE 正确性验证;per-WR 延迟/CQE 时序 + 吞吐扫频需要 L1(见下一条 payload 说明)。</li>
+  <li><strong>payload 取数是硬件自动的,但喂数当前走 JTAG(慢)。</strong>SQ 命令给出本地地址与长度后,协议引擎自己从 <code>m_rdma_rd_req</code> 发 <code>(vaddr, len, ctl)</code> 读命令、等数据从 <code>s_axis_rdma_rd</code> 流回、切 PMTU、打包发送——<strong>这部分永远是线速的</strong>。当前 payload 由 JTAG-to-AXI 预先写入片上 staging(URAM/BRAM);单 WRITE 的<strong>出线时序仍是真实线速</strong>(payload 已在片上,doorbell 一敲即发)。但<strong>逐条 JTAG 敲 WQE 不能测吞吐</strong>(WRITE 间隔被 JTAG 主导)→ 吞吐/延迟扫频需要"payload 预载 + 片上 replay 引擎背靠背发",属研究阶段。</li>
+  <li><strong>ICRC 在仓库里。</strong><code>hdl/common/icrc.sv</code> + <code>hls/crc/</code>;该栈与 ConnectX-5 互操作过,线上格式为合法 RoCE v2,Wireshark 可解。</li>
+  <li><strong>Corundum 侧的官方插入点是 <code>mqnic_app_block</code></strong>:TX/RX 三层 AXI-Stream 钩子 + DMA 接口 + AXI-Lite,专为在数据面内做自定义处理设计(<a href="#code-corundum">§3</a>)。</li>
+  <li><strong>环回两端都是本板 CMAC</strong> → FEC/autoneg/对端兼容类问题在本阶段结构性不存在,全部推迟到 CX-5 互操作阶段。</li>
+</ul>
+
+<!-- ============================ §2 ============================ -->
+<h2 id="sec-2"><span class="secno">§2</span>RoCE v2 协议入门</h2>
+<p class="lede">自足入门,适合组内共读。已熟 RDMA 者可跳到 <a href="#sec-3">§3</a>;更深的协议笔记见 Obsidian <code>003互联基础设施/rdma</code>(基于 rxe / ib_pack.h / Mellanox PRM 核验)。</p>
+
+<h3 id="proto-frame">2.1 帧格式:RoCE v2 就是跑在 UDP 上的 InfiniBand 传输层</h3>
+<div class="tablebox"><table>
+  <tr><th>层</th><th>字段</th><th>本平台取值 / 说明</th></tr>
+  <tr><td>Ethernet</td><td class="mono">dst/src MAC, type=0x0800</td><td>环回阶段静态配置;ARP 由 <code>hls/arp_server</code> 或静态表解决</td></tr>
+  <tr><td>IPv4</td><td class="mono">src/dst IP, proto=UDP</td><td><code>roce_stack</code> 顶层有 <code>local_ip_address</code> 输入;栈内 <code>#define IP_VERSION 4</code></td></tr>
+  <tr><td>UDP</td><td class="mono">dport=4791</td><td>源码常量 <code>RDMA_DEFAULT_PORT = 0x12B7</code>(=4791),RoCE v2 的注册端口</td></tr>
+  <tr><td>IB BTH(12 B)</td><td class="mono">opcode, destQP, PSN, ackreq…</td><td>传输层头,每个包都有;opcode 编码"这是消息的第几段"(下节)</td></tr>
+  <tr><td>IB RETH(16 B)</td><td class="mono">vaddr(8B), rkey(4B), DMALen(4B)</td><td>只出现在 WRITE 的 FIRST/ONLY 包:告诉对端"写到哪、凭什么、总共多长"</td></tr>
+  <tr><td>payload</td><td>—</td><td>FIRST/MIDDLE 段严格等于 PMTU;本栈 PMTU=4096(硬编码)</td></tr>
+  <tr><td>ICRC(4 B)</td><td class="mono">CRC32</td><td>不变量 CRC:对"路由中不变的字段+载荷"计算,可变字段(TTL、DSCP/ECN、校验和等)按掩码规则替换后参与计算。接收端 ICRC 错 = <strong>静默丢弃</strong></td></tr>
+</table></div>
+<div class="callout warn"><span class="tag">调试要点(Stage B 勘误)</span>本分支 <strong>RX 根本不校验 ICRC</strong>(<code>crc.hpp:39</code> 无条件 <code>#define DISABLE_CRC_CHECK</code>)——坏 ICRC 帧会被照常接受、放置、回 ACK,<code>crc_drop_pkg_count</code> 恒为 0(Stage B 实测)。计数器仍接 AXI-Lite,但排障时不要指望它;真正设防的是对端商品 RNIC(它会校验我们的 TX——我们的 TX ICRC 已与参考实现互证正确)。若未来需要 RX 设防:去掉该 define 重新综合,或在 SV 层加校验。</div>
+
+<h3 id="proto-rc">2.2 RC 语义:PSN / ACK / NAK / go-back-N</h3>
+<ul>
+  <li><strong>PSN(24-bit,每 QP 独立)</strong>:发送侧每发一个包 +1;接收侧严格按序校验——收到"过去的 PSN"重发 ACK(重复包),收到"跳号的 PSN"回 <strong>NAK sequence error</strong>。</li>
+  <li><strong>ACK / AETH</strong>:响应端用 ACK 包(BTH+AETH)确认;AETH 携带 syndrome 与 MSN(消息序号,多包消息计数)。ACK 是累积的。</li>
+  <li><strong>go-back-N 重传</strong>:发起端收到 NAK 或超时,从出错 PSN 起整段重发。<strong>本仓库注意</strong>:fns master 的 <code>RETRANS_EN</code> 是被注释掉的(<code>hls/rocev2/rocev2.hpp</code>);BALBOA 重构核有超时+PSN 触发重传,但重传缓冲设计在 HBM 通道上——VCU118 无 HBM,重置方案见 <a href="#sec-6">§6</a>。环回链路丢包率≈0,Stage B–E 可以先跑无重传模式,但要清楚:<strong>一旦丢一个包,该 QP 就挂死</strong>(接收端 NAK、发送端不重发)。</li>
+  <li><strong>流控</strong>:该栈用 ACK 时钟化的按请求计信用(最大在途请求数为构建参数),不依赖 PFC——BALBOA 在有损交换网上就是这样跑的,我们的点对点环回更不需要 PFC。</li>
+</ul>
+
+<h3 id="proto-write">2.3 WRITE 解剖 × 为什么 WRITE-only</h3>
+<p>一次 RDMA WRITE(消息长 L,PMTU=4096)在线上是:</p>
+<pre><code>L ≤ 4096      →  WRITE_ONLY   [BTH+RETH+payload+ICRC]
+L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
+                 WRITE_MIDDLE [BTH+4096B] × n    ← 每段严格 = PMTU
+                 WRITE_LAST   [BTH+尾段]</code></pre>
+<p>响应端<strong>内容无关</strong>地把字节放到 <code>vaddr</code>(经 rkey 授权),按 PSN 记账,回 ACK。两个直接推论:</p>
+<ul>
+  <li><strong>WRITE-only 是够用的科研范围</strong>:KV 传输的主 verb 就是 WRITE;BALBOA 本身也只实现 WRITE+READ(无 SEND/ATOMICS)。READ 需要响应端状态机,后置。</li>
+  <li><strong>WRITE_WITH_IMM 伏笔</strong>:普通 WRITE 在响应端<strong>不产生任何 CQE</strong>(不消耗 receive request)——纯环回内我们两端都可观测,无所谓;但将来对 stock 网卡(CX-5)做压缩载荷实验时,接收主机需要"到达通知 + 压缩后长度"——WRITE_WITH_IMM 恰好消耗一个预投递的 RECV 并交付带 32-bit imm 的 CQE,把压缩长度放 imm 里一举两得。<strong>设计从第一天就留这个口。</strong></li>
+</ul>
+
+<!-- ============================ §3 ============================ -->
+<h2 id="sec-3"><span class="secno">§3</span>组件与代码导读</h2>
+
+<h3 id="code-fns">3.1 fpga-network-stack(协议引擎)</h3>
+<div class="kv">
+  <span class="k">仓库</span><span><code>github.com/fpgasystems/fpga-network-stack</code></span>
+  <span class="k">分支</span><span><strong><code>coyote-TCP-RDMA</code></strong>——Coyote v2 以 submodule <code>hw/services/network</code> 引用的就是它(2024-02 重构后、BALBOA 同款核)。<em>不要用</em> master 上的老 RoCE 或 coyote_v1 的旧核。BALBOA 论文钉的 commit 是 <code>9eda6ce</code>,我们也应钉死自己的 commit 并记录</span>
+  <span class="k">规模</span><span>全仓 392 文件;RoCE 核 HLS + SV 混合</span>
+  <span class="k">许可</span><span>BSD-3(仓库 LICENSE 为准)</span>
+</div>
+<div class="tablebox"><table>
+  <tr><th>路径</th><th>是什么 / 读它的原因</th></tr>
+  <tr><td class="mono">hls/rocev2/rocev2.cpp .hpp</td><td>协议引擎 HLS 顶层——dataflow 结构、各子进程连线;<code>RETRANS_EN</code> 注释在 .hpp。<strong>Stage A 的 csim 对象</strong></td></tr>
+  <tr><td class="mono">hls/rocev2/newFakeDram.hpp, simSwitch.hpp</td><td>自带的 csim 基建:假 DRAM 模型 + 模拟交换。意味着不上板就能全协议仿真——直接复用</td></tr>
+  <tr><td class="mono">hls/ib_transport_protocol/</td><td>传输层状态机核心(PSN 生成/校验、opcode 序列、AETH);常量 <code>RDMA_DEFAULT_PORT=0x12B7</code>、<code>RETRANS_RETRY_CNT=12</code> 在其 .hpp</td></tr>
+  <tr><td class="mono">hls/fns_config.hpp</td><td><code>const uint16_t PMTU = 4096;</code>(第 6 行)——全栈分段粒度,改它要全链路重验</td></tr>
+  <tr><td class="mono">hdl/common/roce_stack.sv</td><td><strong>集成边界。</strong>SV 包装层:SQ 命令位域打包(VITIS_HLS 与非 VITIS 两种布局)、内存命令重组、五个调试计数器输出。接口速查见 <a href="#sec-8">§8</a></td></tr>
+  <tr><td class="mono">hdl/common/icrc.sv + hls/crc/</td><td>ICRC 生成/校验;BALBOA 把它重造成 512/320/32-bit 并行流水(其论文数据:约 12.5K LUT,占核内 28%)</td></tr>
+  <tr><td class="mono">hls/ipv4, hls/udp, hls/arp_server, hls/mac_ip_encode</td><td>L2/L3 胶水。环回阶段 ARP 可用静态表替代,但 RX 双向可达必须保证(ACK 是反向流的!)</td></tr>
+  <tr><td class="mono">hdl/ultraplus/vcu118/tcp_ip_top.v</td><td>仓库里唯一的 VCU118 顶层——<strong>是 TCP/IP 示例不是 RoCE</strong>;只作板卡约束/时钟参考,别误当现成集成</td></tr>
+</table></div>
+<div class="callout acc"><span class="tag">README 原话</span>"The RDMA-stack presented in this repository is the blue roce_stack. <strong>Surrounding modules would need to be provided by users</strong> to integrate the RDMA-capability in their projects." —— 我们的整个 Stage C 就是在造这些 surrounding modules,这条路是仓库钦定的。</div>
+
+<h3 id="code-corundum">3.2 Corundum(NIC 载体)</h3>
+<p>已有资产:VCU118 <code>fpga_100g</code> bitstream 已构建(rev100,时序收敛),基线占用 LUT 6.66% / BRAM 11.76% / URAM 4.69% → <strong>&gt;88% 器件余量</strong>留给我们的逻辑。集成走 <code>mqnic_app_block</code>——Corundum 文档明确它是数据面内自定义包处理的预期挂点:</p>
+<div class="tablebox"><table>
+  <tr><th>接口组</th><th>信号</th><th>用途(本平台)</th></tr>
+  <tr><td>MAC 直连流</td><td class="mono">s/m_axis_direct_tx/rx</td><td>TX/RX 时钟域、最低延迟;暂不用</td></tr>
+  <tr><td><strong>核时钟同步流</strong></td><td class="mono">s/m_axis_sync_tx/rx</td><td><strong>主用</strong>:RoCE 帧从 <code>m_axis_sync_tx</code> 注入;<code>s_axis_sync_rx</code> 上按 UDP:4791 过滤截获,其余流量透传给 mqnic 原生路径</td></tr>
+  <tr><td>聚合接口流</td><td class="mono">s/m_axis_if_tx/rx</td><td>接口级聚合;暂不用</td></tr>
+  <tr><td>控制</td><td class="mono">s_axil_app_ctrl</td><td><strong>doorbell 垫片的 BAR 落点</strong>:WR 字段寄存器、QP 配置、计数器读回</td></tr>
+  <tr><td>DMA</td><td class="mono">DMA read/write desc + RAM</td><td>L0 阶段用于把 payload 从 host 搬进 staging;L1 阶段升级为 WQE fetch</td></tr>
+</table></div>
+<p>启用需在构建参数打开对应的 <code>APP_AXIS_SYNC_ENABLE</code> 等开关(Stage D 检查项)。注意 Corundum 主线自 2023-12 起休眠——遇 shell 问题以自己读源码为准,别指望上游响应。</p>
+
+<!-- ============================ §4 ============================ -->
+<h2 id="sec-4"><span class="secno">§4</span>学习导览</h2>
+<p>学习路线独立成篇:<a href="https://claude.ai/code/artifact/d5cc763b-570e-4ee5-a1c4-6f457459f09c"><strong>《RoCE 平台学习导览》</strong></a>——按"哪个阶段需要先学什么"组织的地图(RoCE 协议 → Vitis HLS → fns 代码结构 → Corundum 内部),每项配动手练习并深链回本手册对应章节。组内新人从导览开始;本手册作为执行时的案头参考。</p>
+
+<!-- ============================ §5 ============================ -->
+<h2 id="sec-5"><span class="secno">§5</span>集成阶段与测试通路</h2>
+<p class="lede">五个阶段,每阶段五件套:目标 / 前置 / 操作 / 通过标准 / 常见故障。严格 stage-gate:上一阶段的通过标准没绿,不进下一阶段。Stage A–D 零板卡依赖,今天就能开工;Stage E 等 DAC 线 + hw_server。<strong>每个阶段的实验独立成报告</strong>(结构:回答什么问题 / 原理 / 装置 / 做了什么 / 结果怎么看 / 发现与边界 / 结论与移交),入口见 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《阶段索引》</a>;已完成:<a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">🧪 Stage A 报告(PASS)</a> · <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 报告(PASS)</a>。本手册是标准,报告是证据。</p>
+
+<!-- Stage A -->
+<div class="stage" id="stage-a">
+  <div class="stage-head"><div class="stage-letter">A</div><div><h3>环境 + csim 冒烟</h3><div class="stage-sub">零硬件 · 可立即开工 · 预计 2–4 天</div></div></div>
+  <div class="stage-body"><dl class="fivepart">
+    <dt>目标</dt><dd>在我们的工具链上把 <code>rocev2</code> HLS 核的 C 仿真跑通,拆掉 Vivado 版本漂移这颗最大前置雷。</dd>
+    <dt>前置</dt><dd>Vivado/Vitis 2025.2(已装,license 含 cmac_usplus);clone <code>fpga-network-stack</code> 并 checkout <code>coyote-TCP-RDMA</code> 分支,记录 commit。</dd>
+    <dt>操作</dt><dd><ol>
+      <li>按 <code>hls/rocev2/CMakeLists.txt</code> + <code>make.tcl.in</code> 的仓库自带流程配置 HLS 工程(具体 cmake 变量以仓库为准,不要凭记忆传参);</li>
+      <li>先用 <strong>2025.2</strong> 跑 csim(利用自带 <code>newFakeDram.hpp</code>/<code>simSwitch.hpp</code>);pragma/API 报错则降级旁装 <strong>2022.2</strong>(栈的钉定版本;nodelocked license 覆盖旧版)——两者结论都记录进决策日志;</li>
+      <li>写一个最小 csim 测例:单 QP、单 WRITE(len &lt; PMTU),dump 输出帧字节。</li>
+    </ol></dd>
+    <dt>通过标准</dt><dd><div class="callout pass"><span class="tag">PASS =</span>csim 构建通过;单 WRITE 输出帧的 Eth/IP/UDP(dport 4791)/BTH/RETH 字段逐项符合 §2.1 表;确定"平台工具链版本"并写入决策记录。</div></dd>
+    <dt>常见故障(2026-07-16 实测更新,详见实验记录 A-3/A-4)</dt><dd><div class="tablebox"><table>
+      <tr><th>症状</th><th>实测原因</th><th>处置</th></tr>
+      <tr><td>cmake 报 VitisHLS not found</td><td>独立 clone 下 <code>FindVitisHLS.cmake</code> 缺失(路径假设 Coyote submodule);且 services target 无 csim</td><td>绕过 cmake:手动 sed 生成 4 个 config 头(注意 <code>.in</code> 里 <code>$</code> 是字面量,sed 要转义 <code>\$</code>)+ 手写 csim tcl</td></tr>
+      <tr><td>TB 调 <code>rocev2&lt;512,0&gt;</code> 报模板参数错</td><td><code>rocev2.hpp</code> 声明的 2 参模板从未被定义;真身是 <code>rocev2.cpp</code> 里的 1 参 <code>rocev2&lt;WIDTH&gt;</code>;且 <strong>WIDTH 单位是 bit(512)不是 byte</strong></td><td>TB 前向声明 1 参模板 + add_files rocev2.cpp 借隐式实例化链接;宽度一律 512</td></tr>
+      <tr><td>构造 <code>stream&lt;psnPkg&gt;</code> 硬编译错</td><td><strong>2025.2 真实 API 漂移</strong>:<code>hls::stream&lt;T&gt;</code> 内嵌 <code>T _data</code>,要求 T 可默认构造;<code>DBG_IBV</code> 在 <code>ib_transport_protocol.hpp:40</code> 无条件定义,顶层多 3 个 dbg 流参数</td><td>TB 侧绑零初始化静态存储传引用(dbg 流仅 RX 路写,TX-WRITE 不触碰);设计本体不受影响</td></tr>
+      <tr><td>stock TB 编译错(19 args vs 13 / APP_WRITE 未声明)</td><td><code>test_rocev2.cpp</code> 陈旧(旧签名 + 已删枚举)</td><td>预期行为,写新 TB;报错本身证明编译链路是通的</td></tr>
+      <tr><td>csim 输出帧"缺 Ethernet 头 / 缺 ICRC 字节"</td><td>正常:顶层从 IPv4 起(MAC 在 <code>mac_ip_encode</code> 栈外);csim 不物化 ICRC(IP 总长预留 4B,keep 掩掉)、IP/UDP 校验和为 0</td><td>csim 校验从 IPv4 层起;ICRC 对拍在 Stage B RTL 层做</td></tr>
+      <tr><td>同一帧被发多次</td><td>本分支 RETRANS_EN 默认开 + TB 不回 ACK → 重传</td><td>正常;验首帧即可,或 TB 回 ACK</td></tr>
+    </table></div></dd>
+  </dl></div>
+</div>
+
+<!-- Stage B -->
+<div class="stage" id="stage-b">
+  <div class="stage-head"><div class="stage-letter">B</div><div><h3>roce_stack 独立 RTL 仿真</h3><div class="stage-sub">零硬件 · 实际 1 天 · <strong>PASS 2026-07-17</strong></div></div></div>
+  <div class="stage-body">
+  <div class="callout pass"><span class="tag">已完成</span>全部通过标准达成,九个发现(含三处包装层契约缝与 RX-不校验-ICRC 勘误)见 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 实验报告</a>。仿真器定案 xsim;工件 myDevbox:<code>~/roce-rtl-sim/</code>,TB/脚本入库 <code>platform-stage/stage_b_sim/</code>。</div>
+  <dl class="fivepart">
+    <dt>目标</dt><dd>在 RTL 层把"SQ 命令 → 合法 RoCE 帧 → 回灌 → 放置 + ACK"整环仿真通,建立 golden 帧库。</dd>
+    <dt>前置</dt><dd>Stage A 通过;确定仿真器(xsim 或 Verilator;metaIntf/AXI4S 是 SV interface,Verilator 需确认支持度,不行就 xsim)。</dd>
+    <dt>操作</dt><dd><ol>
+      <li>为 <code>roce_stack.sv</code> 写 testbench:脚本驱动 <code>s_rdma_qp_interface</code>/<code>s_rdma_conn_interface</code> 建 QP,驱动 <code>s_rdma_sq</code> 发 WR;内存侧接行为模型(响应 <code>m_rdma_rd_req</code> 供 payload、接受 <code>m_rdma_wr_req</code> 放置);</li>
+      <li>抓 <code>m_axis_tx</code> 帧,逐字段校验:UDP 4791、BTH opcode 序列(ONLY / FIRST-MIDDLE-LAST)、PSN 递增、RETH 只在首包、FIRST/MIDDLE 段长严格 = 4096;</li>
+      <li><strong>ICRC 对拍</strong>:用软件参考实现(可对照 rxe 内核源码/自己的 Obsidian 笔记)独立算每帧 ICRC,与硬件输出比对;dump golden pcap 供 Wireshark 人工复核;</li>
+      <li>TX 回灌 RX(<code>m_axis_tx</code> → <code>s_axis_rx</code>):验证放置命令 (vaddr, len) 正确、数据 bit-exact、ACK 生成、发起侧 <code>m_rdma_ack</code> 上报;</li>
+      <li>负测试:人为翻转 payload 一个 bit → <s>期望 crc_drop +1</s> <strong>(勘误:本分支 RX 不校验 ICRC,坏帧被照收——见上方调试要点)</strong>;人为跳 PSN → 期望 NAK(实测 AETH syndrome 0x60 + 期望 PSN)/psn_drop+1;重复 PSN → psn_drop+1、不重放数据、重发 ACK。</li>
+    </ol></dd>
+    <dt>通过标准</dt><dd><div class="callout pass"><span class="tag">PASS =</span>单 QP WRITE 环回 bit-exact(64B、4096B、跨段如 12KB、非对齐尾段各一例);≥PMTU 消息分段序列正确;ICRC 与软件参考全部一致;两个负测试按预期触发计数器。golden pcap 入库。</div></dd>
+    <dt>常见故障(全部为 Stage B 实测)</dt><dd><div class="tablebox"><table>
+      <tr><th>症状</th><th>实测原因</th><th>处置</th></tr>
+      <tr><td>SQ TREADY 恒 0,命令永不放行</td><td>rdma_flow 指针表 BRAM 在 xsim 中读出 X(真板比特流会清零)</td><td>仿真侧对 Coyote RAM 原语 + HLS RAM 统一零初始化(SIM_ZERO_INIT,建模比特流)</td></tr>
+      <tr><td>数据进了行为 FIFO 就消失,无任何告警</td><td>xsim 不重新求值引用 SV 队列方法的连续赋值(<code>assign v = q.size()>0</code>)</td><td>行为替身一律写经典指针式 FIFO</td></tr>
+      <tr><td>帧全对唯 RETH VA 全零</td><td>fns@20633d03 txMeta 结构体声明序 raddr 在 laddr 前,Coyote 打包按构造函数参数序 → 互换</td><td>包装层已修(STAGE-B FIX);一切打包以结构体声明序为准</td></tr>
+      <tr><td>WRITE 后无 m_rdma_rd_req,payload 无人取</td><td>设计如此:WRITE payload 须用户主动推流,m_rdma_rd_req 仅 READ 响应</td><td>SQ 提交后立即推 payload 到 s_axis_rdma_rd_req</td></tr>
+      <tr><td>大 WR 产出 DMALen 与 payload 不符的非法帧</td><td>roce_stack 不切分 >PMTU;切分是 SQ 生产者职责</td><td>doorbell 内置 FIRST/MIDDLE/LAST 切分;DMALen=本命令长度(CX-5 互操作观察项)</td></tr>
+      <tr><td>xelab 链接失败 crt1.o not found</td><td>Vivado 自带 gcc 不认识 Debian multiarch 路径</td><td><code>export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu</code></td></tr>
+    </table></div></dd>
+  </dl></div>
+</div>
+
+<!-- Stage C -->
+<div class="stage" id="stage-c">
+  <div class="stage-head"><div class="stage-letter">C</div><div><h3>doorbell L0 + 内存胶水</h3><div class="stage-sub">零硬件 · 预计 1–2 周</div></div></div>
+  <div class="stage-body"><dl class="fivepart">
+    <dt>目标</dt><dd>造齐"surrounding modules":AXI-Lite doorbell 垫片(L0)+ QP 配置写入器 + staging 内存,仿真级全链路由一次 AXI-Lite 写(板上由 JTAG-to-AXI Master 驱动,见 Stage D/E)发起。垫片逻辑与"谁驱动 AXI-Lite"无关——同一份 RTL 在仿真里由 TB 驱动、板上由 <code>jtag_axi</code> 驱动。</dd>
+    <dt>前置</dt><dd>Stage B 通过 ✓(golden 帧库 + 校验脚本已入库 <code>platform-stage/stage_b_sim/</code>)。<strong>三条硬规范(Stage B 报告 §7)</strong>:① SQ 打包按 txMeta 结构体声明序(raddr@[119:56] 在前);② WQE 提交后 payload 主动推流;③ 大 WR 预切分 FIRST/MIDDLE/LAST。</dd>
+    <dt>操作</dt><dd><ol>
+      <li><strong>doorbell 垫片 L0</strong>:AXI-Lite 从口若干寄存器(opcode/qpn/laddr/len/…,写"提交"寄存器时组包成 metaIntf beat 推入 <code>s_rdma_sq</code> 前的 FIFO);同一 AXI-Lite 空间挂 QP 配置写入器(→ <code>s_rdma_qp_interface</code>/<code>s_rdma_conn_interface</code>)、<strong>staging 写口</strong>(payload 经 AXI-Lite/AXI 写入 URAM)与<strong>五个调试计数器的读回</strong>——即 JTAG-to-AXI 板上能触达的全部东西;</li>
+      <li><strong>staging 内存</strong>:先 URAM(仿真快、无校准问题;VU9P URAM 充裕且基线只用了 4.69%),把 <code>m_rdma_rd_req</code>/<code>m_rdma_wr_req</code> + AXI4S 数据口适配到 URAM 控制器;DDR4 MIG 版本推迟到容量需要时;</li>
+      <li>仿真:AXI-Lite VIP(或简单 TB 驱动)模拟 host——写 QP 配置 → 写 payload 进 staging → 写 WR → 观察整环到 <code>m_rdma_ack</code>;</li>
+      <li>golden 校验复用 Stage B 帧库(同输入必须逐字节同输出)。</li>
+    </ol></dd>
+    <dt>通过标准</dt><dd><div class="callout pass"><span class="tag">PASS =</span>一次模拟 AXI-Lite 写发起的 WR 走完"取数→分段→打包→回灌→放置→ACK→m_rdma_ack"全环;输出帧与 Stage B golden 逐字节一致;计数器经 AXI-Lite 可读且数值正确。</div></dd>
+    <dt>常见故障</dt><dd><div class="tablebox"><table>
+      <tr><th>症状</th><th>大概率原因</th><th>处置</th></tr>
+      <tr><td>WR 推入后无反应</td><td>SQ 位域打包与 roce_stack.sv 期望不符(VITIS_HLS 布局有 32-bit 偏移)</td><td>§8 速查表逐位核;先在 TB 里 assert 打包函数</td></tr>
+      <tr><td>payload 取数长度错</td><td>vaddr/len/ctl 字段序或位宽</td><td>对照 <code>rd_cmd_data</code> 解包代码(vaddr[0+:VADDR], len[VADDR+:LEN], ctl)</td></tr>
+      <tr><td>QP 建立后首包即被丢</td><td>QP 状态/PSN 初值未配或不一致</td><td>两侧(同一栈内 TX/RX)PSN 初值一致性检查</td></tr>
+      <tr><td>QP 配置写入后 QP 始终不进 READY_SEND、无任何报错</td><td><code>qpContext.virtual_address</code> 恰为魔数 <code>0xDEADBEEF</code>/<code>0xFEEDBEEF</code>——本分支把 vaddr 复用作"只更新 rkey / 只更新 remote PSN"的带内操作码,命中即静默降级为部分更新(<code>ib_transport_protocol.cpp:2120-2131</code>)</td><td>QP 配置写入器避开这两个值;按三表语义写(state/MSN/conn,rkey 实际存 MSN 表,详见 Stage A 报告发现 5)</td></tr>
+    </table></div></dd>
+  </dl></div>
+</div>
+
+<!-- Stage D -->
+<div class="stage" id="stage-d">
+  <div class="stage-head"><div class="stage-letter">D</div><div><h3>Corundum app_block 集成 + 综合</h3><div class="stage-sub">零板卡(综合即可) · 预计 2–3 周</div></div></div>
+  <div class="stage-body"><dl class="fivepart">
+    <dt>目标</dt><dd>栈 + 垫片 + <strong>JTAG-to-AXI Master</strong> 进入 CMAC 载体(Corundum app_block 或裸 CMAC shell,见下决策),全设计 250 MHz / 512-bit 综合布线收敛,产出第一份资源报告。</dd>
+    <dt>前置</dt><dd>Stage C 通过;rev100 Corundum 工程可重建(已验证过一次)。</dd>
+    <dt>操作</dt><dd><ol>
+      <li><strong>载体决策(本阶段第一件事,因无 PCIe 而升级为真实分叉)</strong>:<strong>(a)</strong> 复用已建的 Corundum rev100——但板不插槽 → 必须确认其数据面时钟改自由运行(不取 PCIe refclk)、复位不门控在 PCIe link-up,PCIe 块悬空可综合;<strong>(b)</strong> 裸 CMAC + JTAG-to-AXI 最小 shell——无 PCIe 依赖、更瘦,但要自建 CMAC/GT bring-up 与时钟。先尝试 (a)(不浪费 rev100);(a) 的 PCIe 依赖若拆不干净,转 (b)。<em>本决策与结论写入 §6 决策日志。</em></li>
+      <li><strong>加 JTAG-to-AXI Master</strong>(Xilinx <code>jtag_axi</code> IP)作为 AXI-Lite 垫片 + staging 写口的主机——这是"无 PCIe 敲 doorbell"的物理落点,Vivado <code>run_hw_axi</code> 从它发 AXI 事务;</li>
+      <li>app_block 内实例化:doorbell 垫片 + roce_stack + URAM staging + L2/L3 胶水(静态 MAC/IP;ARP 先静态表);</li>
+      <li>TX:RoCE 帧经仲裁 mux 进 CMAC 发送流(<code>m_axis_sync_tx</code> 或裸 CMAC AXIS);RX:按 "IPv4 + UDP dport 4791" 过滤入栈;</li>
+      <li>跑综合 + 布线;时钟域检查:roce_stack 设计点 250 MHz,确认载体核频并做 CDC/位宽适配;</li>
+      <li>产出资源/时序报告存档(LUT/BRAM/URAM/FF/Fmax)——未来论文资源表的第一行。参考量级:BALBOA 重构核在 U55C 上约 44K LUT / 101 BRAM(同 UltraScale+ 工艺可比,我们的构建含 jtag_axi + staging + 胶水会有出入)。</li>
+    </ol></dd>
+    <dt>通过标准</dt><dd><div class="callout pass"><span class="tag">PASS =</span>post-route 时序收敛;资源报告在手且总占用留显著余量;行为仿真里 JTAG-to-AXI 写 WQE → WRITE 环回帧不变形;载体决策(a/b)已定并记录。</div></dd>
+    <dt>常见故障</dt><dd><div class="tablebox"><table>
+      <tr><th>症状</th><th>大概率原因</th><th>处置</th></tr>
+      <tr><td>Corundum 综合报缺 PCIe/复位卡住</td><td>数据面时钟/复位依赖 PCIe link-up(板不插槽)</td><td>改自由运行时钟 + 解耦复位;拆不干净则转裸 CMAC shell(方案 b)</td></tr>
+      <tr><td>250 MHz 收不了</td><td>VU9P 三 SLR 跨片路径(ICRC/宽 mux 常见)</td><td>加流水级、SLR 约束/floorplan;先降频收敛拿基线再优化</td></tr>
+      <tr><td>run_hw_axi 写不进寄存器</td><td>jtag_axi 地址映射/AXI-Lite 译码错</td><td>行为仿真里先用 AXI-Lite VIP 打通同一地址图,再上板</td></tr>
+      <tr><td>RX 帧进不了栈</td><td>过滤器字段偏移(VLAN?)或静态 MAC/IP 不匹配</td><td>行为仿真里 dump 过滤器输入;先放宽过滤条件定位</td></tr>
+    </table></div></dd>
+  </dl></div>
+</div>
+
+<!-- Stage E -->
+<div class="stage" id="stage-e">
+  <div class="stage-head"><div class="stage-letter">E</div><div><h3>上板环回首光(JTAG 驱动,无 PCIe)</h3><div class="stage-sub">等 DAC 线 + hw_server · 预计 1–2 周</div></div></div>
+  <div class="stage-body"><dl class="fivepart">
+    <dt>目标</dt><dd>台面 VCU118(独立供电,<strong>不插 PCIe 槽</strong>),QSFP0═DAC═QSFP1 环回,纯 JTAG 驱动下单个 WRITE roundtrip bit-exact。这是"敲 doorbell 写 WQE 即可"的物理落地。</dd>
+    <dt>前置</dt><dd>Stage D 通过;DAC 线到货;VCU118 台面供电 + JTAG(USB)+ hw_server 通路已搭(<strong>不等线,现在就能做</strong>)。<strong>不需要</strong>:PCIe 插槽、PCIe 枚举、mqnic 驱动、BAR——全部推迟到 <a href="#sec-7">§7</a> 的 L1/PCIe 阶段。</dd>
+    <dt>操作</dt><dd><ol>
+      <li>板上电(自带电源)→ <code>hw_server</code> + Vivado 经 JTAG 连上 → 刷写 bitstream → <code>run_hw_axi</code> 读五个计数器(应全 0),确认 JTAG-to-AXI 地址图通;</li>
+      <li>插 DAC 成环,确认两个 CMAC 链路 up(两端同构,无 FEC/AN 兼容问题);</li>
+      <li>单 WRITE 序列全用 <code>run_hw_axi</code>:①写 QP 配置 → ②把 64B 已知 payload 写入 staging → ③写 WQE 字段寄存器(opcode=WRITE_ONLY/qpn/laddr/raddr/len=64)→ ④敲 doorbell 提交寄存器;</li>
+      <li>读回:<code>run_hw_axi</code> 读 placement 区(应等于 payload,bit-exact)+ 读计数器(ibv_tx/rx +1、crc_drop/psn_drop = 0);</li>
+      <li>覆盖分段:再发一个 &gt;PMTU 的 WRITE(如 12KB,payload 预写 staging),验 FIRST-MIDDLE-LAST 序列在板上也 bit-exact;</li>
+      <li>可选埋点(强烈推荐,现在最便宜):BALBOA Fig-5 式<strong>分段延迟插桩</strong>(各流水段 first-byte-in→first-byte-out 的 cycle 计数器,经 AXI-Lite 读回)——单 WRITE 的出线时序是真实线速,可采;</li>
+      <li>负测试(app_block 内受控故障注入):丢一个包 → 确认无重传模式下 QP 挂死行为与计数器符合预期(§7 重传工作的动机数据)。</li>
+    </ol></dd>
+    <dt>通过标准</dt><dd><div class="callout pass"><span class="tag">PASS =</span>纯 JTAG 驱动下单 WRITE(≤PMTU 与跨段各一)板级 roundtrip bit-exact;<code>crc_drop</code>/<code>psn_drop</code> 运行中为 0;计数器/延迟插桩可经 <code>run_hw_axi</code> 读回 → 平台链路宣告打通。<strong>注:吞吐/延迟扫频不在本阶段</strong>——逐条 JTAG 敲 WQE 无法反映真实 WRITE 间隔,吞吐需"payload 预载 + 片上 replay"(研究阶段)。</div></dd>
+    <dt>常见故障</dt><dd><div class="tablebox"><table>
+      <tr><th>症状</th><th>大概率原因</th><th>处置</th></tr>
+      <tr><td>链路不 up</td><td>QSFP 模块/线缆、GT 参考时钟、CMAC 配置</td><td>两端同构排除兼容性;查 CMAC 状态寄存器、GT 眼图/环回自测</td></tr>
+      <tr><td>链路 up 但收不到帧</td><td>RX 过滤器、MAC 地址、app 使能</td><td>读 CMAC 收包统计 vs 栈入口计数,二分定位丢在哪层</td></tr>
+      <tr><td>收到但全被丢</td><td>ICRC(看 <code>crc_drop_pkg_count</code>!)</td><td>板上 ICRC 错而仿真对 → 查综合裁剪/时序;抓帧回放进仿真复现</td></tr>
+      <tr><td>偶发挂死</td><td>真实丢包 × 无重传</td><td>预期行为;记录频率,作为重传工作的输入</td></tr>
+      <tr><td>run_hw_axi 读/写超时</td><td>hw_server 未连、jtag_axi 地址错、板未上电</td><td>先确认 JTAG 链上 device、run_hw_axi 读一个已知常量寄存器自检</td></tr>
+      <tr><td>板上电但 JTAG 认不到 device</td><td>台面供电时序 / USB-JTAG 线 / 模式引脚</td><td>与 DAC/PCIe 无关;先裸刷一个 hello-world 确认 JTAG 链路</td></tr>
+    </table></div></dd>
+  </dl></div>
+</div>
+
+<!-- ============================ §6 ============================ -->
+<h2 id="sec-6"><span class="secno">§6</span>已知雷与决策记录</h2>
+<div class="tablebox"><table>
+  <tr><th>#</th><th>雷 / 决策点</th><th>事实与处置</th></tr>
+  <tr><td class="num">1</td><td><strong>Vivado 版本:已锁定 2025.2(Stage A 实测,07-16)</strong></td><td>csim 经 <code>vitis-run --mode hls --tcl … &lt;/dev/null</code>(2025.2 无 vitis_hls;--csim 标志只配 --config 流)全流程通过,"CSim done with 0 errors",设计 9 源文件零改动编译。唯一真实 API 漂移:2025.2 <code>hls::stream&lt;T&gt;</code> 要求 T 可默认构造——影响 TB 构造 <code>stream&lt;psnPkg&gt;</code>(设计本体不受影响),TB 侧绑零初始化静态存储绕过。无需旁装 2022.2。证据:实验记录 A-4</td></tr>
+  <tr><td class="num">2</td><td><strong>重传:分支间状态相反(勘误 07-16)</strong></td><td><strong>coyote-TCP-RDMA 分支(我们用的)默认开启</strong>:<code>rocev2_config.hpp.in</code> 无条件 <code>#define RETRANS_EN</code>,CMake 默认 <code>RETRANS_EN=1</code>(Stage A-3 实测源码);"被注释"的说法只适用于 fns master。BALBOA 重构核的重传缓冲设计在 HBM 通道 → VCU118 上重传缓冲要重置到 DDR4/URAM(§7);环回阶段若先关重传跑,需显式改 config,并记住一丢即挂</td></tr>
+  <tr><td class="num">3</td><td><strong>PMTU=4096 硬编码</strong></td><td><code>fns_config.hpp:6</code>。环回无所谓;将来对 CX-5 时要求对端 eth MTU ≥4200 且 QP path_mtu=4096(检查单 item 4)</td></tr>
+  <tr><td class="num">4</td><td><strong>WRITE 无响应端 CQE</strong></td><td>IBTA 语义如此。环回内不影响;对 stock 网卡的实验从第一天按 WRITE_WITH_IMM 设计(imm 载压缩长度)</td></tr>
+  <tr><td class="num">5</td><td><strong>ICRC 静默丢弃</strong></td><td>唯一可见性是计数器 → 五个调试计数器(ibv_rx/tx_pkg, crc_drop, psn_drop, retrans)在 Stage C 就接 AXI-Lite,永远第一眼看它们</td></tr>
+  <tr><td class="num">6</td><td><strong>ETH scoop 风险</strong></td><td>BALBOA 论文原文:正在做"line-rate compression and decompression logic cores"。<strong>每季度</strong>盯 fpgasystems 仓库与 arXiv;我们的研究段 novelty 钉在 dual-length verbs 语义 + 实测 per-WR gate,不赌"首个内联压缩"</td></tr>
+  <tr><td class="num">7</td><td><strong>Corundum 主线休眠</strong></td><td>2023-12 起;问题自己读源码解决,shell 侧改动尽量少、都留在 app_block 内</td></tr>
+  <tr><td class="num">8</td><td><strong>无 PCIe / JTAG 驱动(用户约束 07-16)</strong></td><td>板不插槽、台面供电、仅 JTAG+UART 连电脑 → doorbell/WQE/payload/读回全走 JTAG-to-AXI(<code>jtag_axi</code> IP + Vivado <code>run_hw_axi</code>),零驱动零 BAR。<strong>决策点</strong>:载体 (a) 复用 rev100(需拆 Corundum 的 PCIe 时钟/复位依赖)vs (b) 裸 CMAC shell——Stage D 定夺并回填此处。<strong>限制</strong>:JTAG 慢,只做单 WRITE 正确性;吞吐/延迟扫频 = 片上 replay(§7)或 L1/PCIe</td></tr>
+</table></div>
+
+<!-- ============================ §7 ============================ -->
+<h2 id="sec-7"><span class="secno">§7</span>后续路标(平台可用之后)</h2>
+<ol>
+  <li><strong>完整 verb over PCIe(用户明确的"后续流程")</strong>:把板插进主机 PCIe 槽,启用 Corundum 的 PCIe/DMA + mqnic 驱动,做 L1 doorbell = host DRAM SQ ring + producer-index doorbell + DMA 取 WQE。这才解锁 per-WR 延迟组成、CQE 时序、以及真实 host→板 payload 通路。</li>
+  <li><strong>片上 replay 引擎(吞吐扫频的前提)</strong>:payload 预载 staging + 片上描述符环背靠背发 WRITE,让 CMAC 侧计数器测到真实吞吐-消息尺寸曲线——绕开 JTAG 的慢速瓶颈,不必等 PCIe。</li>
+  <li><strong>重传缓冲 DDR4/URAM 重置</strong>:把 HBM 假设换掉,受控丢包(app_block 故障注入)下验证 go-back-N——这同时是 dual-length-under-retransmission 实验的地基。</li>
+  <li><strong>ConnectX-5 互操作</strong>:14 项检查单 + ~200 行 libibverbs 对端 harness(可先用 Soft-RoCE/rxe 调通)→ <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code> Part B。</li>
+  <li><strong>codec 插入</strong>:channel-major/byte-transpose 变换 + Vitis DCL 动态-Huffman gzip CU(<code>gzip_compress_multicore_stream.cpp</code>,ap_ctrl_none 纯 AXI4-Stream)上 TX payload 路径;第一步用自描述 chunk(NetZIP 式)拿通路。</li>
+  <li><strong>dual-length verbs 研究段(论文核心)</strong>:SQ 命令与协议管线扩展 wire-length/app-length 双记账(RETH/DMA-len/PSN/重传存储/放置/CQE),压缩载荷重传正确性;对比"引擎上游自包含压缩"与"verbs 内压缩"两种放置。BALBOA 对比数字与可比性 caveat → 同文档 Part A。</li>
+</ol>
+
+<!-- ============================ §8 ============================ -->
+<h2 id="sec-8"><span class="secno">§8</span>附录:接口速查表</h2>
+
+<h3>8.1 roce_stack.sv 顶层端口(核实自源码)</h3>
+<pre><code>module roce_stack (
+    input  logic  nclk, nresetn,
+    AXI4S.s       s_axis_rx,            AXI4S.m  m_axis_tx,        // 网络侧 512-bit
+    metaIntf.s    s_rdma_sq,            metaIntf.m m_rdma_ack,     // SQ 推入 / 完成(CQE 测点)
+    metaIntf.m    m_rdma_rd_req,        metaIntf.m m_rdma_wr_req,  // 内存命令(取数/放置)
+    AXI4S.s       s_axis_rdma_rd,       AXI4S.m  m_axis_rdma_wr,   // 内存数据流
+    metaIntf.s    s_rdma_qp_interface,  metaIntf.s s_rdma_conn_interface,
+    input  logic [31:0] local_ip_address,
+    // 调试计数器(valid+data 成对):
+    ibv_rx_pkg_count, ibv_tx_pkg_count, crc_drop_pkg_count,
+    psn_drop_pkg_count, retrans_count
+);</code></pre>
+
+<h3>8.2 SQ 命令位域(VITIS_HLS 打包布局,核实自 roce_stack.sv)</h3>
+<div class="tablebox"><table>
+  <tr><th>字段</th><th>位置(VITIS_HLS 变体)</th><th>说明</th></tr>
+  <tr><td class="mono">opcode</td><td class="mono">[0 +: RDMA_OPCODE_BITS]</td><td>verb 选择(WRITE 等)</td></tr>
+  <tr><td class="mono">qpn</td><td class="mono">[32 +: RDMA_QPN_BITS]</td><td>注意:VITIS_HLS 布局下 qpn 从 <strong>bit 32</strong> 起(非 VITIS 布局是紧跟 opcode)——垫片打包最容易错的一处</td></tr>
+  <tr><td class="mono">host</td><td class="mono">[32+QPN +: 1]</td><td>host 位</td></tr>
+  <tr><td class="mono">last</td><td class="mono">[32+QPN+1 +: 1]</td><td>last 位</td></tr>
+  <tr><td class="mono">offs</td><td class="mono">[32+QPN+2 +: RDMA_OFFS_BITS]</td><td>偏移字段</td></tr>
+  <tr><td class="mono">msg</td><td class="mono">[… +: RDMA_MSG_BITS]</td><td>消息参数(本地/远端地址、长度等打包;各 *_BITS 以 lynxTypes 定义为准)</td></tr>
+</table></div>
+
+<h3>8.3 内存命令字段(rd/wr 同构)</h3>
+<div class="tablebox"><table>
+  <tr><th>字段</th><th>位置</th><th>说明</th></tr>
+  <tr><td class="mono">vaddr</td><td class="mono">[0 +: VADDR_BITS]</td><td>staging 内虚地址</td></tr>
+  <tr><td class="mono">len</td><td class="mono">[VADDR_BITS +: LEN_BITS]</td><td>字节长</td></tr>
+  <tr><td class="mono">ctl</td><td class="mono">[VADDR_BITS+LEN_BITS +: 1]</td><td>控制位</td></tr>
+</table></div>
+
+<h3>8.4 mqnic_app_block 端口组</h3>
+<div class="tablebox"><table>
+  <tr><th>组</th><th>信号</th><th>启用参数</th></tr>
+  <tr><td>MAC 直连</td><td class="mono">s/m_axis_direct_tx, s/m_axis_direct_rx</td><td class="mono">APP_AXIS_DIRECT_ENABLE</td></tr>
+  <tr><td>核时钟同步(主用)</td><td class="mono">s/m_axis_sync_tx, s/m_axis_sync_rx</td><td class="mono">APP_AXIS_SYNC_ENABLE</td></tr>
+  <tr><td>接口聚合</td><td class="mono">s/m_axis_if_tx, s/m_axis_if_rx</td><td class="mono">APP_AXIS_IF_ENABLE</td></tr>
+  <tr><td>控制</td><td class="mono">s_axil_app_ctrl(从)· m_axil_ctrl(主)</td><td>—</td></tr>
+  <tr><td>DMA</td><td class="mono">read/write descriptor + RAM 接口</td><td>—</td></tr>
+</table></div>
+
+<h3>8.5 ibvQ 带外交换结构(future:CX-5 互操作用,核实自 Coyote cDefs.hpp)</h3>
+<pre><code>struct ibvQ {  // Coyote sw/include/coyote/cDefs.hpp(约 :311)
+    ip_addr;  qpn;  psn;   // PSN = 随机 24-bit(cThread.cpp 约 :198)
+    rkey;  vaddr;  size;
+    gid[33];
+};  // 经普通 TCP socket 带外交换;对端 harness 拿它做 INIT→RTR→RTS</code></pre>
+
+<div class="footnote">
+  <p>事实来源:fpga-network-stack / Coyote / Corundum 源码逐文件核验(2026-07-16);BALBOA = arXiv 2507.20412(资源与延迟数字系论文图表像素测量,标注"约");Corundum app_block = 官方文档 <code>docs/source/modules/mqnic_app_block.rst</code>。CX-5 检查单与 BALBOA 对比表:仓库 <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code>。本手册对应计划:<code>~/.claude/plans/attach-glowing-puppy.md</code>。</p>
+  <p>WR-ZipGuard · Platform Stage · v1.0 · 2026-07-16</p>
+</div>
+</main>
+</div>

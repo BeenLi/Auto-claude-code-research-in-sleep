@@ -1,0 +1,272 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage A 实验报告 · rocev2 csim 冒烟</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.8; margin: 0; font-size: 15.5px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  main { max-width: 860px; margin: 0 auto; padding: 36px 24px 96px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 28px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 62ch; margin: 0 0 14px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--mono); font-size: 12px; margin-bottom: 4px; }
+  .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; color: var(--muted); }
+  .chip.ok { background: var(--pass-soft); border-color: color-mix(in srgb, var(--pass) 40%, transparent); color: var(--pass); font-weight: 700; }
+  h2 { font-size: 20px; margin: 50px 0 8px; scroll-margin-top: 24px; letter-spacing: -.005em; }
+  h2 .secno { font-family: var(--mono); color: var(--accent-ink); font-size: 14px; margin-right: 10px; }
+  h3 { font-size: 16px; margin: 26px 0 6px; }
+  p { margin: 10px 0; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 13px 15px; overflow-x: auto; line-height: 1.6; }
+  pre code { background: none; padding: 0; font-size: 12.6px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.8px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.8px; }
+  tr:last-child td { border-bottom: none; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--muted); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14.2px; }
+  .callout.pass { border-left-color: var(--pass); background: var(--pass-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.acc  { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px; }
+  .callout.pass .tag { color: var(--pass); } .callout.warn .tag { color: var(--warn); } .callout.acc .tag { color: var(--accent-ink); }
+  ul, ol { margin: 8px 0; padding-left: 22px; } li { margin: 5px 0; }
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 660px; width: 100%; height: auto; }
+  .qa dt { font-weight: 700; margin-top: 14px; }
+  .qa dd { margin: 4px 0 0 0; color: var(--ink); }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 实验报告 A</div>
+  <h1>Stage A:rocev2 协议引擎的 C 仿真冒烟与单 WRITE 帧解剖</h1>
+  <p class="hero-sub">回答一个决定整个平台能否开工的问题:在我们唯一可用的工具链(Vivado/Vitis 2025.2)上,ETH 的 RoCE v2 HLS 协议引擎能不能被驱动起来、并发出一帧协议上正确的 RDMA WRITE?</p>
+  <div class="meta-row">
+    <span class="chip ok">PASS · 2026-07-16</span>
+    <span class="chip">DUT: rocev2_top @ fns coyote-TCP-RDMA 20633d03</span>
+    <span class="chip">环境: myDevbox · Vitis 2025.2 · clang-16</span>
+    <span class="chip">耗时: 1 天</span>
+  </div>
+</header>
+
+<!-- ========== 1 ========== -->
+<h2><span class="secno">§1</span>这个实验回答什么问题</h2>
+<p>Stage A 是整个五阶段计划的第一道闸门,它同时回答三个独立的问题——任何一个是"否",后面所有阶段的计划都要改写:</p>
+<div class="tablebox"><table>
+  <tr><th>#</th><th>问题</th><th>为什么关键</th><th>答案</th></tr>
+  <tr><td>Q1</td><td><strong>工具链</strong>:2025.2(没有 classic <code>vitis_hls</code>)还能不能跑这套 2022 年代 HLS 代码的 csim?</td><td>手册预判的最大前置雷("版本漂移")。若不能,要旁装 2022.2,全项目工具链版本被迫分裂</td><td><strong>能</strong>,一处 TB 侧 API 漂移有干净绕法</td></tr>
+  <tr><td>Q2</td><td><strong>代码可用性</strong>:这个两天前还在推送的活跃分支,当前 API 下能被外部驱动吗?</td><td>README 说"周边模块用户自行提供"——如果连仿真里都喂不动它,Stage C 的 doorbell 垫片就是空中楼阁</td><td><strong>能</strong>,但自带测试台已陈旧,需按新 API 自建</td></tr>
+  <tr><td>Q3</td><td><strong>协议正确性(初检)</strong>:喂一条 SQ 命令,它发出的帧是合法 RoCE v2 吗?</td><td>这是平台的"心跳"——后面一切(环回、互操作、压缩插入)都建立在"引擎发的帧是对的"之上</td><td><strong>是</strong>,单 WRITE 帧逐字段核对通过(ICRC 除外,见 §6)</td></tr>
+</table></div>
+
+<!-- ========== 2 ========== -->
+<h2><span class="secno">§2</span>实验原理</h2>
+<h3>2.1 csim 是什么,它验证什么、不验证什么</h3>
+<p>HLS 的 C 仿真(csim)是把 HLS C++ 源码<strong>当普通软件编译执行</strong>(2025.2 里用 clang-16),流(<code>hls::stream</code>)退化为线程内 FIFO,<code>#pragma HLS</code> 全部被忽略。所以:</p>
+<ul>
+  <li><strong>它验证的是算法/协议语义</strong>:状态机转移、字段组装、字节搬运的逻辑对不对;</li>
+  <li><strong>它不验证</strong>:时序、流水线行为、接口握手时序、以及任何由 pragma 决定的东西(那些属于 csynth/cosim,即 Stage B 之后)。</li>
+</ul>
+<p>对 Stage A 的目标(Q1–Q3)这恰好足够:Q1 是编译器/头文件层问题,Q2 是 API 层问题,Q3 是协议语义问题——三者都在 csim 的验证边界内。</p>
+
+<h3>2.2 为什么"一帧 WRITE 的解剖"就能当协议初检</h3>
+<p>看似只验了一个包,实际上这一帧的每个字节都要求引擎内部一整条链路全部正确才能产生:</p>
+<div class="diagram">
+<svg viewBox="0 0 900 130" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12">
+  <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker></defs>
+  <g>
+    <rect x="8" y="30" width="118" height="58" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="67" y="55" text-anchor="middle" fill="var(--ink)">SQ 命令解析</text><text x="67" y="74" text-anchor="middle" fill="var(--muted)" font-size="10">txMeta 字段</text>
+    <rect x="156" y="30" width="118" height="58" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="215" y="55" text-anchor="middle" fill="var(--ink)">QP 状态/连接表</text><text x="215" y="74" text-anchor="middle" fill="var(--muted)" font-size="10">PSN·目的 IP 解析</text>
+    <rect x="304" y="30" width="118" height="58" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="363" y="55" text-anchor="middle" fill="var(--ink)">payload 取数</text><text x="363" y="74" text-anchor="middle" fill="var(--muted)" font-size="10">mem_read 命令</text>
+    <rect x="452" y="30" width="118" height="58" rx="7" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="511" y="55" text-anchor="middle" fill="var(--accent-ink)">IB 打包</text><text x="511" y="74" text-anchor="middle" fill="var(--muted)" font-size="10">BTH+RETH 组装</text>
+    <rect x="600" y="30" width="118" height="58" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="659" y="55" text-anchor="middle" fill="var(--ink)">UDP/IP 封装</text><text x="659" y="74" text-anchor="middle" fill="var(--muted)" font-size="10">4791·长度·地址</text>
+    <rect x="748" y="30" width="144" height="58" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="820" y="55" text-anchor="middle" fill="var(--ink)">512-bit AXIS 出流</text><text x="820" y="74" text-anchor="middle" fill="var(--muted)" font-size="10">keep/last 掩码</text>
+    <line x1="126" y1="59" x2="156" y2="59" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <line x1="274" y1="59" x2="304" y2="59" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <line x1="422" y1="59" x2="452" y2="59" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <line x1="570" y1="59" x2="600" y2="59" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <line x1="718" y1="59" x2="748" y2="59" stroke="var(--muted)" marker-end="url(#ar)"/>
+  </g>
+  <text x="8" y="118" fill="var(--muted)" font-size="11">帧里每个字段都能反推一个环节:destQP/PSN 对 → 状态表对;RETH 三元组对 → SQ 解析对;payload 对 → 取数通路对;长度自洽 → 封装对。</text>
+</svg>
+</div>
+<p>这就是"单帧解剖"的杠杆:<strong>用一个可完全预测的最小激励,让输出的每个字节都有唯一正确值</strong>。我们把 QP/PSN/rkey/地址/payload 全部设成可辨识的"签名值"(如 <code>0x1122334455667788</code>、<code>0xA0+i</code>),帧里凡是出现这些值的位置,都能反推"哪个环节把哪个输入搬到了哪里"。</p>
+
+<h3>2.3 对照组设计</h3>
+<p>直接跑自带测试台大概率失败(代码考古显示它针对旧 API)。我们把这一步<strong>保留为对照组</strong>而不是跳过:如果它失败在"链接器/头文件找不到",说明工具链有问题(Q1 危险);如果失败在"函数签名不匹配",说明工具链没问题、只是 TB 陈旧(Q1 安全,Q2 需自建)。失败的<strong>形态</strong>本身就是证据。</p>
+
+<!-- ========== 3 ========== -->
+<h2><span class="secno">§3</span>实验装置(Setup)</h2>
+<h3>3.1 被测对象与环境</h3>
+<div class="tablebox"><table>
+  <tr><th>项</th><th>值</th></tr>
+  <tr><td>DUT</td><td class="mono">rocev2_top(ap_ctrl_none 综合顶层)→ 内部 rocev2&lt;512&gt; dataflow;含 ipv4/ipv6/udp/CRC/ib_transport_protocol 全链</td></tr>
+  <tr><td>代码版本</td><td class="mono">fpga-network-stack @ coyote-TCP-RDMA, commit 20633d03(2026-07-14)</td></tr>
+  <tr><td>工具</td><td class="mono">Vitis 2025.2 · vitis-run --mode hls --tcl · csim 编译器 clang-16</td></tr>
+  <tr><td>机器</td><td class="mono">myDevbox(Debian, 64 核)· 工作区 ~/fpga-network-stack-csim/</td></tr>
+  <tr><td>生成配置</td><td class="mono">DATA_WIDTH=64B(=512bit)· PMTU=4096 · MAX_QPS=256 · RETRANS_EN=on(分支默认)</td></tr>
+</table></div>
+
+<h3>3.2 测试台闭环(谁喂谁、谁收谁)</h3>
+<div class="diagram">
+<svg viewBox="0 0 900 250" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12">
+  <defs><marker id="ar2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker></defs>
+  <rect x="330" y="60" width="240" height="130" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="450" y="88" text-anchor="middle" fill="var(--accent-ink)" font-weight="700">rocev2_top(DUT)</text>
+  <text x="450" y="108" text-anchor="middle" fill="var(--muted)" font-size="11">循环调用 20000 次</text>
+  <text x="450" y="126" text-anchor="middle" fill="var(--muted)" font-size="11">(dataflow 在 csim 里靠</text>
+  <text x="450" y="142" text-anchor="middle" fill="var(--muted)" font-size="11">反复调用推进各进程)</text>
+  <rect x="20" y="18" width="250" height="52" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="145" y="40" text-anchor="middle" fill="var(--ink)">① QP 建立(一次性)</text>
+  <text x="145" y="58" text-anchor="middle" fill="var(--muted)" font-size="10.5">qpContext(READY_SEND,…)+ ifConnReq</text>
+  <rect x="20" y="90" width="250" height="52" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="145" y="112" text-anchor="middle" fill="var(--ink)">② 一条 SQ 命令</text>
+  <text x="145" y="130" text-anchor="middle" fill="var(--muted)" font-size="10.5">txMeta(WRITE_ONLY, len=64, …)</text>
+  <rect x="20" y="162" width="250" height="60" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="145" y="184" text-anchor="middle" fill="var(--ink)">③ 假内存(fake mem)</text>
+  <text x="145" y="202" text-anchor="middle" fill="var(--muted)" font-size="10.5">收 mem_read_cmd → 按 keep 回灌</text>
+  <text x="145" y="216" text-anchor="middle" fill="var(--muted)" font-size="10.5">64B 签名 payload(0xA0+i)</text>
+  <rect x="640" y="90" width="240" height="66" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="760" y="112" text-anchor="middle" fill="var(--ink)">④ 收帧 + 落盘</text>
+  <text x="760" y="130" text-anchor="middle" fill="var(--muted)" font-size="10.5">drain m_axis_tx_data(512b word)</text>
+  <text x="760" y="146" text-anchor="middle" fill="var(--muted)" font-size="10.5">print() 线序 hex → tx_frame.txt</text>
+  <line x1="270" y1="44" x2="352" y2="80" stroke="var(--muted)" marker-end="url(#ar2)"/>
+  <line x1="270" y1="116" x2="330" y2="116" stroke="var(--muted)" marker-end="url(#ar2)"/>
+  <line x1="330" y1="170" x2="270" y2="185" stroke="var(--muted)" marker-end="url(#ar2)" marker-start="url(#ar2)"/>
+  <text x="278" y="164" fill="var(--muted)" font-size="10">cmd/data</text>
+  <line x1="570" y1="120" x2="640" y2="120" stroke="var(--muted)" marker-end="url(#ar2)"/>
+  <text x="580" y="112" fill="var(--muted)" font-size="10">TX 帧</text>
+  <text x="330" y="238" fill="var(--muted)" font-size="11">另:5 个计数器(rx/tx/crc_drop/psn_drop/retrans)按值读出;3 个 DBG 流绑静态存储不消费。</text>
+</svg>
+</div>
+
+<h3>3.3 激励参数(全部为可辨识签名值)</h3>
+<div class="tablebox"><table>
+  <tr><th>参数</th><th>设定值</th><th>预期在帧中出现的位置</th></tr>
+  <tr><td class="mono">QPN</td><td class="mono">0x11</td><td>BTH destQP(TB 建连时 remote_qpn=本 QPN)</td></tr>
+  <tr><td class="mono">PSN(local=remote)</td><td class="mono">0x80ce4e</td><td>BTH PSN 字段</td></tr>
+  <tr><td class="mono">RADDR(远端虚地址)</td><td class="mono">0x1122334455667788</td><td>RETH VA(8B)</td></tr>
+  <tr><td class="mono">RKEY</td><td class="mono">0x1234abcd</td><td>RETH R_key(4B)——注意它来自 qpContext,不是 txMeta</td></tr>
+  <tr><td class="mono">LEN</td><td class="mono">64</td><td>RETH DMALen(4B)+ payload 长度 + IP/UDP 长度字段的自洽性</td></tr>
+  <tr><td class="mono">payload</td><td class="mono">byte[i] = 0xA0+i(64B)</td><td>BTH/RETH 之后的数据区,逐字节可验</td></tr>
+  <tr><td class="mono">本端/远端 IP</td><td class="mono">11.1.212.209 / 11.1.212.210</td><td>IPv4 源/目的地址(沿用 stock TB 的地址常量)</td></tr>
+  <tr><td class="mono">UDP 源端口</td><td class="mono">0xC000(=49152)</td><td>UDP sport;dport 应为协议常量 4791</td></tr>
+  <tr><td class="mono">LADDR</td><td class="mono">0x0</td><td>不出现在帧中——它是发给假内存的取数地址(验证取数通路)</td></tr>
+</table></div>
+
+<!-- ========== 4 ========== -->
+<h2><span class="secno">§4</span>我们做了什么(三步)</h2>
+<ol>
+  <li><strong>环境侦察与配置生成。</strong>确认 2025.2 无 <code>vitis_hls</code>、锁定 <code>vitis-run --tcl</code> 入口;发现独立 clone 下 cmake 流断链(FindVitisHLS.cmake 缺失)且官方流程本就没有 csim 目标 → 绕开 cmake,手工从 4 个 <code>.hpp.in</code> 模板生成配置头,手写 csim tcl。</li>
+  <li><strong>对照组:原样编译自带测试台。</strong>结果符合预判:9 个设计源文件全部编译通过,失败只发生在 <code>test_rocev2.cpp</code> 内部,且失败形态是"函数候选要 19 个参数、调用给了 13 个"与"<code>APP_WRITE</code> 未声明"——即<strong>纯 API 陈旧</strong>,工具链无恙。Q1 由此基本得证,Q2 确认需自建。</li>
+  <li><strong>自建最小测试台并迭代到通过。</strong>按 §3.2 的闭环写 <code>my_write_tb.cpp</code>(约 250 行),期间踩到并解决 4 个技术障碍(§6 发现 1–4),最终 csim 官方判定 <code>0 errors</code>,帧落盘。</li>
+</ol>
+
+<!-- ========== 5 ========== -->
+<h2><span class="secno">§5</span>结果怎么看</h2>
+<h3>5.1 先学会读原始输出</h3>
+<p>TX 流每拍是一个 512-bit(64 字节)word,带 <code>keep</code>(64 位,每位标记对应字节是否有效)和 <code>last</code>(帧尾标记)。<code>print()</code> 按 <code>data[7:0]</code> 先出——<strong>实测这就是线序(wire order)</strong>,即打印出的第一个字节就是网络上先发出的字节,多字节字段直接从左向右按大端读,无需再做字节序翻转(这是本实验确立的读数规则,后续阶段沿用)。</p>
+
+<h3>5.2 帧解剖(实测原始数据 + 逐层注释)</h3>
+<pre><code>┌ IPv4(20B)────────────────────────────────────────────────────────────
+│ 45 02 00 7c 00 00 40 00 64 11 00 00 0b 01 d4 d1 0b 01 d4 d2
+│ └45=v4/头长5×4B  └00 7c=总长124  └11=UDP  └源 11.1.212.209 └目的 11.1.212.210
+├ UDP(8B)──────────────────────────────────────────────────────────────
+│ c0 00 12 b7 00 68 00 00
+│ └sport 49152  └dport 0x12B7=4791 ✅  └len 104  └校验和 0(csim 不填)
+├ IB BTH(12B)──────────────────────────────────────────────────────────
+│ 0a 00 ff ff 00 00 00 11 80 80 ce 4e
+│ └opcode 0x0A=RC_RDMA_WRITE_ONLY ✅  └P_Key  └destQP 0x11 ✅  └A=1|PSN 0x80ce4e ✅
+├ IB RETH(16B)─────────────────────────────────────────────────────────
+│ 11 22 33 44 55 66 77 88 | 12 34 ab cd | 00 00 00 40
+│ └VA = RADDR 签名值 ✅      └R_key 签名值 ✅  └DMALen=64 ✅
+├ payload(64B)─────────────────────────────────────────────────────────
+│ a0 a1 a2 … de df   ← 0xA0+i 签名序列,逐字节 ✅(跨两拍:首拍尾 8B + 次拍 56B)
+└ ICRC(4B)── 预留但未物化(见 §6 边界)─────────────────────────────────</code></pre>
+
+<h3>5.3 三道自洽性检查(比逐字段更有力的证据)</h3>
+<ul>
+  <li><strong>长度三角自洽</strong>:IP 总长 124 = 20(IP)+8(UDP)+12(BTH)+16(RETH)+64(payload)+<strong>4(ICRC)</strong>;UDP 长 104 = 124−20;<code>keep</code> 标记的有效字节 = 120 = 124−4。三个独立来源的长度互相咬合,且差值恰为 ICRC 的 4 字节——说明引擎<strong>预留了</strong> ICRC 位置只是没填内容。</li>
+  <li><strong>签名值溯源</strong>:VA 来自 <code>txMeta.raddr</code>、R_key 来自 <code>qpContext.r_key</code>、DMALen 来自 <code>txMeta.len</code>、PSN 来自建 QP 时的初值——四个值经四条不同的内部通路到达帧中,全部正确,即 §2.2 链路图上每个环节都被证实。</li>
+  <li><strong>计数器交叉验证</strong>:<code>regIbvCountTx=8</code> 而 TB 只发了 1 条 SQ 命令——这不是 bug:本分支 <code>RETRANS_EN</code> 默认开,TB 不回 ACK,重传定时器按协议把同一帧重发了 7 次。帧 dump 里 word2/3 与 word0/1 逐字节相同,与该解释完全一致;<code>crc_drop=psn_drop=0</code> 则说明 RX 侧没有误触发。<strong>一个"意外"的读数反而额外白送了重传状态机在动的证据。</strong></li>
+</ul>
+
+<div class="callout pass"><span class="tag">PASS 判定(对照手册 Stage A 通过标准逐条)</span>
+csim 构建通过(官方 "CSim done with 0 errors")✓ · 单 WRITE 帧字段核对:UDP:4791 ✓ / BTH 0x0A ✓ / RETH DMALen=64(+VA/R_key/PSN/destQP)✓ / payload 逐字节 ✓ · 工具链版本定版:<strong>全项目锁定 2025.2</strong> ✓。字段核对由执行者解码 + 复核者按原始 hex 独立重解一致。</div>
+
+<!-- ========== 6 ========== -->
+<h2><span class="secno">§6</span>发现与有效性边界</h2>
+<h3>6.1 实验中的四个技术发现(后来者会再踩的坑)</h3>
+<dl class="qa">
+  <dt>发现 1:模板宽度参数的单位是 bit,不是 byte。</dt>
+  <dd><code>rocev2&lt;DATA_WIDTH&gt;</code> 里 DATA_WIDTH=512;配置系统里同名变量却以字节计(64)。用 <code>&lt;64&gt;</code> 实例化会因 <code>crc&lt;512,0&gt;</code> 等显式实例化缺失而链接失败——单位混用是这套代码的固有陷阱。</dd>
+  <dt>发现 2:头文件里有一个"幽灵声明"。</dt>
+  <dd><code>rocev2.hpp</code> 声明了 2 参模板 <code>rocev2&lt;WIDTH, INSTID&gt;</code> 但从未定义;真身是 <code>rocev2.cpp</code> 里的 1 参版本。TB 必须自己前向声明 1 参版本、并靠 <code>rocev2_top</code> 的隐式实例化来链接。这是"声明与实现漂移"的活教材,也再次印证该分支处于活跃重构期。</dd>
+  <dt>发现 3(唯一的真版本漂移):2025.2 的 <code>hls::stream&lt;T&gt;</code> 要求 T 可默认构造。</dt>
+  <dd>新实现内嵌 <code>T _data</code> 成员,而 <code>psnPkg</code> 只有带参构造 → <strong>TB 里</strong>构造 <code>stream&lt;psnPkg&gt;</code> 直接编译失败(设计本体只传引用,不受影响)。绕法:把引用绑到零初始化的静态存储上、从不消费(这三个 DBG 流只在 RX 路被写)。这是 Q1 的完整答案:2025.2 可用,且漂移面被精确圈定在"TB 构造流对象"这一种场景。</dd>
+  <dt>发现 4:DBG_IBV 是无条件宏。</dt>
+  <dd><code>ib_transport_protocol.hpp:40</code> 里直接 <code>#define</code>,不是编译开关——顶层因此固定多 3 个调试流参数(stock TB 报"要 19 个参数"的直接原因)。对 Stage C 的意义:SV 侧 <code>roce_stack.sv</code> 的 <code>`define DBG_IBV</code> 与之呼应,垫片接口按 19 参形态设计。</dd>
+  <dt>发现 5(07-16 复盘"没建连查表验证啥"时追源码补录):"QP 上下文"内部拆成三张表;<code>virtual_address</code> 字段被复用为部分更新的魔数操作码。</dt>
+  <dd>① 一条 <code>qpContext</code> 默认同时写两处:state table(状态 + 双向 PSN)与 <strong>MSN 表</strong>(rkey,经 <code>if2msnTable_init</code>);连接表(remote_qpn/IP/UDP 端口)由 <code>ifConnReq</code> 单独灌——<strong>不存在一张统一 QP 表</strong>。state table 自己的 <code>r_key</code> 写入在本分支被注释(<code>state_table.hpp:207</code>),RETH.rkey 的真实供数是 MSN 表(<code>generate_exh</code> 读 <code>msnMeta.r_key</code>,<code>ib_transport_protocol.cpp:1577</code>)。② <code>qpContext</code> 没有"命令"字段,该分支把 <code>virtual_address</code> 当带内操作码:<code>0xDEADBEEF</code> → 本条只更新 rkey(只写 MSN 表);<code>0xFEEDBEEF</code> → 只更新 remote PSN(state table 选择性更新);其余值 → 常规全量建 QP(<code>ib_transport_protocol.cpp:2120-2131</code>)。对 Stage C 的意义:QP 配置写入器按三表语义设计;<strong>这两个魔数禁止当真实 VA 传入</strong>(会被静默解释成部分更新,QP 建不起来且无任何报错);反过来调试期可用 <code>0xFEEDBEEF</code> 重同步 PSN 而不重建 QP。</dd>
+</dl>
+<h3>6.2 本实验证明不了什么(诚实边界)</h3>
+<ul>
+  <li><strong>ICRC 正确性</strong>:csim 不物化 ICRC 字节(长度预留、keep 掩掉),校验和字段也为 0。ICRC 生成逻辑是否正确<strong>本实验无证据</strong> → 已列为 Stage B(RTL 仿真)的第一记录点,用软件参考实现对拍。</li>
+  <li><strong>Ethernet 层</strong>:帧从 IPv4 起——MAC 头由栈外的 <code>mac_ip_encode</code> 添加,属 Stage B/D 的验证范围。</li>
+  <li><strong>时序与握手</strong>:csim 里 dataflow 靠反复调用推进,任何"流水线深度/反压/时钟域"的结论都不能从本实验得出。</li>
+  <li><strong>RX 路径</strong>:本实验只走了 TX;RX 解析/放置/ACK 生成留待 Stage B 的 TX→RX 回灌。</li>
+</ul>
+
+<!-- ========== 7 ========== -->
+<h2><span class="secno">§7</span>结论与对下一阶段的输入</h2>
+<p><strong>结论:Stage A PASS。</strong>三个问题全部得到肯定答案:2025.2 工具链可用(锁定,不装 2022.2);活跃分支可被外部驱动(自建 TB,自带 TB 弃用);协议引擎 TX 链路在语义层正确(单 WRITE 帧逐字段+三道自洽检查通过)。</p>
+<p><strong>移交给 Stage B 的具体输入:</strong></p>
+<ol>
+  <li><strong>ICRC 对拍</strong>是第一记录点(本实验的最大空白);</li>
+  <li>本 TB(<code>my_write_tb.cpp</code>)即 Stage B golden 激励的原型——同样的签名值方法直接搬到 RTL 层;</li>
+  <li>SV 包装层要从 Coyote 仓库取(本分支无 <code>hdl/</code>);</li>
+  <li>负测试的预期要按 <strong>RETRANS_EN=开</strong> 设计(跳 PSN 触发的是重传流程,不是简单丢弃);</li>
+  <li>读数规则沿用:<code>print()</code> 输出即线序。</li>
+</ol>
+
+<div class="footnote">
+  <p>工件(myDevbox):<code>~/fpga-network-stack-csim/{gen/, csim_stock.tcl, csim_mywrite.tcl, my_write_tb.cpp, tx_frame.txt, stock_csim.log, mywrite_csim.log, rocev2_mywrite_prj/}</code>。相关文档:<a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">《集成手册》</a>(Stage A 标准与故障表)· <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《阶段索引》</a>。</p>
+  <p>WR-ZipGuard · Platform Stage · 实验报告 A · 2026-07-16</p>
+</div>
+</main>

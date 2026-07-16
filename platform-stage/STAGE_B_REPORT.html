@@ -1,0 +1,261 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage B 实验报告 · roce_stack RTL 仿真</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.8; margin: 0; font-size: 15.5px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  main { max-width: 860px; margin: 0 auto; padding: 36px 24px 96px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 28px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 62ch; margin: 0 0 14px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--mono); font-size: 12px; margin-bottom: 4px; }
+  .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; color: var(--muted); }
+  .chip.ok { background: var(--pass-soft); border-color: color-mix(in srgb, var(--pass) 40%, transparent); color: var(--pass); font-weight: 700; }
+  h2 { font-size: 20px; margin: 50px 0 8px; scroll-margin-top: 24px; letter-spacing: -.005em; }
+  h2 .secno { font-family: var(--mono); color: var(--accent-ink); font-size: 14px; margin-right: 10px; }
+  h3 { font-size: 16px; margin: 26px 0 6px; }
+  p { margin: 10px 0; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 13px 15px; overflow-x: auto; line-height: 1.6; }
+  pre code { background: none; padding: 0; font-size: 12.6px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.8px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.8px; }
+  tr:last-child td { border-bottom: none; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--muted); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14.2px; }
+  .callout.pass { border-left-color: var(--pass); background: var(--pass-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.acc  { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px; }
+  .callout.pass .tag { color: var(--pass); } .callout.warn .tag { color: var(--warn); } .callout.acc .tag { color: var(--accent-ink); }
+  ul, ol { margin: 8px 0; padding-left: 22px; } li { margin: 5px 0; }
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 660px; width: 100%; height: auto; }
+  .qa dt { font-weight: 700; margin-top: 14px; }
+  .qa dd { margin: 4px 0 0 0; color: var(--ink); }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 实验报告 B</div>
+  <h1>Stage B:roce_stack 独立 RTL 仿真——从"语义正确"到"电路正确"</h1>
+  <p class="hero-sub">Stage A 证明了协议引擎在 C 语义层会发正确的帧;Stage B 把它综合成真电路、套上 Coyote 的 SystemVerilog 包装层(含 ICRC),回答 csim 永远回答不了的问题:比特流会怎样初始化、ICRC 是不是对的、把自己的帧喂回自己会发生什么、以及协议被违反时电路怎么反应。</p>
+  <div class="meta-row">
+    <span class="chip ok">PASS · 2026-07-17</span>
+    <span class="chip">DUT: roce_stack(Coyote SV 包装 + rocev2 csynth RTL)</span>
+    <span class="chip">仿真器: xsim(Vivado 2025.2)</span>
+    <span class="chip">器件目标: xcvu9p(VCU118)@ 4ns</span>
+  </div>
+</header>
+
+<!-- ========== 1 ========== -->
+<h2><span class="secno">§1</span>这个实验回答什么问题</h2>
+<p>Stage B 承接 Stage A 的三项移交(ICRC 空白、SV 包装层下落、golden 激励原型),回答三个新问题:</p>
+<div class="tablebox"><table>
+  <tr><th>#</th><th>问题</th><th>为什么关键</th><th>答案</th></tr>
+  <tr><td>Q1</td><td><strong>可综合性</strong>:csim 通过不等于可综合——2025.2 能把这套 HLS 代码变成 RTL 吗?PPA 初值多少?</td><td>RTL 是本阶段和 Stage D 的全部前提;资源数是未来论文第一张表的第一行</td><td><strong>能</strong>,2 分钟出 RTL;LUT 6.9 万(VU9P 约 5.9%)。Fmax 估计 151.9MHz 低于 250 目标(估计值,Stage D post-route 裁决)</td></tr>
+  <tr><td>Q2</td><td><strong>包装层契约</strong>:Coyote 的 roce_stack.sv(SQ 位域打包、内存管路、ICRC 分工)和 fns@20633d03 咬合吗?</td><td>Stage C 的 doorbell 直接面对这套契约;任何缝隙都会变成板上的静默故障</td><td><strong>三处不咬合/隐契约全部抓获</strong>:laddr/raddr 打包互换(已修)、WRITE payload 主动推流、>PMTU 切分是 SQ 生产者的职责</td></tr>
+  <tr><td>Q3</td><td><strong>RTL 层协议正确性</strong>:ICRC 物化后对不对?环回能否放置?违反协议(坏 CRC/重复 PSN/PSN 跳变)电路怎么反应?</td><td>这是 csim 的验证边界之外的全部;Stage E 板上环回的每个预期都在这里预演</td><td><strong>ICRC 与独立参考实现一致;环回放置位精确 + ACK 闭环;重复→重发 ACK,跳变→标准 NAK;坏 CRC 被照收(RX 检查被分支禁用,发现 B5)</strong></td></tr>
+</table></div>
+
+<!-- ========== 2 ========== -->
+<h2><span class="secno">§2</span>实验原理</h2>
+<h3>2.1 RTL 仿真验证什么、不验证什么</h3>
+<p>csim 跑的是 C++ 函数,流是无限深队列、没有时钟;RTL 仿真跑的是综合后的门级前身(周期级握手、有限深 FIFO、真实的 BRAM 初始化行为)。所以 Stage B 能新回答:<strong>反压与握手是否正确、上电初值是否安全、跨模块位域是否对齐、ICRC 电路的输出值</strong>。它仍然回答不了:时序能否收敛(那要 post-route,Stage D)、真实 Xilinx FIFO IP 的行为细节(本实验用行为替身,见 §6 边界)。</p>
+<h3>2.2 对拍方法学:csim golden 是唯一裁判</h3>
+<p>Stage A 的单 WRITE 帧(签名值激励)是被逐字段验证过的 golden。Stage B 的判据设计成一条不等式:<strong>RTL 帧的前 120 字节必须与 csim golden 逐字节相等,且 keep 恰好多出 4 个有效字节</strong>——多出的正是 csim 不物化的 ICRC。任何偏差要么是包装层的缝(如 laddr/raddr 互换,§6-B2),要么是 RTL 化引入的错。这样 Stage A 的全部验证成果被直接继承,Stage B 只需为"增量"负责。</p>
+<h3>2.3 ICRC 的"独立双算"</h3>
+<p>ICRC 的正确性不能靠"电路自己说了算"。我们写了一个与硬件毫无共同血统的参考实现:Python + zlib 的 CRC32(同一多项式 0x04C11DB7 反射式),按 IBTA 附录规则对帧做掩码(IPv4 的 DSCP/ECN、TTL、头校验和,UDP 校验和,BTH resv8a 全部置 1,前缀 64 位全 1),小端序发射。<strong>SV 的 icrc.sv(961 行流水线 CRC512)和 30 行 Python 得出同一个 32 位值,才算数</strong>。签名值方法在这里复用:换一个 RETH VA,两边的 ICRC 必须一起变。</p>
+<h3>2.4 回灌闭环:Stage E 的仿真彩排</h3>
+<p>单板环回(QSFP0═DAC═QSFP1)的本质是"自己的 TX 是自己的 RX"。Stage B 在仿真里预演它:把捕获的 TX 帧原样喂进 s_axis_rx。由于 QP 表里 remote_psn 与 local_psn 配了同一初值,DUT 会以响应方身份接受这帧——放置命令、放置数据、回 ACK 全部可观测;再把 ACK 帧喂回去,请求方的 CQE 类比信号(m_rdma_ack)和流控释放也闭环。</p>
+<h3>2.5 负测试按 RETRANS_EN=开 设计</h3>
+<p>Stage A 勘误确认本分支重传逻辑默认开。所以负测试的预期不是"丢弃",而是重传协议的标准反应:重复 PSN → 不重放数据、重发 ACK;PSN 跳变 → NAK(PSN Sequence Error,AETH syndrome 0x60)并携带期望 PSN。PSN 跳变帧的 ICRC 由 Python 参考实现重算后经 plusarg 注入——参考实现在这里第二次发挥作用:它能构造电路自己造不出来的"合法坏帧"。</p>
+
+<!-- ========== 3 ========== -->
+<h2><span class="secno">§3</span>装置(Setup)</h2>
+<h3>3.1 被测对象与组件清单</h3>
+<div class="tablebox"><table>
+  <tr><th>组件</th><th>来源</th><th>说明</th></tr>
+  <tr><td class="mono">rocev2_top RTL(139 .v)</td><td>csynth @2025.2,本实验产出</td><td>part=xcvu9p-flga2104-2L-e,4ns,27% uncertainty(Coyote 官方默认),reset all/low</td></tr>
+  <tr><td class="mono">roce_stack.sv + icrc.sv + 胶水(12 .sv)</td><td>Coyote 仓库 hw/hdl/network/rdma/(depth-1 clone)</td><td>TX: rocev2 → read_request_trimmer → icrc → m_axis_tx;RX: FIFO → ack_gap_enforcer → rocev2;含 rdma_flow(流控)与 rdma_mux_retrans(重传缓冲 mux)</td></tr>
+  <tr><td class="mono">lynxTypes 包(782 行)</td><td>Jinja 模板 + 自写渲染器(render_lynx.py)</td><td>值取 Coyote FindCoyoteHW.cmake 官方默认(N_REGIONS=1, PMTU=4096, VADDR=48…)</td></tr>
+  <tr><td class="mono">rocev2_ip 别名模块</td><td>脚本从 rocev2_top.v 端口表机械生成</td><td>顶替 Vivado IP 包装;TSTRB 输入绑 TKEEP</td></tr>
+  <tr><td class="mono">FIFO 行为替身 ×2 族</td><td>自写(axis_fifo_stubs / axis_meta_fifo_stubs)</td><td>顶替 axis_data_fifo_512(_cc_tx) 与 meta_8…512 共 10 个 Vivado IP;指针式实现(见发现 B7)</td></tr>
+  <tr><td class="mono">SIM_ZERO_INIT 补丁</td><td>对 Coyote 4 个 RAM 原语 + 17 个 HLS RAM</td><td>仿真侧建模比特流 BRAM 清零(见发现 B6)</td></tr>
+</table></div>
+<h3>3.2 测试台闭环</h3>
+<div class="diagram"><svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,monospace" font-size="11">
+  <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker></defs>
+  <rect x="230" y="70" width="240" height="160" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="350" y="90" text-anchor="middle" fill="var(--accent-ink)" font-weight="700">roce_stack(DUT)</text>
+  <rect x="250" y="100" width="90" height="34" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="295" y="121" text-anchor="middle" fill="var(--ink)">rocev2 RTL</text>
+  <rect x="360" y="100" width="90" height="34" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="405" y="115" text-anchor="middle" fill="var(--ink)">trimmer</text><text x="405" y="128" text-anchor="middle" fill="var(--ink)">+ icrc</text>
+  <rect x="250" y="150" width="90" height="34" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="295" y="165" text-anchor="middle" fill="var(--ink)">rdma_flow</text><text x="295" y="178" text-anchor="middle" fill="var(--muted)" font-size="9">流控/CQ</text>
+  <rect x="360" y="150" width="90" height="34" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="405" y="165" text-anchor="middle" fill="var(--ink)">mux_retrans</text><text x="405" y="178" text-anchor="middle" fill="var(--muted)" font-size="9">payload 广播</text>
+  <rect x="20" y="30" width="150" height="44" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="95" y="48" text-anchor="middle" fill="var(--ink)">① QP/conn 配置</text><text x="95" y="63" text-anchor="middle" fill="var(--muted)" font-size="9">184b ×2(签名值)</text>
+  <rect x="20" y="92" width="150" height="44" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="95" y="110" text-anchor="middle" fill="var(--ink)">② SQ 命令(dreq_t)</text><text x="95" y="125" text-anchor="middle" fill="var(--muted)" font-size="9">③ 紧随:payload 主动推流</text>
+  <rect x="20" y="154" width="150" height="44" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="95" y="172" text-anchor="middle" fill="var(--ink)">staging 内存模型</text><text x="95" y="187" text-anchor="middle" fill="var(--muted)" font-size="9">1MiB,签名 payload</text>
+  <rect x="20" y="216" width="150" height="44" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="95" y="234" text-anchor="middle" fill="var(--ink)">重传缓冲模型</text><text x="95" y="249" text-anchor="middle" fill="var(--muted)" font-size="9">收 wr_cmd+数据;供 rd</text>
+  <rect x="530" y="60" width="150" height="52" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="605" y="80" text-anchor="middle" fill="var(--ink)">④ TX 捕获→文件</text><text x="605" y="96" text-anchor="middle" fill="var(--muted)" font-size="9">beat 级 DATA/KEEP/LAST</text>
+  <rect x="530" y="132" width="150" height="52" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="605" y="152" text-anchor="middle" fill="var(--ink)">⑤ RX 回灌注入器</text><text x="605" y="168" text-anchor="middle" fill="var(--muted)" font-size="9">帧0/帧1/改造帧(plusarg)</text>
+  <rect x="530" y="204" width="150" height="52" rx="7" fill="var(--surface-2)" stroke="var(--line)"/><text x="605" y="224" text-anchor="middle" fill="var(--ink)">放置+ACK 观察者</text><text x="605" y="240" text-anchor="middle" fill="var(--muted)" font-size="9">wr_req/wr_data/m_rdma_ack</text>
+  <path d="M170 52 L240 92" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+  <path d="M170 114 L250 160" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+  <path d="M170 176 L360 176" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+  <path d="M405 184 L405 240 L170 240" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+  <path d="M450 112 L530 90" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+  <path d="M530 158 L470 130" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+  <path d="M340 230 L530 230" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+  <text x="350" y="285" text-anchor="middle" fill="var(--muted)" font-size="10">④ 的输出既是判据(对拍 golden)也是 ⑤ 的弹药(回灌/负测试)——TX 与 RX 互为对照。</text>
+</svg></div>
+<h3>3.3 激励:签名值(Stage A 血统,一处重新注册)</h3>
+<div class="tablebox"><table>
+  <tr><th>参数</th><th>值</th><th>说明</th></tr>
+  <tr><td class="mono">QPN</td><td class="mono">0x11(pid=17, vfid=0)</td><td>Coyote 侧 QPN={vfid,pid} 复合,与 Stage A 同值</td></tr>
+  <tr><td class="mono">PSN 初值 / RKEY</td><td class="mono">0x80ce4e / 0x1234abcd</td><td>同 Stage A</td></tr>
+  <tr><td class="mono">RADDR</td><td class="mono">48'h334455667788(原 64'h1122…7788)</td><td><strong>重新注册</strong>:Coyote 打包中 HLS 64 位远端地址 = {10'b0, strm, dest, vaddr48},高 16 位不自由,旧签名不可表达;csim golden 已用新值重生成</td></tr>
+  <tr><td class="mono">payload</td><td class="mono">64B: 0xA0+i;8KiB: i%256</td><td>staging[0] 起</td></tr>
+  <tr><td class="mono">IP / UDP 源端口</td><td class="mono">0x0b01d4d1→0x0b01d4d2 / 0xC000</td><td>同 Stage A(conn 表 128 位反序值逐位镜像)</td></tr>
+</table></div>
+<h3>3.4 四个测试用例</h3>
+<div class="tablebox"><table>
+  <tr><th>用例</th><th>激励</th><th>验什么</th></tr>
+  <tr><td class="mono">write64</td><td>一条 WRITE_ONLY 64B</td><td>B-4 golden 对拍 + B-5 ICRC 双算</td></tr>
+  <tr><td class="mono">rx_loop</td><td>write64 后回灌帧0,再回灌 ACK 帧</td><td>B-6:放置命令/数据 + 响应方 ACK + 请求方 CQE 闭环</td></tr>
+  <tr><td class="mono">write8k</td><td>WRITE_FIRST(4096)+WRITE_LAST(4096) 两条命令</td><td>B-7a:多包切分(SQ 预切分契约,见发现 B4)</td></tr>
+  <tr><td class="mono">rx_neg</td><td>坏 payload 帧 → 好帧 → PSN+2 帧(Python 重算 ICRC)</td><td>B-7b:坏 CRC / 重复 PSN / PSN 跳变三种违规反应</td></tr>
+</table></div>
+
+<!-- ========== 4 ========== -->
+<h2><span class="secno">§4</span>我们做了什么</h2>
+<ol>
+  <li><strong>综合出 RTL</strong>:按仓库官方 make.tcl.in 手工实例化(器件换 VU9P、时钟 4ns、不确定度 27%——后经查证与 Coyote 官方默认逐项一致),csynth 2 分钟通过,139 个 Verilog 文件。</li>
+  <li><strong>收齐依赖闭包</strong>:Coyote 包装层 12 个 .sv + 队列原语 + RAM 原语;lynxTypes 是 Jinja 模板 → 写渲染器按官方 CMake 默认值实例化(782 行,0 未解析);10 个 Vivado FIFO IP 写行为替身;<code>rocev2_ip</code> 别名模块从端口表机械生成。仿真器定案 xsim(SV interface 重度使用 + 与 Stage D 同工具链)。</li>
+  <li><strong>三场硬仗</strong>(每场都是一个可复用的诊断手法,细节见 §6 发现):
+    <ul>
+      <li><strong>X 污染死锁</strong>:SQ 永不放行 → 逐级探针定位到 rdma_flow 指针表 BRAM 读出 X → 仿真侧零初始化(B6);</li>
+      <li><strong>替身吞包</strong>:payload 进了 FIFO 替身就消失 → VCD 时间线锁定 → xsim 不重算引用 SV 队列方法的连续赋值(B7)→ 指针式重写;</li>
+      <li><strong>RETH VA 全零</strong>:帧其余 116 字节全对唯 VA 为 0 → 锁存寄存器验尸(SQ 线上数据正确、HLS 解出的 laddr 却是 raddr 的值)→ fns 结构体声明序与 Coyote 打包序互换(B2)→ 修包装层。</li>
+    </ul>
+    诊断工具箱按序升级:内部 FIFO 空满全扫 → 进程阻塞标志(blk_n)全扫 → 各级进程锁存 meta 寄存器"验尸" → VCD 事件时间线。前两者证明"无阻塞、无滞留",第三者指出事件走到哪一站,第四者给出逐周期剧本。</li>
+  <li><strong>四用例全部跑通并回归</strong>:write64 → rx_loop → write8k(先按错误假设跑出协议非法帧,进而发现预切分契约 B4,改正后通过)→ rx_neg(坏 CRC 帧被照收,进而发现 RX 检查被禁用 B5)。TB 重构后四用例复跑无回归。</li>
+  <li><strong>校验自动化</strong>:check_golden_icrc.py(B-4 对拍 + B-5 ICRC 双算)、gen_neg_frame.py(PSN 跳变帧构造 + ICRC 重算)入库,供 Stage C/E 复用。</li>
+</ol>
+
+<!-- ========== 5 ========== -->
+<h2><span class="secno">§5</span>结果怎么看</h2>
+<h3>5.1 B-4/B-5:golden 对拍与 ICRC 双算</h3>
+<pre><code>[B-4] byte-exact over first 120 bytes: True
+[B-4] RTL carries exactly 4 extra bytes: True (rtl=124, csim=120)
+[B-5] RTL ICRC bytes : ccbeb072
+[B-5] Python ref ICRC: ccbeb072      ← 独立参考实现,零共同血统
+[B-5] ICRC match: True</code></pre>
+<p>读法:前 120 字节继承 Stage A 的逐字段验证;多出的 4 字节(keep 从 0x00ff… 变 0x0fff…)是 icrc.sv 物化的 ICRC。自洽检查:laddr/raddr 修复前后 VA 从全零变 0x0000334455667788,ICRC 同步从 9caaba4e 变 ccbeb072——两个实现对"VA 参与 CRC"的反应一致。</p>
+<h3>5.2 B-6:回灌闭环</h3>
+<pre><code>WR_REQ  vaddr=334455667788 len=64 last=1        ← 放置命令 = RETH 原文
+WR_DATA a0 a1 … df(64B,keep 全 1,LAST=1)     ← 放置数据 = 发出的 payload,位精确
+F1: 48B opcode=0x11 AETH syndrome=0x1f msn=1    ← 响应方自动回 ACK
+[10210us] ACK: opcode=11 pid=17 vfid=0          ← ACK 回灌后请求方 CQE 类比信号</code></pre>
+<p>读法:放置 vaddr 与 RETH VA 一字不差、长度 64、数据逐字节等于签名 payload——<strong>单 QP WRITE 环回 bit-exact</strong>(手册 Stage B 通过标准第一条)。ACK 帧回灌后 m_rdma_ack 携带正确的 pid/vfid,rdma_flow 流控释放。附带确认:m_rdma_ack 的载荷是 32 位 ack_t(last 门控),不是 dack_t(发现 B8)。</p>
+<h3>5.3 write8k:切分结构</h3>
+<pre><code>F0: 4156B opcode=0x06(FIRST) psn=0x80ce4e RETH{va=334455667788, rkey=1234abcd, dmalen=4096} icrc=True
+F1: 4140B opcode=0x08(LAST)  psn=0x80ce4f 无RETH  payload 从 4096 续,连续性=True icrc=True</code></pre>
+<p>读法:长度三角 4156=20+8+12+16+4096+4、4140=20+8+12+4096+4;PSN 连号;RETH 只在 FIRST;两帧 ICRC 均过参考实现。注意 dmalen=4096 是<strong>本命令长度</strong>而非 IBTA 语义的总消息长度 8192(发现 B4 的第二半)。</p>
+<h3>5.4 rx_neg:三幕违规剧本</h3>
+<div class="tablebox"><table>
+  <tr><th>注入</th><th>预期(按 RETRANS_EN=开)</th><th>实际</th><th>判读</th></tr>
+  <tr><td>坏 payload(ICRC 未改)</td><td>crc_drop+1,不放置</td><td class="mono">crc_drop=0;被放置(含坏字节)+ 回 ACK</td><td><strong>预期落空 → 发现 B5</strong>:RX 检查被编译禁用</td></tr>
+  <tr><td>重复 PSN(好帧重放)</td><td>不重放数据,重发 ACK</td><td class="mono">psn_drop+1;放置计数不变;ACK 重发(F2 与 F1 同)</td><td>✓ 标准重复语义</td></tr>
+  <tr><td>PSN+2(参考实现重算 ICRC)</td><td>NAK PSN Sequence Error</td><td class="mono">F3: AETH syndrome=0x60,psn=0x80ce4f(期望值);psn_drop+1</td><td>✓ 教科书级 NAK</td></tr>
+</table></div>
+
+<div class="callout pass"><span class="tag">PASS 判定(对照手册 Stage B 通过标准逐条)</span>
+单 QP WRITE 环回 bit-exact ✓(5.2)· ≥PMTU 多包切分正确 ✓(5.3,按真实 SQ 预切分契约)· 帧字段 UDP:4791/BTH/RETH/PSN 序列 ✓ · <strong>ICRC 与软件参考实现对拍一致 ✓</strong>(5.1,Stage A 第一记录点闭合)· 负测试按 RETRANS_EN=开 得到标准 NAK/重复语义 ✓。判定由自动化脚本复核(check_golden_icrc.py 退出码 + 帧结构验证脚本)。</div>
+
+<!-- ========== 6 ========== -->
+<h2><span class="secno">§6</span>发现与有效性边界</h2>
+<h3>6.1 九个发现(B1–B9)</h3>
+<dl class="qa">
+  <dt>B1:2025.2 可综合;PPA 初值到手;Fmax 估计低于目标。</dt>
+  <dd>LUT 69,309 / FF 147,050 / BRAM 75 / DSP 0(VU9P 约 5.9% LUT)。HLS 估计关键路径 6.58ns(151.9MHz)<em>低于</em> 250MHz 目标——但 HLS 估计一贯悲观,Coyote 官方就按 4ns 目标发布;裁决权在 Stage D post-route。这行数字就是未来论文资源表的第一行草稿。</dd>
+  <dt>B2:laddr/raddr 在包装层与 HLS 之间互换(已修)。</dt>
+  <dd>fns@20633d03 的 txMeta <strong>结构体声明序是 raddr 在前、laddr 在后</strong>(hpp:227-228),而构造函数参数序相反——csim 走构造函数所以 Stage A 一切正常;Coyote roce_stack.sv 按参数序手工打包,于是 RETH VA 拿到的是 laddr(=0)。表现为"帧其余 116 字节全对、唯 VA 全零"的高迷惑性故障。已在我们的包装层副本修复(<code>STAGE-B FIX</code> 标记)。<strong>Stage C 规范:doorbell 打包一律以结构体声明序为准,构造函数参数序不可信。</strong></dd>
+  <dt>B3:WRITE 的 payload 是"主动推流",不是请求-响应。</dt>
+  <dd>rdma_mux_retrans 对 WRITE 类命令只登记序列 + 发重传缓冲写命令;<code>m_rdma_rd_req</code> 仅在 READ 响应时发出。用户侧(Coyote shell / 我们的 doorbell)必须在提交 WR 后立刻把 payload 推上 s_axis_rdma_rd_req。Coyote 源码注释原话:"Shouldn't it be automatically delivered to the stack?"。<strong>Stage C 设计输入:doorbell 提交 WQE 后由控制器同步从 staging 读出并推流。</strong></dd>
+  <dt>B4:>PMTU 切分是 SQ 生产者的职责;RETH.DMALen 是本命令长度。</dt>
+  <dd>roce_stack 信任 SQ 契约,不切分:直接喂 8KiB WRITE_ONLY 会产出协议非法帧(DMALen=8192 但 payload 4096)。Coyote 在 shell 层 dreq_rdma_parser_wr 切分(req_t.mode 注释为证)。且 FIRST 帧的 DMALen=4096(本命令)而非 IBTA 语义的总长 8192——<strong>CX-5 互操作观察项</strong>(严格接收方可能报长度错)。<strong>Stage C:doorbell 必须内置 FIRST/MIDDLE/LAST 切分器。</strong></dd>
+  <dt>B5:本分支 RX 不校验 ICRC——crc_drop 计数器是死的。</dt>
+  <dd><code>crc.hpp:39</code> 无条件 <code>#define DISABLE_CRC_CHECK</code>(与 DBG_IBV/RETRANS_EN 同款分支级硬编码)。实测:payload 损坏、ICRC 失配的帧被照常接受、放置、回 ACK,crc_drop 恒 0。TX 侧 ICRC(SV icrc.sv)真实且已验证。手册"首上板第一眼看 crc_drop"的建议需要加注。环回实验无碍(两端都是自己);接商品 RNIC 时对端会校验我们的 TX(没问题),但我们的 RX 不设防。</dd>
+  <dt>B6:仿真-硬件初始化鸿沟:未初始化 BRAM 的 X 会死锁流控。</dt>
+  <dd>rdma_flow 的指针表(ram_sp_nc)在 xsim 里读出 X → <code>if(!issued || head!=tail)</code> 永假 → SQ 永不放行。真板上比特流把 BRAM 清零、csim 的 C++ 静态数组也天然是零——只有 RTL 仿真裸奔。修法:对 Coyote RAM 原语 + HLS 生成 RAM 统一 <code>SIM_ZERO_INIT</code>(如实建模比特流,不是作弊)。这也提示:任何"读在写前"的表项依赖上电清零,是移植到非 FPGA 载体时的隐性假设。</dd>
+  <dt>B7:xsim 陷阱——引用 SV 队列方法的连续赋值不被重新求值。</dt>
+  <dd><code>assign tvalid = (q.size()>0)</code> 在 always_ff 里 push 后不更新 → FIFO 替身静默吞包,且无任何仿真警告。替身必须写成经典指针式 RTL。凡行为模型进 xsim,此坑通用。</dd>
+  <dt>B8:m_rdma_ack 的载荷类型是 ack_t(32b),且只放行 last 拍。</dt>
+  <dd>rdma_flow 的 CQ 队列(queue_meta)只搬 32 位 ack 本体、由 <code>data.last</code> 门控入队——TB 最初按 dack_t(33b)解读,导致所有字段整体错 1 位。Stage C 的 CQE 读回寄存器按 ack_t 布局设计。</dd>
+  <dt>B9(未决):请求方定时重传在 RTL 窗口内未观测到。</dt>
+  <dd>csim 同一激励 20000 次迭代产出 8 份重传副本;RTL 240µs(6 万周期)窗口内 retrans 计数从未跳动。transport_timer 的常数在 csim/综合两分支都只有个位数 tick,理论上应在数µs 级触发——差异未解释。重传<strong>数据通路</strong>本身已验证(重传缓冲写命令+数据入库正确;NAK 路径正确),未验证的是 timer 触发的自发重发。列为 Stage B 遗留第一项,建议下次直接对 transport_timer 做 VCD。</dd>
+</dl>
+<h3>6.2 本实验证明不了什么(诚实边界)</h3>
+<ul>
+  <li><strong>时序收敛</strong>:151.9MHz 是 HLS 估计,不是判决;250MHz 能否收敛要 Stage D post-route。</li>
+  <li><strong>真实 FIFO IP 行为</strong>:10 个 Vivado FIFO IP 用行为替身(深度/延迟不忠实,时钟域转换器被当单时钟);Stage D 换真 IP 后握手时序可能微变,语义结论不受影响。</li>
+  <li><strong>Ethernet 层</strong>:帧仍从 IPv4 起,MAC 层在 Corundum 侧(Stage D)。</li>
+  <li><strong>多 QP / 并发</strong>:全部单 QP 单飞;flow-control 的多未完成(N_OST)路径未压测。</li>
+  <li><strong>吞吐/背压极限</strong>:TB 全程 tready=1,无背压场景。</li>
+</ul>
+
+<!-- ========== 7 ========== -->
+<h2><span class="secno">§7</span>结论与对下一阶段的输入</h2>
+<p><strong>结论:Stage B PASS。</strong>协议引擎在 RTL 层被证明与 csim 语义逐字节一致;ICRC 电路与独立参考实现互证;环回放置位精确、ACK/CQE 闭环;违规反应符合 RETRANS_EN=开 的标准语义。包装层与 HLS 之间的三处契约缝隙(B2/B3/B4)全部在仿真里抓获并修复/规范化——这正是 Stage B 存在的意义:这三处若留到板上,全是无波形可看的静默故障。</p>
+<p><strong>移交给 Stage C(doorbell L0 + 内存胶水)的具体输入:</strong></p>
+<ol>
+  <li><strong>SQ 打包规范</strong>:以 txMeta 结构体声明序为准(raddr@[119:56] 在 laddr@[183:120] 之前),QPN={vfid,pid},远端地址高 16 位 = {10'b0, strm, dest};qpContext 按三表语义写、避开 0xDEADBEEF/0xFEEDBEEF 魔数(Stage A 发现 5);</li>
+  <li><strong>payload 推流机</strong>:WQE 提交后必须主动从 staging 推 payload(B3),推流长度=命令长度;</li>
+  <li><strong>切分器</strong>:大 WR 在 doorbell 内切成 FIRST/MIDDLE/LAST,每段 ≤PMTU=4096(B4);</li>
+  <li><strong>golden 帧库</strong>:write64(124B 含 ICRC)+ write8k(两帧)+ 全套 python 工具(对拍/ICRC/坏帧构造)直接复用;</li>
+  <li><strong>计数器接线</strong>:五计数器仍全部接 AXI-Lite,但文档标注 crc_drop 在本分支恒 0(B5)。</li>
+</ol>
+<p><strong>移交给 Stage D:</strong>Fmax 估计 151.9MHz vs 250MHz 目标的 post-route 裁决(B1);行为替身换真 axis_data_fifo IP;本报告的资源数作为资源表基线。<strong>遗留:</strong>timer 自发重传观测(B9)。</p>
+
+<div class="footnote">
+  <p>工件(myDevbox):<code>~/roce-rtl-sim/{run_xsim.sh, rtl/{hls,coyote,pkg,stubs}, tb/tb_stage_b.sv, check_golden_icrc.py, gen_neg_frame.py, out/*.log, out/rtl_tx_*.txt, out/rtl_placement_*.txt}</code>;csim golden:<code>~/fpga-network-stack-csim/tx_frame.txt</code>(RADDR48 版)。仓库留档:<code>platform-stage/stage_b_sim/</code>。相关文档:<a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">《集成手册》</a> · <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《阶段索引》</a> · <a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">《Stage A 报告》</a>。</p>
+  <p>WR-ZipGuard · Platform Stage · 实验报告 B · 2026-07-17</p>
+</div>
+</main>
