@@ -1,0 +1,23 @@
+platform-stage/STAGE_D_REPORT.html
+  s_b8a86e120bb759::t_dd37dcb9d07e6d 1-196
+platform-stage/STAGE_LOG.html
+  s_b8a86e120bb759::t_4bd64644d72df5 91-93,99,114-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "2a756a1ab806efe557f90f65d474462d200d7d81",
+  "prompts": {},
+  "sessions": {
+    "s_b8a86e120bb759": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86448e23-23e0-4414-bd0c-c3fc5865de33",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
