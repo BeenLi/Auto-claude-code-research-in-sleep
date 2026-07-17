@@ -88,15 +88,15 @@
   </tr>
   <tr>
     <td><span class="slt">D</span></td><td>载体集成 + 综合</td>
-    <td><span class="st todo">未开始</span></td>
-    <td>报告待建</td>
-    <td>首个记录点 = 载体决策:rev100 Corundum 的 PCIe 依赖能否拆净(板不插槽)vs 裸 CMAC 最小载体</td>
+    <td><span class="st pass">PASS · 07-17</span></td>
+    <td><a href="https://claude.ai/code/artifact/53fcf419-00fe-4b91-8354-f03753426e29">🧱 Stage D 报告</a></td>
+    <td>载体决策 (b) 裸 CMAC+jtag_axi(rev100 三层锁证据:时钟/复位/控制根全押 PCIe);真异步三时钟域下 golden 四级传递(per-flow 判据);首跑前 13-agent 评审毙掉 2 blocker;五次综合各排一雷;<strong>250MHz 布线收敛</strong>(WNS +0.029,TNS=0)、URAM 8 / BRAM 2.89% / LUT 7.32%、bitstream 产出</td>
   </tr>
   <tr>
     <td><span class="slt">E</span></td><td>上板环回首光(JTAG 驱动,无 PCIe)</td>
     <td><span class="st block">等 DAC 线</span></td>
     <td>报告待建</td>
-    <td>前置可先做:台面供电 + JTAG/hw_server + run_hw_axi 自检;吞吐扫频不在本阶段(JTAG 慢速)</td>
+    <td>前置可先做:台面供电 + JTAG/hw_server + run_hw_axi 自检(驱动脚本 = tb_stage_d AXI-Lite 序列逐行翻译);硬前置:LED5/6 链路对齐后才准敲 doorbell;吞吐扫频不在本阶段(JTAG 慢速)</td>
   </tr>
 </table></div>
 
@@ -111,6 +111,10 @@
   <tr><td class="mono">07-17</td><td><strong>crc_drop 计数器在本分支恒 0</strong>(crc.hpp:39 无条件 DISABLE_CRC_CHECK,RX 不校验 ICRC);TX 侧 ICRC 真实且经参考实现互证</td><td>Stage B 实验(报告 §6 B5)</td></tr>
   <tr><td class="mono">07-17</td><td><strong>L0 边界确立</strong>:WRITE-only、pusher 源地址 64B 对齐、doorbell 忙时软件轮询 busy;吞吐/延迟扫频不归 L0(JTAG/AXI-Lite 逐条驱动)。集成单元 = <code>roce_l0_top</code>(一 AXI-Lite 从口 + 一对 512b AXIS + mem 口)</td><td>Stage C 实验(报告 §6/§7)</td></tr>
   <tr><td class="mono">07-17</td><td><strong>提交时刻快照纪律</strong>:metaIntf beat 与多段 WR 的 pid/vfid/last 必须在提交时锁存(允许合法的 WQE 预编程);<strong>响应方逐包 ACK</strong>(>PMTU 每 4096B 一个 48B ACK)→ 对端合并 ACK 情形归 CX-5 互操作检查单</td><td>Stage C 审查 C-R1 + 实验发现 C4</td></tr>
+  <tr><td class="mono">07-17</td><td><strong>载体决策 (b) 裸 CMAC shell</strong>:rev100 三层锁——250MHz 主时钟 = PCIe user_clk(插槽 refclk 物理缺失不可救)、<code>mmcm_rst=pcie_user_reset</code> 把自由运行振荡器的下游全扣死(可手术)、CMAC 阀门唯一主人是 PCIe BAR 且 bitstream 为 APP_ENABLE=0。shell 只搬运验证过的组件,再扎根两处(mmcm_rst=0、MMCM 出 250M)</td><td>Stage D 侦察(报告 §2/§6 D1)</td></tr>
+  <tr><td class="mono">07-17</td><td><strong>帧格式事实:roce_stack 收发 IPv4-first 裸帧(无以太网头)</strong>;环回自洽,<strong>CX-5 互通须补 Ethernet encap/decap</strong>(入检查单)。评审 D-R1 的以太网偏移过滤器上板会丢弃 100% 流量且 TB 自洽假绿</td><td>Stage D 评审 D-R1 + golden 实测</td></tr>
+  <tr><td class="mono">07-17</td><td><strong>golden 判据升级为按流</strong>:单捕获流的 WRITE/ACK 交错次序是 RTT 依赖的,不属协议契约;判据 = 各流子序列逐字节(check_stage_d_golden.py)。板上捕获同理</td><td>Stage D 实验(报告 §2/§6 D4)</td></tr>
+  <tr><td class="mono">07-17</td><td><strong>Fmax 悬案裁决 + URAM 路径确立</strong>:HLS 估计 151.9MHz 过悲观,250MHz 布线收敛(WNS +0.029~+0.119);2025.2 推断引擎不支持字节使能 TDP 进 URAM(read-first/no_change 均拒,8-12186 文案误导)→ <code>xpm_memory_tdpram</code> 直驱 URAM288(URAM 8 / staging BRAM 0);仿真 stub 亦须按可综合书写(FWFT 改写 + 16 项不变性)</td><td>Stage D 综合尝试 1–5(报告 §4/§6 D5-D7)</td></tr>
 </table></div>
 
 <div class="rules"><strong>报告纪律(各阶段报告共同遵守):</strong>① 报告结构 = 回答什么问题 / 原理 / 装置(Setup)/ 做了什么 / 结果怎么看 / 发现与有效性边界 / 结论与移交;② 数字与输出必须可溯源到 myDevbox 工件;③ 发现回填手册故障表,决策回填手册 §6 并在本页摘要登记;④ PASS 判定对照手册通过标准逐条勾对,并经独立复核。</div>

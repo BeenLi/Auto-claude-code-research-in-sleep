@@ -1,0 +1,196 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage D 实验报告 · 载体 shell + 综合布线</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.8; margin: 0; font-size: 15px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  main { max-width: 920px; margin: 0 auto; padding: 36px 24px 96px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 27px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 68ch; margin: 0 0 14px; }
+  .verdict { display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: .08em; color: var(--pass); background: var(--pass-soft); border: 1px solid color-mix(in srgb, var(--pass) 40%, transparent); border-radius: 6px; padding: 3px 12px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+  pre code { background: none; padding: 0; }
+  h2 { font-size: 19px; margin: 48px 0 12px; padding-top: 14px; border-top: 2px solid var(--line); }
+  h2 .no { font-family: var(--mono); color: var(--accent-ink); margin-right: 8px; font-size: 15px; }
+  h3 { font-size: 15.5px; margin: 26px 0 8px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .callout.pass { border-left-color: var(--pass); }
+  .callout.pass .tag { color: var(--pass); }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.warn .tag { color: var(--warn); }
+  .finding { margin: 18px 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .finding .fid { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .finding .ftitle { font-weight: 700; }
+  .finding p { margin: 8px 0 0; font-size: 14px; }
+  .figbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 18px 0; overflow-x: auto; }
+  .figcap { font-size: 12.5px; color: var(--muted); margin-top: 10px; font-family: var(--mono); }
+  .st { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+  .st.pass { color: var(--pass); background: var(--pass-soft); font-weight: 700; }
+  .st.fixed { color: var(--warn); background: var(--warn-soft); font-weight: 700; }
+  ul, ol { padding-left: 1.4em; }
+  li { margin: 5px 0; }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+  .toc { font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 18px; margin: 20px 0; }
+  .toc a { border-bottom: none; }
+  .toc span { color: var(--muted); margin: 0 6px; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 实验报告</div>
+  <h1>Stage D:载体 shell + 综合布线 —— 协议栈上板前的最后一站</h1>
+  <p class="hero-sub">载体决策((b) 裸 CMAC + jtag_axi 最小 shell)→ 把 Stage C 验证过的 <code>roce_l0_top</code> 穿上真异步时钟的载体胶水(双向 CDC FIFO、RX 过滤器、CMAC 端口语义)→ 行为仿真重证 golden 传递性 → 250MHz/512b 综合布线拿到实测时序与资源表。首跑之前先做 13-agent 对抗评审,抓掉 2 个 blocker;五次综合尝试各排掉一颗真雷。</p>
+  <span class="verdict">PASS · 2026-07-17</span>
+</header>
+
+<div class="toc">
+  <a href="#s1">1 回答什么问题</a><span>·</span>
+  <a href="#s2">2 原理</a><span>·</span>
+  <a href="#s3">3 装置</a><span>·</span>
+  <a href="#s4">4 做了什么</a><span>·</span>
+  <a href="#s5">5 结果怎么看</a><span>·</span>
+  <a href="#s6">6 发现与边界</a><span>·</span>
+  <a href="#s7">7 结论与移交</a>
+</div>
+
+<h2 id="s1"><span class="no">§1</span>回答什么问题</h2>
+<ol>
+  <li><strong>载体怎么选?</strong> 台架无 PCIe 插槽。Corundum rev100 原样复用(a)与裸 CMAC 最小 shell(b),哪条在"无插槽 + JTAG 驱动"约束下是活路?要源码级证据,不要印象。</li>
+  <li><strong>载体胶水会不会改变行为?</strong> Stage C 的验证是单时钟理想环境;真载体是三个异步时钟域(250MHz 核心 / ~322MHz CMAC TX / ~322MHz CMAC RX,且 RX 是 CDR 恢复时钟与 TX 不同源)+ 不可反压的 CMAC RX + 帧过滤。golden 传递性第四级:同签名输入,CMAC 侧捕获的帧必须仍与 Stage B/C 认证 golden 逐字节一致。</li>
+  <li><strong>综合布线的裁决。</strong> Stage B 的 HLS 报告估计协议栈 Fmax 只有 151.9MHz(目标 250);URAM 双口 + 字节使能推断从未过综合;资源表是未来论文的第一行数据。三者都只有布线后的数字算数。</li>
+</ol>
+
+<h2 id="s2"><span class="no">§2</span>原理</h2>
+<h3>rev100 的三层锁:时钟根、复位根、控制根全押 PCIe</h3>
+<p>载体侦察(11 agents,逐条 file:line 验证)证明 rev100 不插槽是死芯片,且死因分三层:<strong>①时钟根</strong> —— <code>fpga_core</code> 的 250MHz 主时钟就是 PCIe 硬核 user_clk(<code>fpga.v:754→1689</code>),其唯一时钟源是插槽金手指上的 100MHz 参考时钟(<code>AL9/AL8</code>,板上无振荡器,board 文件部件名就叫 <code>pcie_8lane_edge</code>)——物理缺失,无 RTL 可救;<strong>②复位根</strong> —— <code>mmcm_rst = pcie_user_reset</code>(<code>fpga.v:306</code>),而复位同步器初值 1、挂在死的 user_clk 上,于是板上明明自由运行的 125MHz 振荡器与 Si570 的<em>下游闸门</em>被永久扣死:MMCM 不出钟 → CMAC bring-up FSM(跑 125MHz)不启动 → GT QPLL 不锁 → DDR4 复位恒 1——这层是 RTL 布线决策,可手术;<strong>③控制根</strong> —— CMAC 数据阀门 <code>ctl_tx/rx_enable</code> 与 mqnic 端口寄存器相与,上电 0,唯一写路径是 PCIe BAR 的 AXIL 桥;且已建 bitstream 为 <code>APP_ENABLE=0</code>,app block 在综合期就被 generate 裁掉,bitstream 不可 patch。</p>
+<h3>裸 shell 的原则:只搬运被验证过的器官</h3>
+<p><code>cmac_gty_wrapper</code> 自带 GT bring-up 状态机、默认全开的使能寄存器、cmac_pad(以太网最小帧填充)——且其时序约束 tcl 按 <code>ORIG_REF_NAME</code> 匹配,整体搬运不失效。shell 只做两处再扎根:<code>mmcm_rst=1'b0</code>、MMCM 加 CLKOUT1=250MHz;控制主换成 jtag_axi(JTAG 线缆即"我们的 PCIe");阀门直接拉高。Corundum 源码一行不改,全部手术在自己 ~470 行顶层里。</p>
+<h3>golden 判据升级:按流,不按捕获文件</h3>
+<p>Stage C 的 RX-direct 环回 RTT 极短,首段 ACK 会插在两个 WRITE 分段之间;Stage D 的真 CDC×2+过滤器路径 RTT 变长,ACK 排到分段之后(板上亦然)。单一捕获流的交错次序是 RTT 依赖的,<em>不属于协议契约</em>;契约是每条流内部的字节序列。判据升级为:WRITE 帧子序列与 ACK 帧子序列各自逐字节等于认证 golden(<code>check_stage_d_golden.py</code>);c_write64(单帧单 ACK)仍整文件逐字节一致,ICRC <code>ccbeb072</code> 不变。</p>
+<h3>综合器是另一位评审者</h3>
+<p>xsim 对两类东西宽容而综合器严格:SV 语法混进 <code>.v</code> 文件(照吃)、RAM 访问模式(照仿)。因此"仿真全绿"不等于"可综合",每一次综合失败都是一条免费的静态审查——本阶段五次尝试各抓到一颗真雷(§4),全部回灌成代码修复 + 回归门。</p>
+
+<h2 id="s3"><span class="no">§3</span>装置(Setup)</h2>
+<div class="figbox"><pre>
+run_hw_axi / TB task ─AXI-Lite(24b/32b)→ jtag_axi ─→ stage_d_core:
+  roce_l0_top.m_axis_tx (250M) → axis_async_fifo FRAME_FIFO → CMAC QSFP1 (tx_clk ~322.27M)
+      ═ DAC(TB: async FIFO + cmac_pad 模型)═ CMAC QSFP2 (rx_clk, CDR 恢复)
+      → axis_async_fifo DROP_WHEN_FULL+DROP_BAD_FRAME → rx_udp4791_filter → roce_l0_top.s_axis_rx
+</pre><div class="figcap">图:Stage D 数据路径。行为仿真止于 stage_d_core 的 CMAC 侧 AXIS 端口(tap 点即 golden 捕获点);CMAC/GT/jtag_axi 硬核由 Stage E 板上验证。</div></div>
+<div class="tablebox"><table>
+<tr><th>件</th><th>内容</th></tr>
+<tr><td class="mono">stage_d_shell/rtl/fpga_stage_d.sv</td><td>板级顶层:时钟/复位再扎根 + 2×cmac_gty_wrapper + jtag_axi + core(469 行)</td></tr>
+<tr><td class="mono">stage_d_shell/rtl/stage_d_core.sv</td><td>仿真/综合共用单元:AXI-Lite 桥、双向 CDC FIFO、过滤器、roce_l0_top、retrans 绑死</td></tr>
+<tr><td class="mono">stage_d_shell/rtl/rx_udp4791_filter.sv</td><td>RoCE v2 RX 过滤器(IPv4-first:byte0 版本 / byte9 proto / bytes22-23 dport,B0 拍组合判决)</td></tr>
+<tr><td class="mono">stage_d_shell/sim/tb_stage_d.sv</td><td>真异步三时钟域 TB(250M/322.16M/322.58M 故意异源)+ TB "DAC"(含 cmac_pad 模型)+ d_filter 负测试</td></tr>
+<tr><td class="mono">stage_d_shell/syn/create_project.tcl</td><td>项目模式综合+布线+报告;stub 护栏;URAM/BRAM 验收;Flow_PerfOptimized_high,-jobs 32</td></tr>
+<tr><td class="mono">roce-rtl-sim/rtl/stubs/axis_fifo_stubs.sv</td><td>STAGE-D 改写:BRAM 同步读 FWFT(原组合读综合成病态 512×577 LUTRAM);sim/synth 同文件,双侧标记护栏</td></tr>
+<tr><td class="mono">roce-rtl-sim/rtl/l0/rdma_uram_staging.sv</td><td>存储体三改:字节使能解码模板 → no_change → <code>xpm_memory_tdpram</code>(§6 D7)</td></tr>
+</table></div>
+<p>门规:任何 RTL 改动 → 重跑 Stage C 四测 + Stage D 五测 + 16 项字节级不变性 + per-flow golden,全绿才允许综合(链式脚本 <code>run_gate_d2*.sh</code> 自动执行)。工具:Vivado/xsim 2025.2,xcvu9p-flga2104-2L-e;代码仓 <code>vcu118-roce-platform</code>(commits <code>0abbb29</code>/<code>93dd6fa</code>/XPM 版),Corundum 基线 <code>1ca0151b</code>。</p>
+
+<h2 id="s4"><span class="no">§4</span>做了什么</h2>
+<h3>首跑前对抗评审(13 agents:5 视角 + 验证):2 blocker 在仿真跑起来之前死掉</h3>
+<div class="tablebox"><table>
+<tr><th>ID</th><th>发现</th><th>级别</th><th>处置</th></tr>
+<tr><td class="mono">D-R1</td><td>RX 过滤器按以太网帧偏移(EtherType@12-13)匹配,但 roce_stack 收发 <strong>IPv4-first 裸帧</strong>(golden 实测 byte0=0x45)→ 全部合法帧被丢;且 TB 负测试的 alien 帧用了同样错误格式,自洽假 PASS(一致性陷阱)</td><td><span class="st fixed">BLOCKER</span></td><td>过滤器改 byte0/9/22-23 偏移;alien 帧重造 IPv4-first、只错 dport</td></tr>
+<tr><td class="mono">D-R2</td><td>TB 读 ACK opcode 用 rv[4:0],但 ack_t MSB-first 打包,opcode 在 [31:27],[4:0] 是恒零 rsrvd → 数据测试必假 FAIL</td><td><span class="st fixed">BLOCKER</span></td><td>改 rv[31:27];补回 C-R1 探针的 ack pid==17 断言</td></tr>
+<tr><td class="mono">D-R3</td><td>板上 cmac_pad 把 48B ACK 填充到 60B,TB 不建模 → 关 CQE 的那一帧存在仿真-板级分歧(两位验证者判定分裂)</td><td><span class="st fixed">MAJOR</span></td><td>TB DAC 加 cmac_pad 模型(首拍 tkeep 补 60、非 keep 清零)→ 仿真裁决:栈容忍填充,CQE 正常关闭</td></tr>
+<tr><td class="mono">D-R4</td><td>FWFT stub 改写只在本地,仓库还是旧版;且 sim(相对路径)/synth(绝对路径)可能各读一份</td><td><span class="st fixed">MAJOR</span></td><td>stub 入库;run_xsim_d.sh 与 create_project.tcl 双侧 "STAGE-D REWRITE" 标记护栏,旧 stub 直接报错</td></tr>
+<tr><td class="mono">D-R5</td><td>URAM 验收用 BLOCKRAM.* 通配会把 URAM288 数成 BRAM(URAM 推断<em>成功</em>时反而报警)</td><td><span class="st fixed">MINOR</span></td><td>改 BLOCKRAM.BRAM.* 子组;另三条 minor(retrans 楔死运维特征、doorbell 前置条件、stub 头注释预写结论)记入 README 边界</td></tr>
+</table></div>
+<h3>D-2 行为仿真门</h3>
+<p>九项测试全 PASS:Stage D 五测(c_write64/8k/12k、c_magic、d_filter)+ Stage B/C 全量回归(FWFT stub 无害性:16 项帧/placement 字节级不变性全过)。插曲:裸调 <code>run_xsim.sh rx_neg</code> 会静默跑缩减版(NEG-3 需要 python 预制 PSN-skip 帧的 plusargs)——补跑完整版后与 golden 逐字节一致,并给脚本加了自动生成注入帧的逻辑,此坑焊死。</p>
+<h3>综合五连击(每次失败都是一颗真雷)</h3>
+<div class="tablebox"><table>
+<tr><th>#</th><th>结果</th><th>雷 / 结论</th></tr>
+<tr><td class="num">1</td><td>90 秒失败</td><td><span class="mono">Synth 8-10936</span>:Stage B 手工补的 17 个 HLS RAM 零初始化块用 SV 语法(<code>for (integer i=0…)</code>),xvlog 照吃,Vivado 按 V2001 读 .v 拒绝 → 声明外提 + translate_off(bitstream 本就清零 BRAM)</td></tr>
+<tr><td class="num">2</td><td>2 分钟失败</td><td><span class="mono">Synth 8-3391</span> "Invalid write to RAM"(2Mib 无法打散)= staging port A 写位段基址含运行时信号(<code>(32*lane+8*i)+:8</code>)→ 字节使能解码成完整 64 位 BE 向量,LHS 只含循环变量</td></tr>
+<tr><td class="num">3</td><td><span class="st pass">rc=0</span></td><td>全流程通:<strong>WNS +0.072ns</strong>、bitstream 产出;但 <span class="mono">Synth 8-12186</span> "ram_style ultra ignored: invalid write mode" → staging 落 64 BRAM(read-first 形态被拒)</td></tr>
+<tr><td class="num">4</td><td><span class="st pass">rc=0</span></td><td>读改回 else 分支(no_change)重试推断:<strong>仍被拒</strong>(同 8-12186)→ 结论:2025.2 推断引擎不支持字节使能 TDP 进 URAM,与读模式无关,报错文案误导。本版留档为 BRAM 回退交付件(WNS +0.119ns)</td></tr>
+<tr><td class="num">5</td><td><span class="st pass">rc=0</span></td><td>存储体换 <code>xpm_memory_tdpram</code>(MEMORY_PRIMITIVE=ultra、BWE=8、no_change、READ_LATENCY=1,直接驱动 URAM288 BWE 引脚绕开推断;XPM DRC 确认该配置合法)→ <strong>URAM288 = 8</strong>,WNS +0.029 ns</td></tr>
+</table></div>
+
+<h2 id="s5"><span class="no">§5</span>结果怎么看</h2>
+<h3>时序:Fmax 悬案裁决</h3>
+<p>Stage B 的 HLS 综合报告估计协议栈 Fmax 151.9MHz(目标 250)。布线实测(尝试 3/4/5):setup WNS <strong>+0.072 / +0.119 / +0.029 ns</strong>,TNS=0(≈39.7 万端点),hold WHS +0.010,脉宽 +0.455——<strong>250MHz 全部收敛</strong>。HLS 估计按"无物理信息的最坏路径"计算,悬案正式了结:估计过悲观,verdict 以布线为准。</p>
+<h3>资源(VU9P,论文第一行数据)</h3>
+<div class="tablebox"><table>
+<tr><th>资源</th><th>Stage D shell(尝试 5,XPM)</th><th>占比</th><th>参照:Corundum rev100 全 NIC</th></tr>
+<tr><td>CLB LUT</td><td class="num">86,565</td><td class="num">7.32%</td><td class="num">6.66%</td></tr>
+<tr><td>CLB FF</td><td class="num">141,554</td><td class="num">5.99%</td><td class="num">5.43%</td></tr>
+<tr><td>BRAM tile</td><td class="num">62.5</td><td class="num">2.89%</td><td class="num">11.76%</td></tr>
+<tr><td>URAM</td><td class="num">8</td><td class="num">0.83%</td><td class="num">4.69%</td></tr>
+<tr><td>DSP</td><td class="num">0</td><td class="num">0%</td><td class="num">—</td></tr>
+</table></div>
+<p>读法:协议栈 + 载体 + 调试全链约占芯片 7%,>88% 余量给未来的 transform 引擎、gate 电路与 Vitis DCL deflate CU——资源不是本平台的约束。BRAM 回退版(尝试 4)数字:LUT 7.30% / FF 5.97% / BRAM 5.86%(staging 占 64 块)/ URAM 0。</p>
+<h3>golden 传递性(第四级)</h3>
+<p>per-flow 判据 3/3 PASS:WRITE 与 ACK 子序列逐字节等于 Stage C 认证 golden;c_write64 整文件一致(ICRC <code>ccbeb072</code> 第四级不变)。交错次序差异(8k/12k:Stage C = F,ACK,L,ACK;Stage D = F,L,ACK,ACK)是 RTT 加长的必然,已证不是缺陷(§2)。</p>
+
+<h2 id="s6"><span class="no">§6</span>发现与边界</h2>
+<div class="finding"><span class="fid">D1</span><span class="ftitle">rev100 三层锁(时钟/复位/控制)—— 载体决策的证据基座。</span><p>见 §2。要点:PCIe refclk 物理缺失不可手术;复位树把自由运行振荡器的下游全扣死(可手术);数据阀门唯一主人是 PCIe BAR;APP_ENABLE=0 的 bitstream 不可 patch。决策 (b) 裸 shell,Corundum 一行不改。</p></div>
+<div class="finding"><span class="fid">D2</span><span class="ftitle">帧格式:roce_stack 收发 IPv4-first 裸帧,无以太网头。</span><p>golden 实测 byte0=0x45、byte9=proto、bytes22-23=dport。环回台架两端都是本栈,自洽;<strong>CX-5 互通必须补以太网 encap/decap</strong>(已加入 interop 检查单)。评审 D-R1 的以太网偏移过滤器若上板,将丢弃 100% 流量且 TB 假绿——首跑前评审的直接回报。</p></div>
+<div class="finding"><span class="fid">D3</span><span class="ftitle">cmac_pad 填充裁决:栈容忍 60B 填充 ACK。</span><p>板上每帧过 cmac_pad(首拍 tkeep 补至 60B、pad 零填)。TB 建模后 CQE 正常关闭:fns RX 各级按头部长度字段切分、AETH 定偏移解析,pad 字节落在 ICRC 之后不被检查(RX ICRC 检查本分支编译剔除,Stage B B5)。仿真-板级分歧点提前消解。</p></div>
+<div class="finding"><span class="fid">D4</span><span class="ftitle">捕获流交错次序是 RTT 的函数,golden 判据升级为按流。</span><p>协议契约在流内不在流间。判据脚本 <code>check_stage_d_golden.py</code> 按 ACK 签名(单拍 48B)分类后逐字节比对。Stage E 板上捕获同理。</p></div>
+<div class="finding"><span class="fid">D5</span><span class="ftitle">xsim 宽容 ≠ 可综合:两类免费静态审查。</span><p>①SV 语法混 .v(17 个 HLS 零初始化补丁);②RAM 访问模式(动态位段基址)。教训:凡手工补丁进 HLS 生成文件,须以最严格方言书写并 translate_off 护住。</p></div>
+<div class="finding"><span class="fid">D6</span><span class="ftitle">字节使能 TDP 无法推断进 URAM(2025.2 实测),XPM 直驱是正路。</span><p>read-first 与 no_change 两形态均触发 8-12186("invalid write mode" 文案误导——真因是 BWE+TDP 组合),静默回退 64 BRAM。<code>xpm_memory_tdpram</code>(ultra/BWE8/no_change/latency-1)直接例化 URAM288;行为与原语义逐点吻合(九项回归 + 不变性全绿),零初始化由 MEMORY_INIT_PARAM="0" 顶替 SIM_ZERO_INIT。BRAM 回退版整套报告留档(<code>out_attempt4_bramfallback/</code>)。</p></div>
+<div class="finding"><span class="fid">D7</span><span class="ftitle">FWFT stub 改写:仿真 stub 也要按可综合写。</span><p>Stage B 的组合读 FIFO stub 综合成 512×577 分布式 LUTRAM(数十万 LUT 位)。改写为 BRAM 同步读 FWFT(+1 拍 empty→valid,消费者全弹性)后,16 项字节级不变性证明无害。sim/synth 双侧标记护栏防新旧混用。</p></div>
+<div class="finding"><span class="fid">D8</span><span class="ftitle">运维边界:retrans 楔死特征 + doorbell 前置条件。</span><p>retrans mem 口绑死 ⇒ 板上任何真实丢帧(误码/FIFO 满)= <code>CNT_RETRANS≠0</code> 且 TX 永久停摆,唯一恢复是复位。RTL 不把 doorbell 挡在链路对齐前 ⇒ <strong>LED5/6(rx_aligned)常绿才准敲 doorbell</strong>;链路状态可读寄存器位列为 Stage E 准备项。B9(请求方定时重传)仍 OPEN——环回 ACK 即时返回,此处测不到。</p></div>
+<p><strong>边界:</strong>CMAC/GT/jtag_axi 硬核不在行为仿真(Stage E 板上验证);L0 逐条敲门测不了吞吐(手册既有边界);Vivado 报 1 条 eval-license 样板 CRITICAL WARNING(同一 license 建出过可用 rev100 bitstream,不阻塞);寄存器映射 0x00-0xB0 + staging 窗口 0x800000 与 Stage C 完全一致(STAGE_C_REPORT 的驱动文档继续有效)。</p>
+
+<h2 id="s7"><span class="no">§7</span>结论与移交</h2>
+<div class="callout pass"><span class="tag">结论</span>载体 (b) 裸 CMAC shell 成立且已落地:<code>roce_l0_top</code> + 载体胶水在真异步时钟下行为不变(golden 四级传递),250MHz 布线收敛(WNS +0.072~+0.119ns),资源占用 ~7%,bitstream 已产出。Fmax 151.9 悬案(过悲观)与 URAM 推断问题(不可推断,XPM 直驱)双双了结。</div>
+<p><strong>移交 Stage E(板上环回,等 DAC 线 + Mac hw_server):</strong></p>
+<ol>
+  <li>交付物:<code>stage_d_shell/syn/out/fpga_stage_d.bit</code>(+ impl.dcp + util/timing/cdc/clocks 四报告);代码仓 commits <code>0abbb29</code> → <code>93dd6fa</code> → XPM 版。</li>
+  <li>驱动脚本 = <code>tb_stage_d.sv</code> 的 AXI-Lite 序列逐行翻译为 <code>run_hw_axi</code> tcl(寄存器映射见 STAGE_C_REPORT §5);JTAG/hw_server 准备不等 DAC。</li>
+  <li>硬前置:两条 CMAC 链路 rx_aligned(LED5/6)常绿后再敲 doorbell(D8);首灯判据 = c_write64 序列 AXI-Lite 读回全 PASS + placement 逐字节。</li>
+  <li>后续(平台可用后):链路状态寄存器位、L1 doorbell(SQ ring + DMA fetch)、retrans 缓冲 URAM/DDR4 再安置、CX-5 互通(先补 Ethernet encap/decap,先打 Soft-RoCE)、codec 插入。</li>
+</ol>
+
+<div class="footnote">WR-ZipGuard · Stage D · 2026-07-17 · xsim/Vivado 2025.2 · VCU118 (xcvu9p) · 代码仓 github.com/BeenLi/vcu118-roce-platform(私有)· 上游:Corundum @1ca0151b + fns coyote-TCP-RDMA @20633d03</div>
+</main>
