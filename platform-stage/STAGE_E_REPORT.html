@@ -1,0 +1,190 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage E 实验报告 · 板上首光:RDMA WRITE 真链路全环</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.8; margin: 0; font-size: 15px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  main { max-width: 920px; margin: 0 auto; padding: 36px 24px 96px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 27px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 68ch; margin: 0 0 14px; }
+  .verdict { display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: .08em; color: var(--pass); background: var(--pass-soft); border: 1px solid color-mix(in srgb, var(--pass) 40%, transparent); border-radius: 6px; padding: 3px 12px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+  pre code { background: none; padding: 0; }
+  h2 { font-size: 19px; margin: 48px 0 12px; padding-top: 14px; border-top: 2px solid var(--line); }
+  h2 .no { font-family: var(--mono); color: var(--accent-ink); margin-right: 8px; font-size: 15px; }
+  h3 { font-size: 15.5px; margin: 26px 0 8px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .callout.pass { border-left-color: var(--pass); }
+  .callout.pass .tag { color: var(--pass); }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.warn .tag { color: var(--warn); }
+  .finding { margin: 18px 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .finding .fid { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .finding .ftitle { font-weight: 700; }
+  .finding p { margin: 8px 0 0; font-size: 14px; }
+  .figbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 18px 0; overflow-x: auto; }
+  .figcap { font-size: 12.5px; color: var(--muted); margin-top: 10px; font-family: var(--mono); }
+  .st { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+  .st.pass { color: var(--pass); background: var(--pass-soft); font-weight: 700; }
+  .st.fixed { color: var(--warn); background: var(--warn-soft); font-weight: 700; }
+  ul, ol { padding-left: 1.4em; }
+  li { margin: 5px 0; }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+  .toc { font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 18px; margin: 20px 0; }
+  .toc a { border-bottom: none; }
+  .toc span { color: var(--muted); margin: 0 6px; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 实验报告</div>
+  <h1>Stage E:板上首光 —— RDMA WRITE 在真 100G 链路上闭环</h1>
+  <p class="hero-sub">Stage D 的 <code>fpga_stage_d.bit</code> 上真板:SVF 烧写 → 时钟/复位再扎根与 CMAC 自主 bring-up 由 LED 实证(相 1);自研 MPSSE 版 XVC 桥打通"Mac(无 USB 直通)→ 容器 Vivado → jtag_axi"交互通道,现场排掉四颗真雷后 <code>run_hw_axi</code> 驱动 c_write64 全环(相 2)。64B payload 走 真 CMAC → QSFP1 → DAC → QSFP2 → 真 CMAC 回环,placement 逐字节 bit-exact,ACK/CQE 闭合,15 项 CHECK 全 PASS。</p>
+  <span class="verdict">PASS · 2026-07-17 夜</span>
+</header>
+
+<div class="toc">
+  <a href="#s1">1 回答什么问题</a><span>·</span>
+  <a href="#s2">2 原理</a><span>·</span>
+  <a href="#s3">3 装置</a><span>·</span>
+  <a href="#s4">4 做了什么</a><span>·</span>
+  <a href="#s5">5 结果怎么看</a><span>·</span>
+  <a href="#s6">6 发现与边界</a><span>·</span>
+  <a href="#s7">7 结论与移交</a>
+</div>
+
+<h2 id="s1"><span class="no">§1</span>回答什么问题</h2>
+<ol>
+  <li><strong>shell 在真板上活不活?</strong> Stage D 的两处再扎根(mmcm_rst=0、MMCM 出 250M)、CMAC 自主 bring-up、Si570 参考时钟共享、GT/QSFP 物理层——行为仿真全部覆盖不到,只有上电见分晓。判据 = DS34(done)+ LED5/6(双 CMAC rx_aligned)。</li>
+  <li><strong>没有 USB 直通,能不能交互驱动 jtag_axi?</strong> 单向 SVF 只能烧板不能对话。案头写的 MPSSE 版 XVC 桥(<code>xvc_mpsse_server.py</code>)首次见硬件——它撑不撑得起 hw_server 的 discovery + run_hw_axi?</li>
+  <li><strong>全环闭不闭?</strong> A→D 四级 golden 传递后,最后一跳:同一 c_write64 序列经真芯片、真光笼、真铜缆,placement/ACK/CQE/计数器是否与仿真一致(15 项 CHECK)。</li>
+</ol>
+
+<h2 id="s2"><span class="no">§2</span>原理</h2>
+<h3>两相推进:先踩实证过的地板,再走新路</h3>
+<p>相 1(SVF+openocd 烧写、LED 判读)是本台架唯一被证过的路径,它单独就能裁决 shell 的时钟/复位手术是否成功;相 2(XVC 桥)是新路,失败也不动摇相 1 的结论。这个切分让"板子坏了"与"桥写错了"两类故障天然隔离。</p>
+<h3>台架调试方法论:对照组 + 最小自测 + 取证日志</h3>
+<p>桥的每个故障都用三件工具定位:①<strong>已知好对照</strong>(openocd 同 FTDI 读 IDCODE)锚定硬件无辜;②<strong>最小自测客户端</strong>(绕开 Vivado 直接说 XVC:74b IDCODE 探针、2000b 跨批 TDI 回声探针)把"桥对不对"变成可独立判定的命题;③<strong>取证日志</strong>(每 shift 记 nbits+TMS/TDI/TDO 哈希;hw_server 侧开 <code>-ljtag2,discovery,xvc</code> 追踪)让"hw_server 为什么不满意"从猜测变成读日志。四颗雷(§4)全部按此流程钉死,无一靠试错碰运气。</p>
+<h3>参考实现即规范:openocd 为什么不死</h3>
+<p>FT232H 的命令/回读 FIFO 各 1KB。"写完一批再读"的桥在回读积压超限时会让 MPSSE 引擎停摆 → 命令写永久阻塞(USB 写超时)。openocd 从不楔死的结构性原因是它把 OUT 与 IN 的 USB 传输<em>并发提交</em>,芯片侧回读被持续排空。桥最终采用同构方案(读端独立线程),此后零崩溃——比较参考实现的<em>结构</em>,而非只抄它的<em>参数</em>。</p>
+
+<h2 id="s3"><span class="no">§3</span>装置(Setup)</h2>
+<div class="figbox"><pre>
+vivado -source stage_e_write64.tcl (容器, Rosetta x86)
+  └─ hw_server :3121  ←必须以一等电缆方式挂 XVC:
+       -e "set auto-open-servers xilinx-xvc:host.docker.internal:2542"
+        └─(Docker 代理)→ Mac 宿主 :2542  xvc_mpsse_server.py
+             多客户端线程 + FTDI 锁;shift = 0x6B 逐位,写线程 + 读排空线程并发
+              └─ FT232H MPSSE(layout 0x00e8/0x60eb)→ JTAG-SMT2-NC → J106
+                   └─ XCVU9P dbg_hub → jtag_axi → roce_l0_top(寄存器映射 = STAGE_C §5)
+物理:VCU118 台面供电,JTAG 直连 Mac(不过 dock);DAC 铜缆 QSFP1 ↔ QSFP2
+</pre><div class="figcap">图:Stage E 控制与数据路径。烧写走另一条单向路径:容器 Vivado 离线生成 SVF → 宿主 openocd MPSSE 回放。</div></div>
+<div class="tablebox"><table>
+<tr><th>件</th><th>内容</th></tr>
+<tr><td class="mono">stage_e/program.sh</td><td>SVF 烧写封装(复用 smoke/program_via_svf.sh;设计跑起来后 JTAG 10MHz 边际化,scan/烧写降 3MHz)</td></tr>
+<tr><td class="mono">stage_e/xvc_mpsse_server.py</td><td>XVC v1.0 服务器 over FT232H MPSSE;首夜四次现场修订(§4),终版 = 正确 layout + 读线程排空 + 多客户端</td></tr>
+<tr><td class="mono">stage_e/stage_e_write64.tcl</td><td>tb_stage_d AXI-Lite 序列逐行翻译;STEP=sanity(无副作用)/ write64(15 CHECK);open 枚举 target,不用 -xvc_url</td></tr>
+<tr><td class="mono">stage_e/probe_autoxvc.tcl</td><td>最小路径探针:targets→devices→hw_axis→ID 读,四级隔离定位连接问题</td></tr>
+<tr><td class="mono">stage_e/RUNBOOK.md</td><td>两相流程 + 四雷记录 + 楔死特征;代码仓 vivado-on-silicon-mac 分支 wr-zipguard/stage-e-vcu118-roce-write-loopback(97a805f→b7c56cf)</td></tr>
+</table></div>
+<p>工具:Vivado/hw_server 2025.2(容器,license 钉 MAC)、openocd 0.12(brew)、pyftdi 0.57.2(Xcode Python 3.9)。设计 = Stage D 尝试-5 交付件 <code>fpga_stage_d.bit</code>(250MHz 收敛,URAM×8 XPM)。</p>
+
+<h2 id="s4"><span class="no">§4</span>做了什么</h2>
+<h3>相 1:烧板 + LED 判读(一次通过)</h3>
+<p>SVF 生成 + openocd 回放:<strong>59 条命令 0 errors,回放 29 秒</strong>。板上:<strong>DS34 亮</strong>(配置成功);<strong>LED0–6 常亮,LED7 心跳闪</strong>——LED5/6 = 双 CMAC <code>rx_aligned</code> 常绿,一次点亮就绪:mmcm_rst 再扎根、250M/125M 时钟树、CMAC bring-up FSM、Si570 参考时钟共享、GT 物理层、DAC 链路,整条链在几秒内自主完成。相 1 判据全部满足。</p>
+<h3>相 2:XVC 桥四雷连排(每颗都有独立证据链)</h3>
+<div class="tablebox"><table>
+<tr><th>ID</th><th>症状</th><th>根因(证据)</th><th>处置</th></tr>
+<tr><td class="mono">E-R1</td><td>hw_server 扫 242k 位后报 "No devices";自测 TDO 全 1</td><td>FTDI layout 记岔:0x0088/0x008b 是 <strong>digilent_hs2</strong> 的;本模块真身 <code>0x00e8/0x60eb</code>(ADBUS5/6/7 全高 + ACBUS5/6 输出低)。半使能缓冲下 TCK/TMS 打不进链(GPIO 逐拍采样 TDO 恒高实证)</td><td><span class="st fixed">FIXED</span> 修 layout 后 74b 探针 IDCODE 严丝合缝落在 Shift-DR 入口 offset 12,TDO=reply bit7 原约定被证正确</td></tr>
+<tr><td class="mono">E-R2</td><td>discovery 中途桥崩:<code>Errno 60</code> USB 写超时,"device no longer available"</td><td>写完再读死锁 FT232H:>1KB 回读积压 → MPSSE 引擎停摆 → 命令写阻塞。批量减半无效(第二次同崩)→ 结构问题非参数问题(对照 openocd 并发 URB)</td><td><span class="st fixed">FIXED</span> 读端独立线程持续排空 + SEND_IMMEDIATE + latency=2;2000b 跨批探针:IDCODE@12 + TDI 回声精确 +32 拍,字节级正确;此后零崩溃</td></tr>
+<tr><td class="mono">E-R3</td><td>桥不崩了,discovery 完整跑完(~1M 位/次)仍 "No devices";run 结束后仍有连接无限重扫</td><td>hw_server 对 XVC 目标开<strong>多条连接</strong>(jtagpoll 轮询 + open 数据通道),单客户端 <code>listen(1)</code> 谁后到谁饿死(饿死的连接在桥日志里根本不出现——accept 积压不可见)</td><td><span class="st fixed">FIXED</span> 多客户端线程 + FTDI 全局锁;哈希取证顺带证明桥高度确定(同请求 221 次重试 218 次同答,3 例差异均为前序状态不同)</td></tr>
+<tr><td class="mono">E-R4</td><td>多客户端后 hw_server 连上桥<strong>零 shift</strong> 即报 "No devices";而其内部日志明明 <code>add node …-14b31093-0</code></td><td><code>open_hw_target -xvc_url</code>(labtools 发起路径)在本 hw_server 环境死路——换桥/重启 hw+cs/重烧全无效,设备节点建了但 open 路径拿不到</td><td><span class="st fixed">FIXED</span> hw_server 启动挂 <code>-e "set auto-open-servers xilinx-xvc:host:2542"</code>(一等电缆路径),open 枚举出的 target——probe_autoxvc 一发命中:targets→xcvu9p_0→hw_axi_1→ID=0x0c1a0001</td></tr>
+</table></div>
+<p>途中防御性动作:发现 openocd 10MHz 现身 <code>IR capture error</code>(设计跑起来后 JTAG 边际化)→ 降 3MHz 扫链干净,并用 3MHz 重放 SVF 重烧一次(排除早期错 layout 会话向链上灌垃圾的隐患);Tcl RESULT 行花括号转义 bug 顺手修掉。</p>
+<h3>sanity → LED 确认 → write64</h3>
+<p><code>sanity</code>:ID <code>0x0C1A0001</code> PASS,STATUS=0,11 计数器全 0(重烧后处女状态),<strong>RESULT PASS (0 errors)</strong>。操作员确认 LED5/6 常绿(硬前置 D8)后敲 doorbell——<code>write64</code> 15 项 CHECK 一次全绿。</p>
+
+<h2 id="s5"><span class="no">§5</span>结果怎么看</h2>
+<h3>write64 十五项 CHECK(首光判据)</h3>
+<div class="tablebox"><table>
+<tr><th>CHECK</th><th>读回</th><th>证明了什么</th></tr>
+<tr><td class="mono">id</td><td class="num">0x0C1A0001</td><td>AXI-Lite 面可达,设计版本正确</td></tr>
+<tr><td class="mono">cqe reached (0 polls)</td><td class="num">首轮即达</td><td>板级 RTT(仿真 ~0.93µs)≪ JTAG 单次轮询延迟——doorbell 到 CQE 在第一次读回前已完成</td></tr>
+<tr><td class="mono">placement 64B bit-exact</td><td class="num">64/64</td><td><strong>全环核心证据</strong>:payload 走 URAM 取指→切分→打包(RETH/ICRC)→CMAC TX→QSFP1→DAC→QSFP2→CMAC RX→过滤→placement 回 URAM 0x27788,逐字节无损</td></tr>
+<tr><td class="mono">sq / wr_req / cqe</td><td class="num">1 / 1 / 1</td><td>单 WR = 单分段、单 placement 命令、单 CQE,语义与 Stage C 一致</td></tr>
+<tr><td class="mono">ack opcode / pid</td><td class="num">0x11 / 17</td><td>responder 在真链路上收到 WRITE 并回 ACK,requester 收 ACK 关闭 CQE</td></tr>
+<tr><td class="mono">retrans(楔死检查)</td><td class="num">0</td><td>无丢帧、无重传绑死(D8 风险未触发)</td></tr>
+<tr><td class="mono">crc_drop / psn_drop</td><td class="num">0 / 0</td><td>无 PSN 乱序;crc 恒 0 是编译剔除的已知事实,不作链路质量证据</td></tr>
+<tr><td class="mono">tx_frm / rx==tx</td><td class="num">2 / 2</td><td>线上恰好两帧(WRITE + ACK),TX 出多少 RX 收多少——真环回无损</td></tr>
+</table></div>
+<p><strong>RESULT write64: PASS (0 errors)。</strong>与 tb_stage_d 仿真的 c_write64 期望值逐项相同——golden 传递性第五级(A csim → B RTL → C 全环 → D 载体 → <strong>E 真板</strong>)闭合。</p>
+<h3>LED 读法</h3>
+<p>DS34 = 配置 done;LED5/6 = 两条 CMAC rx_aligned(相 1 核心判据);LED7 心跳 = 250MHz 时钟树活着(MMCM 手术成功的直接可视证据);LED0–4 = shell 静态状态位。上电到全绿数秒,无需任何软件干预——CMAC bring-up FSM 与 RS-FEC 双端同栈天然一致。</p>
+
+<h2 id="s6"><span class="no">§6</span>发现与边界</h2>
+<div class="finding"><span class="fid">E1</span><span class="ftitle">JTAG-SMT2-NC 的 MPSSE layout 是 0x00e8/0x60eb,不是 hs2 的 0x0088/0x008b。</span><p>ADBUS5/6/7 三个缓冲使能必须全驱高、ACBUS5/6 输出低。只驱 bit7 时"半使能":TCK/TMS 不达链、TDO 恒高——症状与"板子没上电"无法区分,极易误诊。对照 openocd 自带 cfg 原文是唯一可靠信源(记忆不是)。</p></div>
+<div class="finding"><span class="fid">E2</span><span class="ftitle">FT232H 写完再读会死锁;并发排空是结构性要求。</span><p>回读积压 >1KB → MPSSE 引擎停摆 → 命令写超时(Errno 60)→ 会话死。批量调参(2048→448)不解决——必须写/读并发(openocd 的 async URB 同构)。同时 SEND_IMMEDIATE(0x87)+ latency=2 消除 16ms 延迟计时器等待。</p></div>
+<div class="finding"><span class="fid">E3</span><span class="ftitle">hw_server 对 XVC 目标开多条连接;XVC 服务器必须多客户端。</span><p>jtagpoll 节点轮询与 open 数据通道各占一条;单客户端服务器谁后到谁饿死,且饿死者在服务器日志不可见(accept 积压)。Xilinx 参考 xvcserver 也是单客户端——它能用大概率是时序侥幸,不要抄。</p></div>
+<div class="finding"><span class="fid">E4</span><span class="ftitle">open_hw_target -xvc_url 在本环境死路;auto-open-servers 是正解。</span><p>labtools 发起的 XVC open 在 hw_server 2025.2(容器/Rosetta)下恒报 "No devices detected",与桥实现、hw_server/cs_server 新旧、重烧全部无关(hw_server 内部日志显示节点明明建立)。启动参数 <code>-e "set auto-open-servers xilinx-xvc:host:port"</code> 走一等电缆代码路径,一次成功。此坑价值一小时。</p></div>
+<div class="finding"><span class="fid">E5</span><span class="ftitle">设计跑起来后 JTAG 10MHz 边际化。</span><p>配置前 openocd 10MHz 扫链干净;配置后同参数报 IR capture error(off-by-one 特征),3MHz 恢复干净。250MHz 逻辑 + GTY 活动改变 TDO 时序余量。后续所有 openocd 操作(扫链/SVF)统一降 <code>adapter speed 3000</code>;XVC 桥本就 3MHz 不受影响。</p></div>
+<div class="finding"><span class="fid">E6</span><span class="ftitle">JTAG-AXI 吞吐画像:讨论式操作足够,数据面不可用。</span><p>逐位 XVC(3 字节命令/位)下 discovery ~1M 位耗时十余秒,单次 AXI 读回 ~百 ms 量级;write64 全流程(含 16 次 payload 预载写)分钟内完成。这是控制面/调试面带宽——8K/12K payload 预载(2048 次写)是分钟级,吞吐测量不归 Stage E(手册既有边界)。</p></div>
+<p><strong>边界:</strong>本夜只跑 c_write64(write8k/12k 的 FIRST/MIDDLE/LAST 板上版为可选加测);B9(请求方定时重传)依旧 OPEN——环回 ACK 即时返回测不到;retrans 楔死运维边界不变(真丢帧 = CNT_RETRANS≠0 + TX 停摆,唯一恢复是重烧,今夜未触发);链路状态可读寄存器位仍未实现(本夜靠 LED 目视,列平台可用期第一项);XVC 桥为调试基础设施,非交付物性能路径。</p>
+
+<h2 id="s7"><span class="no">§7</span>结论与移交</h2>
+<div class="callout pass"><span class="tag">结论</span>平台首光达成:Stage D shell 在真板一次点亮(时钟/复位手术 + CMAC 自主 bring-up + DAC 链路全验证),自研 XVC 桥打通交互式 run_hw_axi,c_write64 全环 15/15 PASS——单 VCU118 RoCE WRITE 平台 <strong>Stage A→E 五门全部关闭</strong>。golden 五级传递:同一帧序列从 csim 到真铜缆逐字节一致(ICRC ccbeb072 五代不变)。</div>
+<p><strong>移交平台可用期(优先级序):</strong></p>
+<ol>
+  <li><strong>链路状态寄存器位</strong>(rx_aligned 读回,替代 LED 目视;需 D-2 门回归 + 重综合)——解除"必须有人看板子"的运维依赖。</li>
+  <li>可选加测:write8k/write12k 板上版(tcl 扩 STEP,预载分钟级为预期)。</li>
+  <li>L1 doorbell(SQ ring + DMA WQE fetch)、retrans 缓冲 DDR4/URAM 再安置。</li>
+  <li>CX-5 互通:先补 Ethernet encap/decap(D2/账本 A21),先打 Soft-RoCE/rxe,再上真卡(14 项检查单)。</li>
+  <li>codec 插入(transform 引擎 + Vitis DCL gzip CU)→ dual-length verbs 研究期(未来论文核心)。</li>
+</ol>
+<p>复跑口令(RUNBOOK 已固化):烧板 <code>./stage_e/program.sh</code>;桥 <code>python3 -u stage_e/xvc_mpsse_server.py</code>;hw_server 带 <code>auto-open-servers xilinx-xvc:…</code> 启动后 <code>vivado -source stage_e_write64.tcl -tclargs sanity|write64</code>。</p>
+
+<div class="footnote">WR-ZipGuard · Stage E · 2026-07-17 夜 · VCU118 (xcvu9p) 台面 + Apple-Silicon Mac + 容器化 Vivado 2025.2 · 桥/脚本仓 vivado-on-silicon-mac 分支 wr-zipguard/stage-e-vcu118-roce-write-loopback @b7c56cf · 设计 = Stage D fpga_stage_d.bit(代码仓 vcu118-roce-platform)</div>
+</main>

@@ -94,9 +94,9 @@
   </tr>
   <tr>
     <td><span class="slt">E</span></td><td>上板环回首光(JTAG 驱动,无 PCIe)</td>
-    <td><span class="st block">等 DAC 线</span></td>
-    <td>报告待建</td>
-    <td>前置可先做:台面供电 + JTAG/hw_server + run_hw_axi 自检(驱动脚本 = tb_stage_d AXI-Lite 序列逐行翻译);硬前置:LED5/6 链路对齐后才准敲 doorbell;吞吐扫频不在本阶段(JTAG 慢速)</td>
+    <td><span class="st pass">PASS · 07-17 夜</span></td>
+    <td><a href="https://claude.ai/code/artifact/c69771a8-46f2-4579-99bb-4cace4f2ea9f">🔦 Stage E 报告</a></td>
+    <td>相 1:SVF 烧写 59 命令 0 errors,DS34 亮、<strong>LED5/6 常绿</strong>(时钟/复位手术 + CMAC 自主 bring-up + DAC 链路一次点亮);相 2:自研 MPSSE-XVC 桥现场排四雷(layout 0x00e8/0x60eb、FT232H 读写并发、多客户端、auto-open-servers)后 run_hw_axi 打通;<strong>c_write64 真链路全环 15/15 PASS</strong>——placement 逐字节 bit-exact、ACK/CQE 闭合、retrans=0、tx=rx=2。golden 五级传递(csim→真铜缆,ICRC 同值)</td>
   </tr>
 </table></div>
 
@@ -115,6 +115,8 @@
   <tr><td class="mono">07-17</td><td><strong>帧格式事实:roce_stack 收发 IPv4-first 裸帧(无以太网头)</strong>;环回自洽,<strong>CX-5 互通须补 Ethernet encap/decap</strong>(入检查单)。评审 D-R1 的以太网偏移过滤器上板会丢弃 100% 流量且 TB 自洽假绿</td><td>Stage D 评审 D-R1 + golden 实测</td></tr>
   <tr><td class="mono">07-17</td><td><strong>golden 判据升级为按流</strong>:单捕获流的 WRITE/ACK 交错次序是 RTT 依赖的,不属协议契约;判据 = 各流子序列逐字节(check_stage_d_golden.py)。板上捕获同理</td><td>Stage D 实验(报告 §2/§6 D4)</td></tr>
   <tr><td class="mono">07-17</td><td><strong>Fmax 悬案裁决 + URAM 路径确立</strong>:HLS 估计 151.9MHz 过悲观,250MHz 布线收敛(WNS +0.029~+0.119);2025.2 推断引擎不支持字节使能 TDP 进 URAM(read-first/no_change 均拒,8-12186 文案误导)→ <code>xpm_memory_tdpram</code> 直驱 URAM288(URAM 8 / staging BRAM 0);仿真 stub 亦须按可综合书写(FWFT 改写 + 16 项不变性)</td><td>Stage D 综合尝试 1–5(报告 §4/§6 D5-D7)</td></tr>
+  <tr><td class="mono">07-17 夜</td><td><strong>台架 JTAG 通道规范确立</strong>:JTAG-SMT2-NC layout = <code>0x00e8/0x60eb</code>(hs2 的 0x0088/0x008b 是误记);FT232H 必须写/读并发(写完再读会死锁引擎);XVC 服务器必须多客户端(hw_server 开多连接);<code>open_hw_target -xvc_url</code> 本环境死路 → hw_server 启动挂 <code>auto-open-servers xilinx-xvc:…</code>;设计运行后 JTAG 10MHz 边际化 → openocd 统一降 3MHz</td><td>Stage E 台架实测(报告 §4/§6 E1–E5)</td></tr>
+  <tr><td class="mono">07-17 夜</td><td><strong>平台首光,Stage A→E 五门全关</strong>:单 VCU118 RoCE WRITE 平台可用——AXI-Lite(JTAG)驱动 doorbell,真 CMAC×2 + DAC 环回,write64 全环 bit-exact。平台可用期第一项 = 链路状态可读寄存器位(替代 LED 目视)</td><td>Stage E write64 15/15 PASS(报告 §5/§7)</td></tr>
 </table></div>
 
 <div class="rules"><strong>报告纪律(各阶段报告共同遵守):</strong>① 报告结构 = 回答什么问题 / 原理 / 装置(Setup)/ 做了什么 / 结果怎么看 / 发现与有效性边界 / 结论与移交;② 数字与输出必须可溯源到 myDevbox 工件;③ 发现回填手册故障表,决策回填手册 §6 并在本页摘要登记;④ PASS 判定对照手册通过标准逐条勾对,并经独立复核。</div>
