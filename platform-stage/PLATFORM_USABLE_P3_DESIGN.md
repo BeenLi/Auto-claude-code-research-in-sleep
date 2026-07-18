@@ -214,6 +214,16 @@ retransmission read will return the wrong segment. **This does not affect existi
 ## Build / board (P3-SYN / task 17)
 - Synth build#2 (ID 0x0C1A0003): expect the URAM count to rise from 8 → ~16 (staging 8 +
   retrans 8) and a small LUT/FF bump for the SQ ring + FSMs; 250 MHz must still close.
+- **build#2 RESULT (2026-07-17 night): functionally complete but WNS −0.209 ns / 935
+  failing endpoints — all on the reset tree** (single sync FF → LUT2 fanout 9454 R pins
+  across SLRs, 97 % routing). Fix: `rstn_core` two-stage pipeline + `max_fanout=256`
+  (quasi-static, 2-cycle-late deassert harmless).
+- **build#3 RESULT (2026-07-18 09:11): ✅ TIMING CLOSED — WNS +0.169 ns, TNS = 0,
+  0 failing endpoints (408,952), hold +0.010, pulse +0.455.** The reset fix recovered
+  −0.209 → +0.169, better margin than Stage D's +0.029. Util: LUT 89,986 = 7.61 %,
+  FF 146,515 = 6.20 %. `fpga_stage_d.bit` produced (syn/out/), ID 0x0C1A0003 —
+  **the board-session flash candidate.** Preceded by GATE2 all-green (10/10 sims incl
+  both b9 retrans DATA checks, per-flow goldens).
 - Board: L1 multi-WR submit over JTAG; and — the payoff — a real frame-loss scenario that
   previously wedged now recovers via retransmission (drive with a deliberate single-frame
   drop if a mechanism exists, else document that loopback cannot inject loss and B9 stays
