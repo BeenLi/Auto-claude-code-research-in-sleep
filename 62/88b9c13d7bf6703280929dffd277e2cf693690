@@ -1,0 +1,27 @@
+AGENT.md
+  s_92edfd06c40fd5::t_f78dd0b7b2cb24 38
+platform-stage/PLATFORM_USABLE_P3_DESIGN.md
+  s_92edfd06c40fd5::t_006deb85866f83 217-226
+platform-stage/PLATFORM_USABLE_P4_CODEC_DESIGN.md
+  s_92edfd06c40fd5::t_e680278ecbfb64 1-358
+platform-stage/STAGE_LOG.html
+  s_92edfd06c40fd5::t_0929656b68147a 120-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6288b9c13d7bf6703280929dffd277e2cf693690",
+  "prompts": {},
+  "sessions": {
+    "s_92edfd06c40fd5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f39dce6d-1dbe-483f-9488-ac7912b731a5",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
