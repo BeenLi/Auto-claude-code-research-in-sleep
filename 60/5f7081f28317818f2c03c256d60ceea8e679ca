@@ -1,0 +1,23 @@
+platform-stage/PLATFORM_USABLE_P3_DESIGN.md
+  s_b8a86e120bb759::t_16c3fba10e5e5e 1-229
+AGENT.md
+  s_b8a86e120bb759::t_962fa45a89683c 91,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "605f7081f28317818f2c03c256d60ceea8e679ca",
+  "prompts": {},
+  "sessions": {
+    "s_b8a86e120bb759": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86448e23-23e0-4414-bd0c-c3fc5865de33",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
