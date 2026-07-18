@@ -1,0 +1,21 @@
+AGENT.md
+  s_b8a86e120bb759::t_81c5e79b6d066d 91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "87ed938c9b553a997db1bb5e36c340d72ff548d0",
+  "prompts": {},
+  "sessions": {
+    "s_b8a86e120bb759": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86448e23-23e0-4414-bd0c-c3fc5865de33",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
