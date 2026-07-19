@@ -43,13 +43,6 @@ WR-ZipGuard · VCU118 RoCE 平台阶段的全部文档(报告/设计/决策)。�
 | [DOORBELL_SQRING_RETRANS_DESIGN.md](DOORBELL_SQRING_RETRANS_DESIGN.md) | L1 doorbell(SQ 环)+ 重传 URAM 再安置,含评审记录 | 平台可用期 ③(旧名 PLATFORM_USABLE_P3_DESIGN.md) |
 | [CODEC_INTEGRATION_DESIGN.md](CODEC_INTEGRATION_DESIGN.md) | codec 插入(E0 变换 + Vitis DCL gzip CU 存转发),含评审与结果 | 平台可用期 ④(旧名 PLATFORM_USABLE_P4_CODEC_DESIGN.md) |
 
-## 迁移 stub(占住旧 URL,仅转发)
-
-| 本地文件 | 占住的旧 Artifact | 转发到 |
-|---|---|---|
-| [_stub_integration_guide.html](_stub_integration_guide.html) | 原《集成手册》[db3cafcb](https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986) | 指南 / 两篇前置(带旧锚点自动跳转) |
-| [_stub_learning_roadmap.html](_stub_learning_roadmap.html) | 原《学习导览》[d5cc763b](https://claude.ai/code/artifact/d5cc763b-570e-4ee5-a1c4-6f457459f09c) | 指南 §4 / 两篇前置(T1→协议,T2–T4→框架) |
-
 ## 历史沿革(2026-07-19 文档重组)
 
 - 删除:`PLATFORM_INTEGRATION_GUIDE.html`(手册)、`LEARNING_ROADMAP.html`(导览)、
@@ -57,4 +50,5 @@ WR-ZipGuard · VCU118 RoCE 平台阶段的全部文档(报告/设计/决策)。�
 - 改名(git mv,commit `ec7ec45`):P3/P4 前缀文件 → 描述名(见上表"旧名"列)。
   "P3/P4" = 平台可用期第 ③/④ 项的旧编号。
 - Artifact URL 变迁:`4e143779` 原为《阶段索引》,现为《学习与集成指南》(4/6 份报告的回链
-  因此保持有效);`db3cafcb`/`d5cc763b` 变迁移 stub;报告与前置文档 URL 不变/新增。
+  因此保持有效);原《集成手册》`db3cafcb` 与《学习导览》`d5cc763b` 两个 Artifact 已废弃
+  (可在 claude.ai 的 Artifacts 列表删除);报告与前置文档 URL 不变/新增。
