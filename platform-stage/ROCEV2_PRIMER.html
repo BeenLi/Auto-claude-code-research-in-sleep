@@ -1,0 +1,156 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoCE v2 协议入门</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.75; margin: 0; font-size: 15.5px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  main { max-width: 860px; margin: 0 auto; padding: 36px 24px 96px; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 36px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 29px; line-height: 1.3; margin: 0 0 12px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 62ch; margin: 0; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; font-family: var(--mono); font-size: 12px; }
+  .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; color: var(--muted); }
+  h2 { font-size: 20px; margin: 48px 0 8px; scroll-margin-top: 24px; letter-spacing: -.005em; }
+  h2 .secno { font-family: var(--mono); color: var(--accent-ink); font-size: 14.5px; margin-right: 10px; }
+  p { margin: 10px 0; }
+  .lede { color: var(--muted); margin: 0 0 18px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.6; }
+  pre code { background: none; padding: 0; font-size: 12.8px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.8px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  td.mono { font-family: var(--mono); font-size: 12.8px; }
+  tr:last-child td { border-bottom: none; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--muted); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14.2px; }
+  .callout.pass { border-left-color: var(--pass); background: var(--pass-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.acc  { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px; }
+  .callout.pass .tag { color: var(--pass); } .callout.warn .tag { color: var(--warn); }
+  .callout.acc .tag { color: var(--accent-ink); }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  li::marker { color: var(--muted); }
+  .item { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 18px; margin: 18px 0; }
+  .item .item-title { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--accent-ink); margin-bottom: 8px; }
+  .facet { display: grid; grid-template-columns: 74px 1fr; gap: 3px 14px; font-size: 14px; }
+  .facet .fk { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 3px; white-space: nowrap; }
+  .facet .fv.ex { color: var(--ink); }
+  .facet .fv.ex::before { content: "▸ "; color: var(--pass); }
+  .why { color: var(--muted); }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+</style>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 前置知识</div>
+  <h1>RoCE v2 协议入门</h1>
+  <p class="hero-sub">自足入门,适合组内共读。三节对应三个层次:帧长什么样(§1)→ 可靠性怎么记账(§2)→ 一次 WRITE 在线上如何展开(§3)。每节末附"此刻为什么学 · 动手做什么"。更深的协议笔记见 Obsidian <code>003互联基础设施/rdma</code>(基于 rxe / ib_pack.h / Mellanox PRM 核验)。</p>
+  <div class="meta-row">
+    <span class="chip">前置知识 · 拆自集成手册 §2 + 学习导览 T1</span>
+    <span class="chip">解锁 Stage B</span>
+    <span class="chip">v1.0 · 2026-07-19</span>
+  </div>
+</header>
+
+<h2 id="proto-frame"><span class="secno">§1</span>帧格式:RoCE v2 就是跑在 UDP 上的 InfiniBand 传输层</h2>
+<div class="tablebox"><table>
+  <tr><th>层</th><th>字段</th><th>本平台取值 / 说明</th></tr>
+  <tr><td>Ethernet</td><td class="mono">dst/src MAC, type=0x0800</td><td>环回阶段静态配置;ARP 由 <code>hls/arp_server</code> 或静态表解决</td></tr>
+  <tr><td>IPv4</td><td class="mono">src/dst IP, proto=UDP</td><td><code>roce_stack</code> 顶层有 <code>local_ip_address</code> 输入;栈内 <code>#define IP_VERSION 4</code></td></tr>
+  <tr><td>UDP</td><td class="mono">dport=4791</td><td>源码常量 <code>RDMA_DEFAULT_PORT = 0x12B7</code>(=4791),RoCE v2 的注册端口</td></tr>
+  <tr><td>IB BTH(12 B)</td><td class="mono">opcode, destQP, PSN, ackreq…</td><td>传输层头,每个包都有;opcode 编码"这是消息的第几段"(§3)</td></tr>
+  <tr><td>IB RETH(16 B)</td><td class="mono">vaddr(8B), rkey(4B), DMALen(4B)</td><td>只出现在 WRITE 的 FIRST/ONLY 包:告诉对端"写到哪、凭什么、总共多长"</td></tr>
+  <tr><td>payload</td><td>—</td><td>FIRST/MIDDLE 段严格等于 PMTU;本栈 PMTU=4096(硬编码)</td></tr>
+  <tr><td>ICRC(4 B)</td><td class="mono">CRC32</td><td>不变量 CRC:对"路由中不变的字段+载荷"计算,可变字段(TTL、DSCP/ECN、校验和等)按掩码规则替换后参与计算。接收端 ICRC 错 = <strong>静默丢弃</strong></td></tr>
+</table></div>
+<div class="callout warn"><span class="tag">调试要点(Stage B 勘误)</span>本分支 <strong>RX 根本不校验 ICRC</strong>(<code>crc.hpp:39</code> 无条件 <code>#define DISABLE_CRC_CHECK</code>)——坏 ICRC 帧会被照常接受、放置、回 ACK,<code>crc_drop_pkg_count</code> 恒为 0(Stage B 实测)。计数器仍接 AXI-Lite,但排障时不要指望它;真正设防的是对端商品 RNIC(它会校验我们的 TX——我们的 TX ICRC 已与参考实现互证正确)。若未来需要 RX 设防:去掉该 define 重新综合,或在 SV 层加校验。</div>
+<div class="item">
+  <div class="item-title">此刻为什么学 · 动手做什么</div>
+  <div class="facet">
+    <span class="fk">为什么</span><span class="why">Stage B 的核心工作就是逐字段校验 <code>m_axis_tx</code> 输出帧。注意上方勘误:本分支 RX 不校验 ICRC,环回平台内它不是故障源;但对端商品 RNIC(CX-5)会校验我们的 TX——互操作阶段"ICRC 错 = 静默丢包"仍是最阴的故障模式。</span>
+    <span class="fk">动手</span><span class="fv ex">用 Wireshark 打开任一 RoCE v2 抓包(或 Stage B 产出的 golden pcap),手工核对 BTH 的 opcode/PSN/destQP 与 RETH 的 vaddr/rkey/DMALen;再手算一帧 ICRC 与工具比对。</span>
+    <span class="fk">入口</span><span>源码 <code>hdl/common/icrc.sv</code>, <code>hls/crc/</code> · Obsidian <code>003互联基础设施/rdma</code>(ib_pack.h 逐字段笔记)</span>
+  </div>
+</div>
+
+<h2 id="proto-rc"><span class="secno">§2</span>RC 语义:PSN / ACK / NAK / go-back-N</h2>
+<ul>
+  <li><strong>PSN(24-bit,每 QP 独立)</strong>:发送侧每发一个包 +1;接收侧严格按序校验——收到"过去的 PSN"重发 ACK(重复包),收到"跳号的 PSN"回 <strong>NAK sequence error</strong>。</li>
+  <li><strong>ACK / AETH</strong>:响应端用 ACK 包(BTH+AETH)确认;AETH 携带 syndrome 与 MSN(消息序号,多包消息计数)。ACK 是累积的。<strong>本栈实测(Stage C)</strong>:响应方逐包回 ACK 不合并(&gt;PMTU 每 4096B 一个 48B ACK),CQE 仍只一个;对端合并 ACK 的情形归 CX-5 互操作检查单。</li>
+  <li><strong>go-back-N 重传</strong>:发起端收到 NAK 或超时,从出错 PSN 起整段重发。<strong>本仓库注意</strong>:coyote-TCP-RDMA 分支 <code>RETRANS_EN</code> 默认开启(fns master 才是注释掉的——Stage A 勘误);BALBOA 重构核的重传缓冲设计在 HBM 通道上,VCU118 无 HBM,平台已再安置到 URAM(见下方注记)。</li>
+  <li><strong>流控</strong>:该栈用 ACK 时钟化的按请求计信用(最大在途请求数为构建参数),不依赖 PFC——BALBOA 在有损交换网上就是这样跑的,我们的点对点环回更不需要 PFC。</li>
+</ul>
+<div class="callout pass"><span class="tag">时间线注记(07-18 已更新)</span>早期文档说"环回阶段先跑无重传、一丢即挂"——那是 Stage B–E 首光阶段的状态,已过期。平台可用期工作项 ③ 已把重传缓冲再安置到 URAM(替换 tie-off,解楔死)并仿真闭案 Stage B 遗留 B9:丢 ACK → transport timer 约 626µs 超时 → 重传帧逐字节 = 原帧(线上 TX 抓包证明)。板级保持仿真证明(环回链路无丢帧注入器)。详见 <code>platform-stage/DOORBELL_SQRING_RETRANS_DESIGN.md</code> 与指南仪表盘 07-18 决策行。</div>
+<div class="item">
+  <div class="item-title">此刻为什么学 · 动手做什么</div>
+  <div class="facet">
+    <span class="fk">为什么</span><span class="why">Stage B 的负测试(跳 PSN → NAK)与重传闭环(B9)都由它解释;将来 dual-length 研究段改的就是这套记账。</span>
+    <span class="fk">动手</span><span class="fv ex">在 myDevbox 上起 Soft-RoCE(rxe)+ tcpdump,发一个跨 PMTU 的 ib_write,观察真实 FIRST/MIDDLE/LAST 序列与 ACK 的 PSN/MSN 演进。</span>
+    <span class="fk">入口</span><span>源码 <code>hls/ib_transport_protocol/</code>(状态机本体)· Obsidian rxe 笔记(内核参考实现)</span>
+  </div>
+</div>
+
+<h2 id="proto-write"><span class="secno">§3</span>WRITE 解剖 × 为什么 WRITE-only</h2>
+<p>一次 RDMA WRITE(消息长 L,PMTU=4096)在线上是:</p>
+<pre><code>L ≤ 4096      →  WRITE_ONLY   [BTH+RETH+payload+ICRC]
+L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
+                 WRITE_MIDDLE [BTH+4096B] × n    ← 每段严格 = PMTU
+                 WRITE_LAST   [BTH+尾段]</code></pre>
+<p>响应端<strong>内容无关</strong>地把字节放到 <code>vaddr</code>(经 rkey 授权),按 PSN 记账,回 ACK。两个直接推论:</p>
+<ul>
+  <li><strong>WRITE-only 是够用的科研范围</strong>:KV 传输的主 verb 就是 WRITE;BALBOA 本身也只实现 WRITE+READ(无 SEND/ATOMICS)。READ 需要响应端状态机,后置。</li>
+  <li><strong>WRITE_WITH_IMM 伏笔</strong>:普通 WRITE 在响应端<strong>不产生任何 CQE</strong>(不消耗 receive request)——纯环回内我们两端都可观测,无所谓;但将来对 stock 网卡(CX-5)做压缩载荷实验时,接收主机需要"到达通知 + 压缩后长度"——WRITE_WITH_IMM 恰好消耗一个预投递的 RECV 并交付带 32-bit imm 的 CQE,把压缩长度放 imm 里一举两得。<strong>设计从第一天就留这个口。</strong></li>
+</ul>
+<div class="item">
+  <div class="item-title">此刻为什么学 · 动手做什么</div>
+  <div class="facet">
+    <span class="fk">为什么</span><span class="why">Stage B 通过标准里"≥PMTU 多包切分正确"就是它;WITH_IMM 是未来对 stock 网卡做压缩实验的接收通知设计,要从第一天留口。平台可用期 ④ 的双长度面(WQE len=压缩长)也建立在这张分段图上——线长必须 ceil4(IBTA PadCount 现实)。</span>
+    <span class="fk">动手</span><span class="fv ex">拿 12KB 消息手画包序列(含每包长度与 PSN),再与 Stage B 仿真输出对照;找出 len 恰为 n×4096 时的边界情况。</span>
+    <span class="fk">入口</span><span><code>hls/fns_config.hpp</code>(PMTU 常量)</span>
+  </div>
+</div>
+
+<div class="footnote">
+  <p>返回:🧭 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《VCU118 RoCE 平台:学习与集成指南》</a>(仪表盘 + 阶段流程 + 速查表)。姊妹篇:🧱 <a href="https://claude.ai/code/artifact/c3fd7041-528d-48a5-8cdd-c61920de5656">《三框架入门:fns · Corundum · BALBOA》</a>。</p>
+  <p>WR-ZipGuard · Platform Stage · RoCE v2 入门 v1.0 · 2026-07-19(拆自《集成手册》v1.0 §2 与《学习导览》T1;两处时效性修订:RX-ICRC 勘误落位、重传状态更新至平台可用期 ③)</p>
+</div>
+</main>
