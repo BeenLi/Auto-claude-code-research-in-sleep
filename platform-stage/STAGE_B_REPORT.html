@@ -120,7 +120,83 @@
   <tr><td class="mono">FIFO 行为替身 ×2 族</td><td>自写(axis_fifo_stubs / axis_meta_fifo_stubs)</td><td>顶替 axis_data_fifo_512(_cc_tx) 与 meta_8…512 共 10 个 Vivado IP;指针式实现(见发现 B7)</td></tr>
   <tr><td class="mono">SIM_ZERO_INIT 补丁</td><td>对 Coyote 4 个 RAM 原语 + 17 个 HLS RAM</td><td>仿真侧建模比特流 BRAM 清零(见发现 B6)</td></tr>
 </table></div>
-<h3>3.2 测试台闭环</h3>
+<h3>3.2 DUT 内部架构与三条数据流</h3>
+<div class="diagram"><svg viewBox="0 0 700 545" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,monospace" font-size="11">
+  <defs>
+    <marker id="arA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--accent)"/></marker>
+    <marker id="arL" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--link)"/></marker>
+    <marker id="arM" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
+  </defs>
+  <rect x="165" y="40" width="475" height="440" rx="10" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="185" y="64" fill="var(--ink)" font-weight="700">roce_stack(DUT)· Coyote SV 包装层 + csynth RTL</text>
+  <rect x="190" y="120" width="135" height="56" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="257" y="142" text-anchor="middle" fill="var(--ink)" font-weight="700">rdma_flow</text>
+  <text x="257" y="160" text-anchor="middle" fill="var(--muted)" font-size="9">SQ 流控 · CQ(B6/B8)</text>
+  <rect x="190" y="230" width="135" height="56" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="257" y="252" text-anchor="middle" fill="var(--ink)" font-weight="700">mux_retrans</text>
+  <text x="257" y="270" text-anchor="middle" fill="var(--muted)" font-size="9">payload 广播(B3)</text>
+  <rect x="360" y="120" width="120" height="250" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="420" y="146" text-anchor="middle" fill="var(--accent-ink)" font-weight="700">rocev2</text>
+  <text x="420" y="168" text-anchor="middle" fill="var(--accent-ink)" font-size="9">fns HLS RTL ×139</text>
+  <text x="420" y="186" text-anchor="middle" fill="var(--accent-ink)" font-size="9">BTH·RETH·PSN</text>
+  <text x="420" y="204" text-anchor="middle" fill="var(--accent-ink)" font-size="9">重传状态机</text>
+  <rect x="510" y="120" width="110" height="56" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="565" y="142" text-anchor="middle" fill="var(--ink)" font-weight="700">trimmer</text>
+  <text x="565" y="160" text-anchor="middle" fill="var(--muted)" font-size="9">读请求修剪</text>
+  <rect x="510" y="230" width="110" height="56" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="565" y="252" text-anchor="middle" fill="var(--ink)" font-weight="700">icrc</text>
+  <text x="565" y="270" text-anchor="middle" fill="var(--muted)" font-size="9">追加 4B ICRC</text>
+  <rect x="315" y="400" width="160" height="56" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="395" y="422" text-anchor="middle" fill="var(--ink)" font-weight="700">ack_gap_enforcer</text>
+  <text x="395" y="442" text-anchor="middle" fill="var(--muted)" font-size="9">ACK 间隔整形</text>
+  <rect x="505" y="400" width="110" height="56" rx="6" fill="var(--surface-2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+  <text x="560" y="422" text-anchor="middle" fill="var(--ink)" font-weight="700">rx FIFO</text>
+  <text x="560" y="442" text-anchor="middle" fill="var(--muted)" font-size="9">行为替身(B7)</text>
+  <rect x="40" y="56" width="108" height="48" rx="6" fill="var(--surface-2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+  <text x="94" y="75" text-anchor="middle" fill="var(--ink)">QP/conn 配置</text>
+  <text x="94" y="92" text-anchor="middle" fill="var(--muted)" font-size="9">184b ×2 签名值</text>
+  <rect x="40" y="124" width="108" height="48" rx="6" fill="var(--surface-2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+  <text x="94" y="143" text-anchor="middle" fill="var(--ink)">SQ 命令</text>
+  <text x="94" y="160" text-anchor="middle" fill="var(--muted)" font-size="9">dreq_t · WQE</text>
+  <rect x="40" y="182" width="108" height="48" rx="6" fill="var(--surface-2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+  <text x="94" y="201" text-anchor="middle" fill="var(--ink)">CQE 观察</text>
+  <text x="94" y="218" text-anchor="middle" fill="var(--muted)" font-size="9">ack_t 32b(B8)</text>
+  <rect x="40" y="242" width="108" height="48" rx="6" fill="var(--surface-2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+  <text x="94" y="261" text-anchor="middle" fill="var(--ink)">payload 推流</text>
+  <text x="94" y="278" text-anchor="middle" fill="var(--muted)" font-size="9">主动推流(B3)</text>
+  <rect x="40" y="310" width="108" height="48" rx="6" fill="var(--surface-2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+  <text x="94" y="329" text-anchor="middle" fill="var(--ink)">重传缓冲模型</text>
+  <text x="94" y="346" text-anchor="middle" fill="var(--muted)" font-size="9">wr 入库 / 重读</text>
+  <rect x="40" y="380" width="108" height="48" rx="6" fill="var(--surface-2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+  <text x="94" y="399" text-anchor="middle" fill="var(--ink)">放置观察</text>
+  <text x="94" y="416" text-anchor="middle" fill="var(--muted)" font-size="9">wr_req + 数据</text>
+  <path d="M148 80 H420 V116" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arM)"/>
+  <line x1="148" y1="148" x2="186" y2="148" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arA)"/>
+  <line x1="325" y1="140" x2="356" y2="140" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arA)"/>
+  <line x1="148" y1="266" x2="186" y2="266" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arA)"/>
+  <line x1="325" y1="258" x2="356" y2="258" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arA)"/>
+  <line x1="480" y1="148" x2="506" y2="148" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arA)"/>
+  <path d="M565 176 V226" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arA)"/>
+  <path d="M565 286 V316 H652" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arA)"/>
+  <path d="M656 320 V428 H619" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arM)"/>
+  <line x1="505" y1="428" x2="479" y2="428" stroke="var(--link)" stroke-width="1.5" marker-end="url(#arL)"/>
+  <path d="M395 400 V374" fill="none" stroke="var(--link)" stroke-width="1.5" marker-end="url(#arL)"/>
+  <line x1="360" y1="164" x2="329" y2="164" stroke="var(--link)" stroke-width="1.5" marker-end="url(#arL)"/>
+  <path d="M220 176 V206 H152" fill="none" stroke="var(--link)" stroke-width="1.5" marker-end="url(#arL)"/>
+  <path d="M360 350 H265 V404 H152" fill="none" stroke="var(--link)" stroke-width="1.5" marker-end="url(#arL)"/>
+  <path d="M258 286 V334 H152" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arM)"/>
+  <line x1="40" y1="505" x2="64" y2="505" stroke="var(--accent)" stroke-width="2"/>
+  <text x="70" y="509" fill="var(--muted)" font-size="10">发送流:SQ→帧→m_axis_tx</text>
+  <line x1="245" y1="505" x2="269" y2="505" stroke="var(--link)" stroke-width="2"/>
+  <text x="275" y="509" fill="var(--muted)" font-size="10">接收流:s_axis_rx→放置/ACK</text>
+  <line x1="470" y1="505" x2="494" y2="505" stroke="var(--muted)" stroke-width="2" stroke-dasharray="4 3"/>
+  <text x="500" y="509" fill="var(--muted)" font-size="10">TB 闭环(回灌/重传)</text>
+  <text x="350" y="532" text-anchor="middle" fill="var(--muted)" font-size="10">虚线框 = 非真身(TB 模型 / 行为替身);橙底 rocev2 = fns HLS 引擎,其余实线框 = Coyote SV。</text>
+</svg></div>
+<p><strong>发送流(橙,左→右)</strong>:TB 先写 QP/conn 配置(灰箭头,一次性);SQ 命令(<code>dreq_t</code>)进 <code>rdma_flow</code> 做流控放行,放行后按位打包成 HLS 的 txMeta 喂给 <code>rocev2</code>——发现 B2(laddr/raddr 互换)出在这一步打包,B6(BRAM 读 X 死锁)出在 <code>rdma_flow</code> 内部的指针表。与此同时 payload 必须由用户侧<strong>主动</strong>推进 <code>mux_retrans</code>(B3:引擎对 WRITE 也发内部取数命令,但 mux 吞掉不透传,<code>m_rdma_rd_req</code> 只在 READ 响应时跳);mux 把每一拍数据一分为二:一路给 <code>rocev2</code> 打包,一路进重传缓冲(灰虚线),两路 tready 取 AND、锁步前进。裸帧经 <code>trimmer</code>、<code>icrc</code>(追加 4B)从 <code>m_axis_tx</code> 出去,TB 逐拍捕获,即 B-4/B-5 判据的对拍对象。重传缓冲按 <code>{vfid,pid,offs}</code> 分槽、每槽一个 PMTU——这给 B4(SQ 生产者必须预切分)补了电路层理由:超 PMTU 的命令会溢出自己的槽。</p>
+<p><strong>接收流(青,右→左)</strong>:右侧灰虚线即"回灌"——TB 把捕获的 TX 帧原样喂回 <code>s_axis_rx</code>,是 Stage E 板上 DAC 环回的仿真等价物。帧经 FIFO 行为替身(B7 案发地:xsim 不重算引用 SV 队列方法的连续赋值)与 <code>ack_gap_enforcer</code> 进入 <code>rocev2</code>,以响应方身份解 RETH、发放置命令+数据(<code>m_rdma_wr_req</code>/<code>m_axis_rdma_wr</code>,TB 验证 vaddr/len/payload 位精确);ACK 信息经 <code>rocev2 → rdma_flow</code> 入 CQ,以 32 位 <code>ack_t</code>(B8,last 门控)从 <code>m_rdma_ack</code> 读出,完成 CQE 闭环。</p>
+<p>两处如实的画法:RX 通路上<strong>没有 ICRC 检查站</strong>——本应在 <code>rocev2</code> 入口做的校验被 <code>crc.hpp:39</code> 分支级禁用(B5),故图中无此站;<code>rx FIFO</code> 虽在包装层内部却画成虚线框,因为 10 个 Vivado FIFO IP 本实验全部用行为替身顶替(§6.2 边界第二条)。B2/B3/B4 三条契约缝全部位于橙(fns)与青(Coyote)交界面上——单独测任何一方都测不出来,这正是本阶段存在的理由。</p>
+<h3>3.3 测试台闭环</h3>
 <div class="diagram"><svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,monospace" font-size="11">
   <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker></defs>
   <rect x="230" y="70" width="240" height="160" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
@@ -145,7 +221,7 @@
   <path d="M340 230 L530 230" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
   <text x="350" y="285" text-anchor="middle" fill="var(--muted)" font-size="10">④ 的输出既是判据(对拍 golden)也是 ⑤ 的弹药(回灌/负测试)——TX 与 RX 互为对照。</text>
 </svg></div>
-<h3>3.3 激励:签名值(Stage A 血统,一处重新注册)</h3>
+<h3>3.4 激励:签名值(Stage A 血统,一处重新注册)</h3>
 <div class="tablebox"><table>
   <tr><th>参数</th><th>值</th><th>说明</th></tr>
   <tr><td class="mono">QPN</td><td class="mono">0x11(pid=17, vfid=0)</td><td>Coyote 侧 QPN={vfid,pid} 复合,与 Stage A 同值</td></tr>
@@ -154,7 +230,7 @@
   <tr><td class="mono">payload</td><td class="mono">64B: 0xA0+i;8KiB: i%256</td><td>staging[0] 起</td></tr>
   <tr><td class="mono">IP / UDP 源端口</td><td class="mono">0x0b01d4d1→0x0b01d4d2 / 0xC000</td><td>同 Stage A(conn 表 128 位反序值逐位镜像)</td></tr>
 </table></div>
-<h3>3.4 四个测试用例</h3>
+<h3>3.5 四个测试用例</h3>
 <div class="tablebox"><table>
   <tr><th>用例</th><th>激励</th><th>验什么</th></tr>
   <tr><td class="mono">write64</td><td>一条 WRITE_ONLY 64B</td><td>B-4 golden 对拍 + B-5 ICRC 双算</td></tr>
