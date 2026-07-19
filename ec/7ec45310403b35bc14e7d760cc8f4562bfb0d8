@@ -1,0 +1,25 @@
+platform-stage/CODEC_INTEGRATION_DESIGN.md
+  s_92edfd06c40fd5::t_e695d9c9f74b20 1-3
+platform-stage/CODEC_INTEGRATION_REPORT.html
+  s_92edfd06c40fd5::t_2afc08f8e47795 172,237
+platform-stage/DOORBELL_SQRING_RETRANS_DESIGN.md
+  s_92edfd06c40fd5::t_b3e3150305358d 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ec7ec45310403b35bc14e7d760cc8f4562bfb0d8",
+  "prompts": {},
+  "sessions": {
+    "s_92edfd06c40fd5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f39dce6d-1dbe-483f-9488-ac7912b731a5",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
