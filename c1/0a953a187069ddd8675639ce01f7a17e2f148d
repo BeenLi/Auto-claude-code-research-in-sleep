@@ -1,0 +1,23 @@
+AGENT.md
+  s_92edfd06c40fd5::t_187459dd46ffa8 38,77
+platform-stage/README.md
+  s_92edfd06c40fd5::t_fbaefc34c1e803 53-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c10a953a187069ddd8675639ce01f7a17e2f148d",
+  "prompts": {},
+  "sessions": {
+    "s_92edfd06c40fd5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f39dce6d-1dbe-483f-9488-ac7912b731a5",
+        "model": "unknown"
+      },
+      "human_author": "wildlee <wanli.99@qq.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
