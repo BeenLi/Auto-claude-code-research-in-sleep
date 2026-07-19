@@ -169,7 +169,7 @@
 
 <h2 id="s4"><span class="no">§4</span>做了什么</h2>
 <h3>设计先行:三路侦察 → 设计文档 → 4 视角对抗评审</h3>
-<p>侦察(内核契约 / 插入点 / 数据与基准)钉出三个关键前提:WQE len 端到端不透明(压缩长 WR 零改栈)、Port A 空闲窗口可借、<strong>E0 变换粒度是整 chunk 而非每 32KB 块</strong>(α 对照的正确姿势)。设计文档(<code>PLATFORM_USABLE_P4_CODEC_DESIGN.md</code>)过 4 视角评审 + 对抗验证:唯一 MAJOR(64B 写回与 32b 总线矛盾)被验证员降级为文档措辞问题——实现侧已改为 32b 协议(staging 因此零改动);4 个 MINOR 全部闭环(chan/chan_bt 环序区分、背靠背测试、err_len 措辞、doorbell-忙碌期约束的软件化决策)。</p>
+<p>侦察(内核契约 / 插入点 / 数据与基准)钉出三个关键前提:WQE len 端到端不透明(压缩长 WR 零改栈)、Port A 空闲窗口可借、<strong>E0 变换粒度是整 chunk 而非每 32KB 块</strong>(α 对照的正确姿势)。设计文档(<code>CODEC_INTEGRATION_DESIGN.md</code>)过 4 视角评审 + 对抗验证:唯一 MAJOR(64B 写回与 32b 总线矛盾)被验证员降级为文档措辞问题——实现侧已改为 32b 协议(staging 因此零改动);4 个 MINOR 全部闭环(chan/chan_bt 环序区分、背靠背测试、err_len 措辞、doorbell-忙碌期约束的软件化决策)。</p>
 <h3>Gate 1(csim):2025.2 一把过,并买到一个 α 决策</h3>
 <p>7 项 roundtrip 全过、TUSER 长度定律成立。<strong>blk16 决策</strong>:32KB chan_bt 在 blk32 下 α=0.772(单棵树跨 plane0/plane1 熵段),16KB 块边界恰落 plane 边界 → <strong>0.716</strong>,反超软件 V3(0.724);e5m2 与 256KB 中性。<strong>核数不变性</strong>:1 核与 8 核输出对全部四种输入 <code>cmp</code> 逐字节一致——核数是纯吞吐旋钮。256KB(E0 粒度)α=<strong>0.7005</strong>,与 E0 声称 0.708 同粒度贴合,数据管线正确性得证。</p>
 <h3>Gate 2(csynth)与 Gate 3(RTL 集成):六颗雷,逐一取证</h3>
@@ -234,7 +234,7 @@
 </ol>
 
 <div class="footnote">
-  <p>文档家族:🧭 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">阶段索引</a> · 🔌 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">集成手册</a> · 设计与评审全文 <code>platform-stage/PLATFORM_USABLE_P4_CODEC_DESIGN.md</code>(docs 仓)。实验代码统一在私有代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>codec/</code> + <code>roce-rtl-sim/rtl/l0/rdma_codec_cu.sv</code> + <code>rtl/hls_codec/</code>,commit <code>d213c7d</code>)。</p>
+  <p>文档家族:🧭 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">阶段索引</a> · 🔌 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">集成手册</a> · 设计与评审全文 <code>platform-stage/CODEC_INTEGRATION_DESIGN.md</code>(docs 仓)。实验代码统一在私有代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>codec/</code> + <code>roce-rtl-sim/rtl/l0/rdma_codec_cu.sv</code> + <code>rtl/hls_codec/</code>,commit <code>d213c7d</code>)。</p>
   <p>WR-ZipGuard · Platform Stage · 平台可用期 item ④ 实验报告 · 2026-07-19</p>
 </div>
 </main>

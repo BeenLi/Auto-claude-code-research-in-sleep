@@ -1,4 +1,6 @@
-# Platform-usable P3 — L1 doorbell (SQ ring) + retransmission re-housing
+# L1 doorbell (SQ ring) + retransmission re-housing — 平台可用期工作项 ③
+
+> 旧名 `PLATFORM_USABLE_P3_DESIGN.md`（"P3" = 平台可用期第 ③ 项，2026-07-19 改为描述名）。
 
 Design document for platform-usable item **③**. Grounds two RTL changes in verified
 recon of the `fns`/`fpga-network-stack` `coyote-TCP-RDMA` @20633d03 stack: the SQ /

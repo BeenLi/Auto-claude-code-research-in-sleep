@@ -1,4 +1,6 @@
-# Platform-usable P4 — codec insertion (transform + Vitis DCL gzip CU, store-and-forward)
+# Codec insertion (transform + Vitis DCL gzip CU, store-and-forward) — 平台可用期工作项 ④
+
+> 旧名 `PLATFORM_USABLE_P4_CODEC_DESIGN.md`（"P4" = 平台可用期第 ④ 项，2026-07-19 改为描述名）。
 
 Design document for platform-usable item **④**, the entry point of the dual-length-verbs
 research phase. Grounds a store-and-forward compression CU in verified recon of three
