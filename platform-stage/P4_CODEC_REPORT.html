@@ -1,0 +1,240 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>平台可用期④ 实验报告 · codec 插入:压缩 WRITE 全环(仿真级)</title>
+<style>
+  :root {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+      --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+      --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+      --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+      --code-bg: #202A35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12181F; --surface: #1A222B; --surface-2: #212B36; --ink: #E4EAF0;
+    --muted: #93A2B0; --line: #2E3A46; --accent: #D98F4E; --accent-ink: #E0A468;
+    --accent-soft: #33261A; --link: #63BFC7; --pass: #5FBE8B; --pass-soft: #16281E;
+    --warn: #D9A94A; --warn-soft: #2C2414; --fail: #E07883; --fail-soft: #301B1E;
+    --code-bg: #202A35;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F7F8; --surface: #FFFFFF; --surface-2: #EEF1F4; --ink: #1D2833;
+    --muted: #5C6B78; --line: #D8DEE3; --accent: #A85B22; --accent-ink: #8A4A1B;
+    --accent-soft: #F3E7DC; --link: #0F6B74; --pass: #2E7D4F; --pass-soft: #E3F0E8;
+    --warn: #96660A; --warn-soft: #F6EEDA; --fail: #B23842; --fail-soft: #F6E3E5;
+    --code-bg: #EEF1F4;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.8; margin: 0; font-size: 15px; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  main { max-width: 920px; margin: 0 auto; padding: 36px 24px 96px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
+  h1 { font-size: 27px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; text-wrap: balance; }
+  .hero-sub { color: var(--muted); max-width: 68ch; margin: 0 0 14px; }
+  .verdict { display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: .08em; color: var(--pass); background: var(--pass-soft); border: 1px solid color-mix(in srgb, var(--pass) 40%, transparent); border-radius: 6px; padding: 3px 12px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--code-bg); border-radius: 4px; padding: 1.5px 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+  pre code { background: none; padding: 0; }
+  h2 { font-size: 19px; margin: 48px 0 12px; padding-top: 14px; border-top: 2px solid var(--line); }
+  h2 .no { font-family: var(--mono); color: var(--accent-ink); margin-right: 8px; font-size: 15px; }
+  h3 { font-size: 15.5px; margin: 26px 0 8px; }
+  .tablebox { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--line); padding: 7px 12px 7px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--surface); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .callout.pass { border-left-color: var(--pass); }
+  .callout.pass .tag { color: var(--pass); }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.warn .tag { color: var(--warn); }
+  .finding { margin: 18px 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .finding .fid { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .finding .ftitle { font-weight: 700; }
+  .finding p { margin: 8px 0 0; font-size: 14px; }
+  .figbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 18px 0; overflow-x: auto; }
+  .figcap { font-size: 12.5px; color: var(--muted); margin-top: 10px; font-family: var(--mono); }
+  .st { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+  .st.pass { color: var(--pass); background: var(--pass-soft); font-weight: 700; }
+  .st.fixed { color: var(--warn); background: var(--warn-soft); font-weight: 700; }
+  ul, ol { padding-left: 1.4em; }
+  li { margin: 5px 0; }
+  .footnote { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 56px; padding-top: 16px; }
+  .toc { font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 18px; margin: 20px 0; }
+  .toc a { border-bottom: none; }
+  .toc span { color: var(--muted); margin: 0 6px; }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 实验报告 · 平台可用期 item ④</div>
+  <h1>codec 插入:压缩 WRITE 全环 —— 双长度面首次打通(仿真级)</h1>
+  <p class="hero-sub">在 Stage A–E 认证的 WRITE 平台上插入 Vitis DCL 2024.2 gzip 动态 Huffman 压缩 CU(存转发,挂 staging Port A,认证 Port B 零改动):真实 Qwen KV 块 → 硬件 E0 变换(纯地址生成器)→ 压缩 → <strong>以压缩长度提交 WQE</strong>(≠原长、非 64B 倍数、&gt;PMTU 自动分段)→ 环回 placement。三测全绿,CU 输出 ≡ placement ≡ 线上载荷,stock <code>gzip.decompress</code> 逐位还原变换输入;既有 25 项认证回归全数保持。ID → <code>0x0C1A_0004</code>。</p>
+  <span class="verdict">PASS(仿真级)· 2026-07-19</span>
+</header>
+
+<div class="toc">
+  <a href="#s1">1 回答什么问题</a><span>·</span>
+  <a href="#s2">2 原理</a><span>·</span>
+  <a href="#s3">3 装置</a><span>·</span>
+  <a href="#s4">4 做了什么</a><span>·</span>
+  <a href="#s5">5 结果怎么看</a><span>·</span>
+  <a href="#s6">6 发现与边界</a><span>·</span>
+  <a href="#s7">7 结论与移交</a>
+</div>
+
+<h2 id="s1"><span class="no">§1</span>回答什么问题</h2>
+<ol>
+  <li><strong>双长度可行吗?</strong> 研究主线(dual-length verbs)的第一块地基:WQE 携带压缩长度(与原始长度解耦)能否<em>零改动</em>走完 roce_stack 全环——RETH.DMALen 取压缩值、任意字节长度、&gt;PMTU 由 doorbell 预切分、responder 内容无关地 placement。侦察结论"len 28 位端到端不透明"必须被数据证实。</li>
+  <li><strong>DCL 2024.2 内核真实可用吗?</strong> 用户 07-17 指定的首要验证点:AMD 已从 2025.x 删除 data_compression,2024.2 分支的内核在 2025.2 工具链下 csim/csynth 是否可用;更进一步——<strong>csim 绿是否等于 RTL 绿</strong>(dataflow 内核的经典陷阱)。</li>
+  <li><strong>硬件变换等价吗?</strong> E0 的 α 声称(bf16 chan_bt 0.708 / e5m2 chan 0.721)建立在 python 变换上;RTL 用地址生成器重新实现,必须证明逐位等价,且 α 落点可解释。</li>
+</ol>
+
+<h2 id="s2"><span class="no">§2</span>原理</h2>
+<h3>存转发是结构必然,不是偷懒</h3>
+<p>doorbell 在 <code>0x70</code> 推环时刻就把 <code>seg_len</code> 同时锁进 SQ meta(→RETH.DMALen)与 pusher 命令(<code>rdma_doorbell_l0.sv:287-321</code>);而动态 Huffman 的输出长度只有压完才知道。因此"先压进 staging、读出 LEN_OUT、再发 WQE"是唯一不改栈的结构。CU 的输出长度经内核 TLAST 拍的 TUSER 带出(<code>axi_stream_utils.hpp:124-131</code>),与收集器字节计数交叉自检。</p>
+<h3>变换 = 纯地址置换 → 读侧地址生成器,零中间缓冲</h3>
+<p>E0 的 <code>chan</code>(channel-major)与 <code>chan_bt</code>(再加字节平面拆分)都是纯字节置换(<code>layout.py:49-54</code> + <code>floatsplit.py:142-149</code>)。staging URAM 是随机访问的,于是变换退化为<strong>按置换序读字节</strong>:三层计数器(plane p / channel c / row r),<code>chan_bt</code> 取 p 外环、<code>chan</code> 取 p 内环,地址 = <code>SRC + ((r&lt;&lt;hd_log2 | c)&lt;&lt;item16 | p)</code>,全移位无乘法。等价性由 §2 第三条的 golden 判据直接裁决。</p>
+<h3>三重恒等式 + 两级 golden</h3>
+<p>判据设计为一条恒等链,每一环排除一类故障:<strong>CU 输出 ≡ csim golden</strong>(变换+内核+写回正确)→ <strong>placement ≡ CU 输出</strong>(WQE/分段/环回/placement 无损)→ <strong>线上载荷 ≡ CU 输出</strong>(逐段拆帧后重组,覆盖非 64B 尾段与 pad)→ <strong>stock 解码 ≡ 变换输入</strong>(commodity-decode 故事的字面验证)。实验揭示第一环对多块输入过强(§6 P4-3):8 核并发使 RTL 打包顺序与顺序执行的 csim 产生<em>合法编码差异</em>——golden 纪律遂修订为两级:单块字节恒等,多块解码逐位恒等(<code>check_codec.py</code>)。</p>
+<h3>Port A 复用:借主机的空闲窗口</h3>
+<p>staging Port A 仅在主机触碰 <code>0x8xxxxx</code> 窗口时活跃;CU 讲同一套 5 信号 32b 协议,由 <code>roce_l0_top</code> 二选一(doorbell 绝对优先,CU 仅在 <code>stg_host_active</code> 低时发拍)。对照 <code>rdma_uram_staging.sv:84-91</code> 的读管线逐拍推演:CU 在 T 发读、T+2 采样,采样值只依赖 T+1 周期的 RAM 输出寄存器——主机 T+1 的强拍影响 T+2/T+3,写操作在 no_change 模式下不动 <code>douta</code>,T 同拍冲突被门控排除 → <strong>无需重放机制即 race-free</strong>。代价是 3 cycles/byte 的读速,对仿真与 JTAG 台架完全无感(吞吐是研究阶段命题,不是本阶段命题)。</p>
+
+<h2 id="s3"><span class="no">§3</span>装置(Setup)</h2>
+<div class="figbox"><svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,monospace" font-size="11">
+  <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--accent)"/></marker></defs>
+  <rect x="10" y="20" width="200" height="110" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="110" y="42" text-anchor="middle" fill="var(--ink)" font-weight="700">rdma_doorbell_l0(扩展)</text>
+  <text x="110" y="62" text-anchor="middle" fill="var(--muted)">regs 0xC0-0xDC 解码</text>
+  <text x="110" y="78" text-anchor="middle" fill="var(--muted)">stg_host_active 导出</text>
+  <text x="110" y="94" text-anchor="middle" fill="var(--muted)">ID → 0x0C1A_0004</text>
+  <text x="110" y="118" text-anchor="middle" fill="var(--muted)">L1 SQ 环 / L0 分段(未动)</text>
+  <rect x="290" y="20" width="280" height="250" rx="8" fill="var(--surface)" stroke="var(--accent)"/>
+  <text x="430" y="42" text-anchor="middle" fill="var(--ink)" font-weight="700">rdma_codec_cu(新)</text>
+  <rect x="305" y="55" width="115" height="62" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="362" y="76" text-anchor="middle" fill="var(--ink)">地址生成器</text>
+  <text x="362" y="92" text-anchor="middle" fill="var(--muted)">raw/chan/chan_bt</text>
+  <text x="362" y="107" text-anchor="middle" fill="var(--muted)">3 cyc/B 读</text>
+  <rect x="440" y="55" width="115" height="62" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="497" y="76" text-anchor="middle" fill="var(--ink)">gzipc_cu(HLS)</text>
+  <text x="497" y="92" text-anchor="middle" fill="var(--muted)">DCL 8核/16KB</text>
+  <text x="497" y="107" text-anchor="middle" fill="var(--muted)">动态 Huffman</text>
+  <rect x="305" y="135" width="250" height="56" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="430" y="156" text-anchor="middle" fill="var(--ink)">32b 写回收集器(4B lane)</text>
+  <text x="430" y="174" text-anchor="middle" fill="var(--muted)">IBTA pad:末 lane 补零 → ceil4</text>
+  <text x="430" y="215" text-anchor="middle" fill="var(--muted)">LEN_OUT=TUSER(精确) · CYCLES</text>
+  <text x="430" y="235" text-anchor="middle" fill="var(--muted)">C-R1 快照 · done 粘滞 · err_align/err_len</text>
+  <rect x="650" y="20" width="200" height="250" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="750" y="42" text-anchor="middle" fill="var(--ink)" font-weight="700">rdma_uram_staging(未动)</text>
+  <text x="750" y="64" text-anchor="middle" fill="var(--muted)">256 KiB XPM URAM</text>
+  <text x="750" y="86" text-anchor="middle" fill="var(--ink)">Port A ← 二选一 mux</text>
+  <text x="750" y="104" text-anchor="middle" fill="var(--muted)">(doorbell 优先)</text>
+  <text x="750" y="140" text-anchor="middle" fill="var(--ink)">Port B(认证路径)</text>
+  <text x="750" y="158" text-anchor="middle" fill="var(--muted)">placement 写 + pusher 读</text>
+  <text x="750" y="176" text-anchor="middle" fill="var(--muted)">零改动</text>
+  <text x="750" y="215" text-anchor="middle" fill="var(--muted)">SRC:原始 KV @0x0</text>
+  <text x="750" y="233" text-anchor="middle" fill="var(--muted)">DST:压缩流 @0x10000</text>
+  <text x="750" y="251" text-anchor="middle" fill="var(--muted)">placement @0x27788</text>
+  <line x1="210" y1="75" x2="290" y2="75" stroke="var(--accent)" marker-end="url(#ar)"/>
+  <text x="250" y="66" text-anchor="middle" fill="var(--muted)">ctrl</text>
+  <line x1="570" y1="100" x2="650" y2="100" stroke="var(--accent)" marker-end="url(#ar)"/>
+  <line x1="650" y1="115" x2="570" y2="115" stroke="var(--accent)" marker-end="url(#ar)"/>
+  <text x="610" y="93" text-anchor="middle" fill="var(--muted)">Port A 32b</text>
+</svg>
+<div class="figcap">图 1 · CU 插入点:doorbell 只加寄存器组与 host_active 导出;staging 一行未改;认证 Port B 数据通路(placement/pusher)与 roce_stack 完全不知道 codec 存在。</div></div>
+
+<div class="tablebox"><table>
+  <tr><th>件</th><th>内容</th></tr>
+  <tr><td>平台基线</td><td>code repo <code>@e8fe303</code>(build#3 时序收敛版)→ 本阶段产物 <code>@d213c7d</code>;测试床 = <code>tb_stage_d</code> 真异步三时钟域(Stage D 认证)</td></tr>
+  <tr><td>压缩内核</td><td>Vitis DCL <strong>2024.2</strong> <code>gzipMulticoreCompressAxiStream&lt;0,16,8,32&gt;</code>:gzip 容器 / <strong>16KB 块 / 8 核</strong> / TUSER32,项目自有 shim <code>codec/hls/gzipc_cu.cpp</code> 钉死参数;csynth @4.0ns → 672 个 .v + 11 个 ROM .dat 进 <code>rtl/hls_codec/</code>;缺失依赖 xf_security 头由 Mac 侧 sparse-clone 补装</td></tr>
+  <tr><td>工具链</td><td>Vitis/Vivado <strong>2025.2</strong>(vitis-run csim / v++ csynth / xsim),Stage A 锁定版;<strong>零源码修改通过</strong>(无 -std 旗、无 cfg 手术,仅 security 头安装)</td></tr>
+  <tr><td>数据</td><td>Qwen2.5-7B prefill-K 中层(L14, head_dim=128)现场捕获(盒上原无留存;<code>gen_kv_blocks.py</code> 确定性重现,sha256 见 <code>codec/data/blocks_manifest.json</code>):raw 4K/32K(bf16)、32K(e5m2)、python 变换后 32K/256K 对照块;软件 V3 α 预检内嵌 manifest</td></tr>
+  <tr><td>寄存器</td><td><code>0xC0</code> CTRL(W1 start)/ <code>0xC4</code> STATUS{err_len,err_align,done,busy} / <code>0xC8/CC/D0</code> SRC/DST/LEN_IN / <code>0xD4</code> LEN_OUT(RO,精确压缩长)/ <code>0xD8</code> CFG{item16,hd_log2,mode} / <code>0xDC</code> CYCLES(RO)</td></tr>
+  <tr><td>测试矩阵</td><td>RTL:<code>c_codec_raw</code>(4KB raw ×2 背靠背)/ <code>c_codec</code>(32KB bf16 chan_bt)/ <code>c_codec_e5m2</code>(32KB chan);csim:blk32/blk16 × 1核/8核 全排列 + 256KB E0 粒度;回归:Stage C 4 测+8 项字节不变性、Stage D 10 测(含双 B9)、per-flow golden ×3</td></tr>
+</table></div>
+
+<h2 id="s4"><span class="no">§4</span>做了什么</h2>
+<h3>设计先行:三路侦察 → 设计文档 → 4 视角对抗评审</h3>
+<p>侦察(内核契约 / 插入点 / 数据与基准)钉出三个关键前提:WQE len 端到端不透明(压缩长 WR 零改栈)、Port A 空闲窗口可借、<strong>E0 变换粒度是整 chunk 而非每 32KB 块</strong>(α 对照的正确姿势)。设计文档(<code>PLATFORM_USABLE_P4_CODEC_DESIGN.md</code>)过 4 视角评审 + 对抗验证:唯一 MAJOR(64B 写回与 32b 总线矛盾)被验证员降级为文档措辞问题——实现侧已改为 32b 协议(staging 因此零改动);4 个 MINOR 全部闭环(chan/chan_bt 环序区分、背靠背测试、err_len 措辞、doorbell-忙碌期约束的软件化决策)。</p>
+<h3>Gate 1(csim):2025.2 一把过,并买到一个 α 决策</h3>
+<p>7 项 roundtrip 全过、TUSER 长度定律成立。<strong>blk16 决策</strong>:32KB chan_bt 在 blk32 下 α=0.772(单棵树跨 plane0/plane1 熵段),16KB 块边界恰落 plane 边界 → <strong>0.716</strong>,反超软件 V3(0.724);e5m2 与 256KB 中性。<strong>核数不变性</strong>:1 核与 8 核输出对全部四种输入 <code>cmp</code> 逐字节一致——核数是纯吞吐旋钮。256KB(E0 粒度)α=<strong>0.7005</strong>,与 E0 声称 0.708 同粒度贴合,数据管线正确性得证。</p>
+<h3>Gate 2(csynth)与 Gate 3(RTL 集成):六颗雷,逐一取证</h3>
+<p>csynth 1.5 分钟通过;cosim 设施在本环境损坏(P4-6)改由集成 xsim 直接裁决内核 RTL 健康。RTL 集成期间按"探针取证→根因→修复→回归"处理六雷(§6):其中 <strong>1 核死锁</strong>(P4-1)由 20µs 粒度探针钉死"喂完 32KB、吐 48 字节后永久沉默",根因直指 <code>zlib_compress.hpp:404-471</code> 的 NUM_BLOCKS 缩放 FIFO 深度公式;<strong>icrc 4B 粒度</strong>(P4-2)由 placement 缺口的零填充模式(缺 38 字节 = 末拍 42B 之载荷部分)反推到 <code>icrc.sv:735-860</code> 的枚举链空洞。修复后定版 8 核/16KB(= AMD 出厂测试的 <code>gzipc_16KB</code> 配置)。</p>
+<h3>全量门禁</h3>
+<p><code>run_gate_p4.sh</code>:Stage C 4 测 + 8 项对认证 golden 的字节不变性 → Stage D 10 测(含 <code>d_retrans_b9</code>/<code>d_retrans_b9_multi</code> 及其线上重传帧数据检查)→ per-flow golden ×3 → codec 3 测 + <code>check_codec.py</code> 三份字节级校验 → <strong><code>GATE_P4_DONE fail=0</code></strong>(<code>codec/logs/gate_p4.log</code>)。</p>
+
+<h2 id="s5"><span class="no">§5</span>结果怎么看</h2>
+<div class="tablebox"><table>
+  <tr><th>测试</th><th>流程</th><th>LEN_OUT</th><th>线上长</th><th>段数</th><th>CYCLES</th><th>α(csim 对照)</th><th>判定</th></tr>
+  <tr><td class="mono">c_codec_raw ×2</td><td>4KB raw,背靠背双 job</td><td class="num">3484 / 3484</td><td class="num">3484</td><td class="num">1+1</td><td class="num">23511(两次相同)</td><td class="num">0.8506(=)</td><td><span class="st pass">csim 逐字节恒等</span></td></tr>
+  <tr><td class="mono">c_codec</td><td>32KB bf16 chan_bt(声称路径)</td><td class="num">23486</td><td class="num">23488(+2 pad)</td><td class="num">6</td><td class="num">140179</td><td class="num">0.7167(0.7162)</td><td><span class="st pass">替代编码·解码逐位恒等</span></td></tr>
+  <tr><td class="mono">c_codec_e5m2</td><td>32KB e5m2 chan</td><td class="num">24136</td><td class="num">24136</td><td class="num">6</td><td class="num">143071</td><td class="num">0.7366(0.7365)</td><td><span class="st pass">替代编码·解码逐位恒等</span></td></tr>
+</table></div>
+<ul>
+  <li><strong>三重恒等式全部成立</strong>:CU 输出 ≡ placement ≡ 线上载荷(6 段重组,含 3006B 非 64B 尾段与 2 字节 pad),排除变换/内核/写回/WQE/分段/环回/placement 各环节的任何字节级损伤;<code>CNT_RETRANS==0</code>、CQE 记账精确、忙碌期主机 staging 读仅使 CU 停顿(C.3 论证的实测背书)。</li>
+  <li><strong>双长度面字面成立</strong>:WQE len=ceil4(LEN_OUT)(23488 ≠ 原长 32768),RETH 以线上单位携带压缩长,responder 内容无关地放置压缩字节——栈的 25 项认证回归同时全数保持,证明这一切确实零改动。</li>
+  <li><strong>背靠背双 job LEN_OUT 与 CYCLES 完全相同</strong>:free-running 内核跨 job 状态干净(评审 lens-3 的担忧闭环),且 CU 行为确定。</li>
+  <li><strong>α 落点可解释</strong>:0.7167 vs E0 0.708 的差 = 32KB WR 粒度(D6 预告);256KB csim 0.7005 证明同粒度下贴合;e5m2 0.7366 优于软件 V3 0.7545(硬件 LZ77 在同质单 plane 数据上占优)。</li>
+  <li><strong>CYCLES 解读</strong>:140179 @250MHz ≈ 561µs/32KB,读侧 3 cyc/B(98k)为主 — 正确性阶段的自觉取舍,吞吐属研究阶段(流水化读 + 多核并行喂料是现成升级路径)。</li>
+</ul>
+<div class="callout pass"><span class="tag">gate</span>Stage C 4/4 + 不变性 8/8 · Stage D 10/10(B9 双测线上重传帧=原帧)· per-flow 3/3 · codec 3/3 + 校验 3/3 —— <code>GATE_P4_DONE fail=0</code></div>
+
+<h2 id="s6"><span class="no">§6</span>发现与有效性边界</h2>
+<div class="finding"><span class="fid">P4-1</span><span class="ftitle">1 核配置 RTL 死锁 —— csim 绿 ≠ RTL 绿</span><span class="st fixed">已定版规避</span>
+<p>DCL 内核内部 FIFO 深度随 NUM_BLOCKS 缩放(<code>c_thriceNumBlocks=3N</code>、<code>c_blckEosDepth=N²+N</code>,<code>zlib_compress.hpp:404-471</code>):N=1 时深度 3/2,第二个顺序块经同一核即楔死(探针:喂完 32KB、吐 48B 后 kin r1/kout v0 永久沉默)。csim 的 hls::stream 无界(其自报最大占用 4355 ≫ 3)故看不见。AMD 只出厂测试 8 核。<strong>定版 8 核/16KB = AMD 测试包络</strong>;核数不改输出字节(cmp 证明)。教训入手册故障表:dataflow 内核必须 RTL 级验证。</p></div>
+<div class="finding"><span class="fid">P4-2</span><span class="ftitle">icrc 重插入只处理 4B 粒度末拍 keep —— IBTA PadCount 现实浮出</span><span class="st fixed">CU 侧按契约补齐</span>
+<p><code>icrc.sv:735-860</code> 的重插入枚举链只有 keep=4,8,…,60,64 字节各臂,无 default:keep=62(压缩长 23486 → 尾段 3006,mod 4 = 2)落空洞,末拍从线上消失(placement 尾部 38 字节补零,首个差异 @23448 与拆帧长度 23448 互证)。本质是 IBTA 契约:RoCE 载荷按 PadCount 补齐到 4B,栈从不自发非 4B 帧——<strong>平台史上第一个非 4B 倍长帧是压缩流发出的</strong>。修复走契约而非改认证栈:CU 末 4B lane 补零(写粒度=4B lane,pad 永不跨 lane),驱动侧 len=ceil4(LEN_OUT)。入 CX-5 互操作检查单(奇长度 PadCount 语义)。</p></div>
+<div class="finding"><span class="fid">P4-3</span><span class="ftitle">多块输入下 RTL 输出 = 合法替代 gzip 编码(≠csim 逐字节)</span><span class="st fixed">golden 纪律两级化</span>
+<p>32KB(2×16KB 块)时 RTL 输出比 csim 长 +16B(bf16)/+1B(e5m2),首差在块 1 编码区内——8 核并发 + 共享 treegen 的到达序使打包时序相关;<strong>解码逐位恒等已证</strong>(两例均 <code>gzip.decompress</code> == 变换输入),α 差 &lt;0.1%。单块(4KB)保持逐字节恒等。推论(载荷&gt;16KB 板上同理且逐次运行可变):<strong>板上 codec golden 必须 decode-based,不能 byte-based</strong>。</p></div>
+<div class="finding"><span class="fid">P4-4</span><span class="ftitle">F_IDLE case 臂缺失 —— default 覆盖 start 迁移</span><span class="st fixed">已修</span>
+<p>feed 引擎 case 无显式 F_IDLE 臂,start 周期里 <code>default: f_state&lt;=F_IDLE</code> 在同一 always_ff 中晚于 start 块执行,最后非阻塞赋值获胜 → CU 永不启动。与 P3 的 <code>sq_fetch</code> 声明初始化冻结同类:SV 块内赋值顺序之坑,第二次入账。</p></div>
+<div class="finding"><span class="fid">P4-5</span><span class="ftitle">HLS ROM .dat 按运行目录解析</span><span class="st fixed">已布置</span>
+<p>内核 11 个 ROM 以 <code>$readmemh("./gzipc_cu_*.dat",…)</code> 引用,按 xsim <em>运行目录</em>而非 RTL 目录解析——需复制到两个 sim 运行目录;<strong>build#4 综合可见性是遗留 watch 项</strong>(Vivado synth 的解析基准不同)。</p></div>
+<div class="finding"><span class="fid">P4-6</span><span class="ftitle">HLS cosim 设施在本环境损坏</span><span class="st fixed">改道验证</span>
+<p>cosim 的 AESL 死锁监控设施 C 编译失败(<code>xsim_53.c</code>,与 Stage B 的 LIBRARY_PATH 修复无关,另缺 zip 工具)。未纠缠:集成 xsim 直接编译运行同一批内核 RTL,回答了 cosim 存在的问题("内核 RTL 仿真健康")且证据等级更高(在真实集成环境中)。</p></div>
+<h3>有效性边界(诚实清单)</h3>
+<ul>
+  <li><strong>仿真级</strong>:未上板(codec 综合 = build#4,未做;HLS slack 估计 −1.90 @4ns,Stage B 先例说明估计悲观,兜底 = CU 独立降频时钟域——存转发全解耦使 CDC 只在 CU 边界)。</li>
+  <li><strong>吞吐未测且未优化</strong>:读侧 3 cyc/B 是正确性期取舍;100G 线速命题属研究阶段。</li>
+  <li><strong>B9 × codec 未组合测试</strong>:压缩 WR 的段与普通 WR 无异(retrans URAM 按段镜像、内容无关),结构性成立但未单独跑"丢 ACK + 压缩载荷重传"——如实记为未测项。</li>
+  <li><strong>约束面</strong>:head_dim 限 2 的幂(E0 全体模型满足);LEN_IN ≤ 2¹⁸−1;mode≠raw 要求 LEN_IN 整除 head_dim×itemsize(E0 对齐门同款);doorbell 忙碌期勿发与 DST 重叠的 WQE(软件约束,与"poll busy 再 doorbell"同类,已写入 doorbell 头注释)。</li>
+  <li><strong>α 语义</strong>:硬件路径 α 引用本报告实测值(0.7167/0.7366/0.7005),<em>不得</em>转引 E0 的 0.708/0.721(粒度不同,D6 纪律)。</li>
+</ul>
+
+<h2 id="s7"><span class="no">§7</span>结论与移交</h2>
+<div class="tablebox"><table>
+  <tr><th>通过标准(设计文档 Part D)</th><th>结果</th></tr>
+  <tr><td>DCL 2024.2 内核在 2025.2 下 csim 可用 + KV roundtrip + α 复核(Gate 1)</td><td><span class="st pass">PASS</span> 7/7 roundtrip;blk16 决策;核数不变性</td></tr>
+  <tr><td>csynth → RTL 导出 + 资源记录(Gate 2)</td><td><span class="st pass">PASS</span> 147K LUT est(12%)/394 BRAM/64 URAM;slack −1.90 入 build#4 风险账</td></tr>
+  <tr><td>c_codec_raw 双 job:csim 逐字节恒等 + 全流程</td><td><span class="st pass">PASS</span> LEN_OUT/CYCLES 双 job 完全一致</td></tr>
+  <tr><td>c_codec / c_codec_e5m2:变换等价 + 三重恒等式 + stock 解码</td><td><span class="st pass">PASS</span>(csim 恒等修订为解码恒等,P4-3)</td></tr>
+  <tr><td>既有认证回归零退化</td><td><span class="st pass">PASS</span> Stage C 4+8 · Stage D 10(含 B9 数据检查)· per-flow 3</td></tr>
+  <tr><td>忙碌期主机干扰只停顿不破坏(C.3)</td><td><span class="st pass">PASS</span> c_codec 内置中途 staging 读</td></tr>
+</table></div>
+<h3>移交清单</h3>
+<ol>
+  <li><strong>build#4(codec 综合)</strong>:台架 tcl 已知 ID 表加 <code>0x0C1A_0004</code> → <code>.dat</code> 对 Vivado synth 的可见性(P4-5)→ 250MHz 收敛或启用降频兜底 → 资源实测对照 csynth 估计。</li>
+  <li><strong>板上 codec STEP(下一个台架窗口)</strong>:sanity(ID 0004)→ codec_raw 4KB(csim 逐字节恒等仍适用)→ codec 32KB(<strong>decode-based 校验</strong>,P4-3)→ 记 CYCLES 板上值。</li>
+  <li><strong>研究阶段接口已就位</strong>:CODEC_LEN_OUT(精确压缩长)/CODEC_CYCLES(时延钩子)/双长度 WQE 流程 —— dual-length verbs 主线可直接开工;CX-5 单加两条(PadCount 奇长度、多块编码可变性)。</li>
+  <li><strong>证据归档</strong>:<code>codec/logs/{gate_p4,csim_verify2,g8_verify,p4_checks}.log</code>、golden 三套(<code>golden16/golden8c/control8</code>)、数据 manifest(sha256)——全部在 code repo <code>@d213c7d</code>。</li>
+</ol>
+
+<div class="footnote">
+  <p>文档家族:🧭 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">阶段索引</a> · 🔌 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">集成手册</a> · 设计与评审全文 <code>platform-stage/PLATFORM_USABLE_P4_CODEC_DESIGN.md</code>(docs 仓)。实验代码统一在私有代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>codec/</code> + <code>roce-rtl-sim/rtl/l0/rdma_codec_cu.sv</code> + <code>rtl/hls_codec/</code>,commit <code>d213c7d</code>)。</p>
+  <p>WR-ZipGuard · Platform Stage · 平台可用期 item ④ 实验报告 · 2026-07-19</p>
+</div>
+</main>
