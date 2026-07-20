@@ -227,7 +227,7 @@
   <li><strong>计数器交叉验证</strong>:<code>regIbvCountTx=8</code> 而 TB 只发了 1 条 SQ 命令——这不是 bug:本分支 <code>RETRANS_EN</code> 默认开,TB 不回 ACK,重传定时器按协议把同一帧重发了 7 次。帧 dump 里 word2/3 与 word0/1 逐字节相同,与该解释完全一致;<code>crc_drop=psn_drop=0</code> 则说明 RX 侧没有误触发。<strong>一个"意外"的读数反而额外白送了重传状态机在动的证据。</strong></li>
 </ul>
 
-<div class="callout pass"><span class="tag">PASS 判定(对照手册 Stage A 通过标准逐条)</span>
+<div class="callout pass"><span class="tag">PASS 判定(对照<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#stage-a">《学习与集成指南》§5 Stage A</a> 通过标准逐条)</span>
 csim 构建通过(官方 "CSim done with 0 errors")✓ · 单 WRITE 帧字段核对:UDP:4791 ✓ / BTH 0x0A ✓ / RETH DMALen=64(+VA/R_key/PSN/destQP)✓ / payload 逐字节 ✓ · 工具链版本定版:<strong>全项目锁定 2025.2</strong> ✓。字段核对由执行者解码 + 复核者按原始 hex 独立重解一致。</div>
 
 <!-- ========== 6 ========== -->

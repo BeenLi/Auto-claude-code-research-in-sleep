@@ -99,7 +99,7 @@
   <tr><td>UDP</td><td class="mono">dport=4791</td><td>源码常量 <code>RDMA_DEFAULT_PORT = 0x12B7</code>(=4791),RoCE v2 的注册端口</td></tr>
   <tr><td>IB BTH(12 B)</td><td class="mono">opcode, destQP, PSN, ackreq…</td><td>传输层头,每个包都有;opcode 编码"这是消息的第几段"(§3)</td></tr>
   <tr><td>IB RETH(16 B)</td><td class="mono">vaddr(8B), rkey(4B), DMALen(4B)</td><td>只出现在 WRITE 的 FIRST/ONLY 包:告诉对端"写到哪、凭什么、总共多长"</td></tr>
-  <tr><td>payload</td><td>—</td><td>FIRST/MIDDLE 段严格等于 PMTU;本栈 PMTU=4096(硬编码)</td></tr>
+  <tr><td>payload</td><td>—</td><td>FIRST/MIDDLE 段严格等于 PMTU;本栈 PMTU 默认 4096(CMake <code>PMTU_BYTES</code> CACHE,配置期可覆盖)</td></tr>
   <tr><td>ICRC(4 B)</td><td class="mono">CRC32</td><td>不变量 CRC:对"路由中不变的字段+载荷"计算,可变字段(TTL、DSCP/ECN、校验和等)按掩码规则替换后参与计算。接收端 ICRC 错 = <strong>静默丢弃</strong></td></tr>
 </table></div>
 <div class="callout warn"><span class="tag">调试要点(Stage B 勘误)</span>本分支 <strong>RX 根本不校验 ICRC</strong>(<code>crc.hpp:39</code> 无条件 <code>#define DISABLE_CRC_CHECK</code>)——坏 ICRC 帧会被照常接受、放置、回 ACK,<code>crc_drop_pkg_count</code> 恒为 0(Stage B 实测)。计数器仍接 AXI-Lite,但排障时不要指望它;真正设防的是对端商品 RNIC(它会校验我们的 TX——我们的 TX ICRC 已与参考实现互证正确)。若未来需要 RX 设防:去掉该 define 重新综合,或在 SV 层加校验。</div>

@@ -282,7 +282,7 @@ F1: 4140B opcode=0x08(LAST)  psn=0x80ce4f 无RETH  payload 从 4096 续,连续�
   <tr><td>PSN+2(参考实现重算 ICRC)</td><td>NAK PSN Sequence Error</td><td class="mono">F3: AETH syndrome=0x60,psn=0x80ce4f(期望值);psn_drop+1</td><td>✓ 教科书级 NAK</td></tr>
 </table></div>
 
-<div class="callout pass"><span class="tag">PASS 判定(对照手册 Stage B 通过标准逐条)</span>
+<div class="callout pass"><span class="tag">PASS 判定(对照<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#stage-b">《学习与集成指南》§5 Stage B</a> 通过标准逐条)</span>
 单 QP WRITE 环回 bit-exact ✓(5.2)· ≥PMTU 多包切分正确 ✓(5.3,按真实 SQ 预切分契约)· 帧字段 UDP:4791/BTH/RETH/PSN 序列 ✓ · <strong>ICRC 与软件参考实现对拍一致 ✓</strong>(5.1,Stage A 第一记录点闭合)· 负测试按 RETRANS_EN=开 得到标准 NAK/重复语义 ✓。判定由自动化脚本复核(check_golden_icrc.py 退出码 + 帧结构验证脚本)。</div>
 
 <!-- ========== 6 ========== -->
