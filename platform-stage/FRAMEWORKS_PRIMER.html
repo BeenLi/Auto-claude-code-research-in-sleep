@@ -122,12 +122,13 @@
   <tr><td class="mono">hls/rocev2/rocev2.cpp .hpp</td><td>协议引擎 HLS 顶层——dataflow 结构、各子进程连线;<code>RETRANS_EN</code> 相关配置在 .hpp/.in(本分支默认开启——Stage A 勘误)。<strong>Stage A 的 csim 对象</strong></td></tr>
   <tr><td class="mono">hls/rocev2/newFakeDram.hpp, simSwitch.hpp</td><td>自带的 csim 基建:假 DRAM 模型 + 模拟交换。意味着不上板就能全协议仿真——直接复用</td></tr>
   <tr><td class="mono">hls/ib_transport_protocol/</td><td>传输层状态机核心(PSN 生成/校验、opcode 序列、AETH);常量 <code>RDMA_DEFAULT_PORT=0x12B7</code>、<code>RETRANS_RETRY_CNT=12</code> 在其 .hpp</td></tr>
-  <tr><td class="mono">hls/fns_config.hpp</td><td><code>const uint16_t PMTU = 4096;</code>(第 6 行)——全栈分段粒度,改它要全链路重验</td></tr>
-  <tr><td class="mono">hdl/common/roce_stack.sv</td><td><strong>集成边界。</strong>SV 包装层:SQ 命令位域打包(VITIS_HLS 与非 VITIS 两种布局)、内存命令重组、五个调试计数器输出。接口速查见<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#sec-8">指南附录</a></td></tr>
-  <tr><td class="mono">hdl/common/icrc.sv + hls/crc/</td><td>ICRC 生成/校验;BALBOA 把它重造成 512/320/32-bit 并行流水(其论文数据:约 12.5K LUT,占核内 28%)。平台可用期 ④ 实测补充:重插入仅支持 4B 粒度末拍 keep(IBTA PadCount 现实)→ 压缩线长必须 ceil4</td></tr>
+  <tr><td class="mono">hls/rocev2/rocev2_config.hpp.in</td><td><code>const uint16_t PMTU = ${PMTU_BYTES};</code>(第 10 行,模板)——由 <code>hls/rocev2/CMakeLists.txt:14</code> 的 <code>set(PMTU_BYTES 4096 CACHE …)</code> 注入,即默认 4096、配置期可覆盖;全栈分段粒度,改它要全链路重验</td></tr>
+  <tr><td class="mono">Coyote hw/hdl/network/rdma/roce_stack.sv<br><em>(不在 fns 仓库内)</em></td><td><strong>集成边界。</strong>本分支(coyote-TCP-RDMA)只提供 HLS 侧,SV 包装层由 Coyote 提供。SV 包装层:SQ 命令位域打包(VITIS_HLS 与非 VITIS 两种布局)、内存命令重组、五个调试计数器输出。接口速查见<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#sec-8">指南附录</a></td></tr>
+  <tr><td class="mono">Coyote hw/hdl/network/rdma/icrc.sv<br>+ fns hls/crc/</td><td>ICRC 生成/校验(SV 侧同样在 Coyote,不在 fns);BALBOA 把它重造成 512/320/32-bit 并行流水(其论文数据:约 12.5K LUT,占核内 28%)。平台可用期 ④ 实测补充:重插入仅支持 4B 粒度末拍 keep(IBTA PadCount 现实)→ 压缩线长必须 ceil4</td></tr>
   <tr><td class="mono">hls/ipv4, hls/udp, hls/arp_server, hls/mac_ip_encode</td><td>L2/L3 胶水。环回阶段 ARP 可用静态表替代,但 RX 双向可达必须保证(ACK 是反向流的!)</td></tr>
-  <tr><td class="mono">hdl/ultraplus/vcu118/tcp_ip_top.v</td><td>仓库里唯一的 VCU118 顶层——<strong>是 TCP/IP 示例不是 RoCE</strong>;只作板卡约束/时钟参考,别误当现成集成</td></tr>
+  <tr><td class="mono">hdl/ultraplus/vcu118/tcp_ip_top.v<br><em>(仅 master 分支)</em></td><td>master 上唯一的 VCU118 顶层——<strong>是 TCP/IP 示例不是 RoCE</strong>;只作板卡约束/时钟参考,别误当现成集成</td></tr>
 </table></div>
+<div class="callout warn"><span class="tag">分支布局陷阱(2026-07-20 核实)</span><code>coyote-TCP-RDMA</code> 分支的仓库顶层<strong>只有 <code>CMakeLists.txt</code> 与 <code>hls/</code>,没有 <code>hdl/</code> 目录</strong>;SV 侧(<code>roce_stack.sv</code>/<code>icrc.sv</code>)由 Coyote 提供。<code>hdl/common/roce_stack.sv</code>、<code>hdl/common/icrc.sv</code>、<code>hls/fns_config.hpp</code>、<code>hdl/ultraplus/…/tcp_ip_top.v</code> 这几个路径<strong>只存在于 <code>master</code></strong>——而 master 上的正是本节开头叫你别用的那套旧核。按路径去 master 找文件 = 掉进本文档自己警告的坑。</div>
 <div class="callout acc"><span class="tag">README 原话</span>"The RDMA-stack presented in this repository is the blue roce_stack. <strong>Surrounding modules would need to be provided by users</strong> to integrate the RDMA-capability in their projects." —— 我们的整个 Stage C 就是在造这些 surrounding modules,这条路是仓库钦定的。</div>
 
 <h3>2.3 读码路线(按数据流读,不按目录读)</h3>
@@ -158,7 +159,7 @@
     <span class="fk">学什么</span><span>SV 顶层每个口的语义(SQ 推入/ack/内存命令/QP 配置/计数器);VITIS_HLS 与非 VITIS 两种 SQ 位域布局的差异(qpn 从 bit 32 起!)。</span>
     <span class="fk">为什么</span><span class="why">Stage C 的 doorbell 垫片直接对着它写;位域打包错是 Stage C 故障表第一名。</span>
     <span class="fk">动手</span><span class="fv ex">照<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#sec-8">指南速查表</a>写一个打包函数 + assert 自检(TB 里跑),再接 FIFO。</span>
-    <span class="fk">入口</span><span><code>hdl/common/roce_stack.sv</code> · 指南附录 8.1–8.3</span>
+    <span class="fk">入口</span><span>Coyote <code>hw/hdl/network/rdma/roce_stack.sv</code> · 指南附录 8.1–8.3</span>
   </div>
 </div>
 
@@ -240,7 +241,7 @@
   <span class="k">可比数字</span><span>U55C 重构核约 <strong>44K LUT / 101 BRAM</strong>(同 UltraScale+ 工艺,可比;我们的构建含 jtag_axi + staging + 胶水,会有出入)。Fig-5 分段延迟插桩方法学(各流水段 first-byte-in→first-byte-out 的 cycle 计数)是我们板级延迟测量的模板。<em>注意:数字系论文图表像素测量,一律标"约"。</em></span>
 </div>
 <div class="callout warn"><span class="tag">竞争风险(= 指南已知雷 #6)</span>BALBOA 论文原文:正在做"line-rate compression and decompression logic cores"。<strong>每季度</strong>盯 fpgasystems 仓库与 arXiv;我们的研究段 novelty 钉在 <strong>dual-length verbs 语义 + 实测 per-WR gate</strong>,不赌"首个内联压缩"。</div>
-<p>深读:仓库 <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code> —— Part A 三层对比表(可比性 caveat 齐全),Part B CX-5 互操作 14 项检查单。</p>
+<p><em>深读材料(三层对比表、CX-5 互操作 14 项检查单)尚未落盘;本节即目前对 BALBOA 的唯一成文出处。</em></p>
 
 <div class="footnote">
   <p>返回:🧭 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《VCU118 RoCE 平台:学习与集成指南》</a>(仪表盘 + 阶段流程 + 速查表)。姊妹篇:📡 <a href="https://claude.ai/code/artifact/5c9c5da5-4dce-4023-8958-7d738610025f">《RoCE v2 协议入门》</a>。</p>

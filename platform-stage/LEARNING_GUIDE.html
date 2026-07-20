@@ -164,7 +164,7 @@
     <td><span class="slt">C</span></td><td><a href="#stage-c">doorbell L0 + 内存胶水</a></td>
     <td><span class="st pass">PASS · 07-17</span></td>
     <td><a href="https://claude.ai/code/artifact/325d9489-6908-4831-9c7c-0713ff603199">🧪 Stage C 报告</a></td>
-    <td>一次 AXI-Lite 写走完 WRITE 全环(64B/8K/12K,TX→RX 直连自话);帧与 Stage B golden 逐字节一致(ICRC 同值);MIDDLE 首覆盖 + 非对齐 placement(偏移 8,两拍跨字);逐包 ACK 事实;对抗审查 2 发现已修(提交时刻快照 + TB retrans 模型拍偏移)</td>
+    <td>一次 AXI-Lite 写走完 WRITE 全环(64B/8K/12K,TX→RX 直连自洽);帧与 Stage B golden 逐字节一致(ICRC 同值);MIDDLE 首覆盖 + 非对齐 placement(偏移 8,两拍跨字);逐包 ACK 事实;对抗审查 2 发现已修(提交时刻快照 + TB retrans 模型拍偏移)</td>
   </tr>
   <tr>
     <td><span class="slt">D</span></td><td><a href="#stage-d">载体集成 + 综合</a></td>
@@ -217,8 +217,8 @@
 <p><strong>本文档的范围:单台 VCU118 把 RoCE WRITE 链路跑通。</strong>即:软件通过 PCIe BAR 发起 Work Request → <code>roce_stack</code> 生成合法 RoCE v2 帧(含 ICRC)→ 经 Corundum 数据面从 QSFP0 发出 → DAC 线环回 QSFP1 → RX 路径解析、放置 payload、产生 ACK → 回到 TX 侧完成确认。全程 bit-exact 可验。</p>
 <p>以下内容<strong>刻意后置</strong>,不在本文档展开:</p>
 <ul>
-  <li><strong>ConnectX-5 互操作</strong>(实验室已有卡)——14 项工程检查单与建链细节见仓库 <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code> Part B;</li>
-  <li><strong>BALBOA 发表数字对比</strong>——三层对比表见同一文档 Part A;</li>
+  <li><strong>ConnectX-5 互操作</strong>(实验室已有卡)——14 项工程检查单与建链细节(<em>尚未落盘</em>);</li>
+  <li><strong>BALBOA 发表数字对比</strong>——三层对比表(<em>尚未落盘</em>);</li>
   <li><strong>codec 插入(transform + deflate)与 dual-length verbs 研究段</strong>——平台跑通后的研究阶段(<a href="#sec-7">§7</a>)。</li>
 </ul>
 <div class="callout acc"><span class="tag">事实基线</span>本手册中的接口位域、文件路径、常量与行为断言,均来自 2026-07-16 前后对一手来源的核验(源码逐文件 grep、官方文档、BALBOA 论文全文深读)。个别来自论文图表像素测量的数值一律标注"约"。未核实处明确写"以仓库为准"。</div>
@@ -259,7 +259,7 @@
   <text x="506" y="126" text-anchor="middle" fill="var(--muted)" font-size="11">HLS rocev2 + ICRC</text>
   <text x="506" y="144" text-anchor="middle" fill="var(--muted)" font-size="11">分段 · PSN · ACK/NAK</text>
   <text x="506" y="162" text-anchor="middle" fill="var(--muted)" font-size="11">512-bit AXI4S</text>
-  <text x="506" y="188" text-anchor="middle" fill="var(--muted)" font-size="10">計數器: rx/tx pkg,</text>
+  <text x="506" y="188" text-anchor="middle" fill="var(--muted)" font-size="10">计数器: rx/tx pkg,</text>
   <text x="506" y="202" text-anchor="middle" fill="var(--muted)" font-size="10">crc_drop, psn_drop, retrans</text>
   <!-- ip glue -->
   <rect x="634" y="82" width="100" height="88" rx="8" fill="var(--surface)" stroke="var(--line)"/>
@@ -304,7 +304,7 @@
   <li><strong>当前物理设置:板不插 PCIe 槽,台面独立供电,仅 JTAG + UART(USB)连电脑</strong>(用户约束 2026-07-16)。所以 doorbell / 写 WQE / 写 payload / 读回全部走调试链路,不走 PCIe。走 PCIe 的完整 verb(host DMA、SQ ring、驱动)= <a href="#sec-7">§7</a> 的后续流程,本文档不实现。</li>
   <li><strong>SQ 是推入式,不含 WQE-fetch 机器。</strong><code>s_rdma_sq</code> 是 metaIntf 流,协议引擎不会主动去 host 内存取 WQE——真实 RNIC 的"doorbell 通知 + 硬件 DMA 取 WQE"前端在 Coyote 里由 shell + 驱动代劳。我们分两档补:<strong>L0(本文档范围)= JTAG-to-AXI Master(Xilinx <code>jtag_axi</code> IP)驱动 AXI-Lite 垫片</strong>:host 侧 Vivado <code>hw_server</code> 的 <code>run_hw_axi</code> 直写 WR 字段寄存器 + 敲 doorbell,零 PCIe、零驱动;<strong>L1(后置,走 PCIe)</strong>host DRAM 放 SQ ring + producer-index doorbell + app_block DMA 取 WQE。L0 足够单 WRITE 正确性验证;per-WR 延迟/CQE 时序 + 吞吐扫频需要 L1(见下一条 payload 说明)。</li>
   <li><strong>payload 取数是硬件自动的,但喂数当前走 JTAG(慢)。</strong>SQ 命令给出本地地址与长度后,协议引擎自己从 <code>m_rdma_rd_req</code> 发 <code>(vaddr, len, ctl)</code> 读命令、等数据从 <code>s_axis_rdma_rd</code> 流回、切 PMTU、打包发送——<strong>这部分永远是线速的</strong>。当前 payload 由 JTAG-to-AXI 预先写入片上 staging(URAM/BRAM);单 WRITE 的<strong>出线时序仍是真实线速</strong>(payload 已在片上,doorbell 一敲即发)。但<strong>逐条 JTAG 敲 WQE 不能测吞吐</strong>(WRITE 间隔被 JTAG 主导)→ 吞吐/延迟扫频需要"payload 预载 + 片上 replay 引擎背靠背发",属研究阶段。</li>
-  <li><strong>ICRC 在仓库里。</strong><code>hdl/common/icrc.sv</code> + <code>hls/crc/</code>;该栈与 ConnectX-5 互操作过,线上格式为合法 RoCE v2,Wireshark 可解。</li>
+  <li><strong>ICRC 在仓库里。</strong>Coyote <code>hw/hdl/network/rdma/icrc.sv</code>(快照在代码仓 <code>roce-rtl-sim/rtl/coyote/icrc.sv</code>) + fns <code>hls/crc/</code>;该栈与 ConnectX-5 互操作过,线上格式为合法 RoCE v2,Wireshark 可解。</li>
   <li><strong>Corundum 侧的官方插入点是 <code>mqnic_app_block</code></strong>:TX/RX 三层 AXI-Stream 钩子 + DMA 接口 + AXI-Lite,专为在数据面内做自定义处理设计(<a href="https://claude.ai/code/artifact/c3fd7041-528d-48a5-8cdd-c61920de5656#code-corundum">《三框架入门》§3</a>)。</li>
   <li><strong>环回两端都是本板 CMAC</strong> → FEC/autoneg/对端兼容类问题在本阶段结构性不存在,全部推迟到 CX-5 互操作阶段。</li>
 </ul>
@@ -373,7 +373,7 @@
 <div class="stage" id="stage-b">
   <div class="stage-head"><div class="stage-letter">B</div><div><h3>roce_stack 独立 RTL 仿真</h3><div class="stage-sub">零硬件 · 实际 1 天 · <strong>PASS 2026-07-17</strong></div></div></div>
   <div class="stage-body">
-  <div class="callout pass"><span class="tag">已完成</span>全部通过标准达成,九个发现(含三处包装层契约缝与 RX-不校验-ICRC 勘误)见 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 实验报告</a>。仿真器定案 xsim;工件与 TB/脚本统一在代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>roce-rtl-sim/</code>;myDevbox <code>~/vcu118-roce-platform/roce-rtl-sim</code>)。</div>
+  <div class="callout pass"><span class="tag">已完成</span>通过标准达成(12KB 跨段与非对齐尾段两项顺延 Stage C 首次覆盖),九个发现(含三处包装层契约缝与 RX-不校验-ICRC 勘误)见 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 实验报告</a>。仿真器定案 xsim;工件与 TB/脚本统一在代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>roce-rtl-sim/</code>;myDevbox <code>~/vcu118-roce-platform/roce-rtl-sim</code>)。</div>
   <dl class="fivepart">
     <dt>目标</dt><dd>在 RTL 层把"SQ 命令 → 合法 RoCE 帧 → 回灌 → 放置 + ACK"整环仿真通,建立 golden 帧库。</dd>
     <dt>前置</dt><dd>Stage A 通过;确定仿真器(xsim 或 Verilator;metaIntf/AXI4S 是 SV interface,Verilator 需确认支持度,不行就 xsim)。</dd>
@@ -404,7 +404,7 @@
   <div class="callout pass"><span class="tag">已完成 · 07-17</span>全部通过标准达成(64B/8K/12K 三规模全环、帧与 Stage B golden 逐字节一致、计数器 AXI-Lite 互证),外加 MIDDLE 首覆盖、非对齐 placement、魔数警戒、mid-WR 突变探针四项超标证据,见 <a href="https://claude.ai/code/artifact/325d9489-6908-4831-9c7c-0713ff603199">🧪 Stage C 实验报告</a>(含完整寄存器映射 = Stage E 的 run_hw_axi 驱动文档)。集成单元 <code>roce_l0_top</code> 三模块在代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>roce-rtl-sim/rtl/l0/</code>)。实际未踩中本表预测故障(三条硬规范前置生效);新增两行实测条目见下。</div>
   <dl class="fivepart">
     <dt>目标</dt><dd>造齐"surrounding modules":AXI-Lite doorbell 垫片(L0)+ QP 配置写入器 + staging 内存,仿真级全链路由一次 AXI-Lite 写(板上由 JTAG-to-AXI Master 驱动,见 Stage D/E)发起。垫片逻辑与"谁驱动 AXI-Lite"无关——同一份 RTL 在仿真里由 TB 驱动、板上由 <code>jtag_axi</code> 驱动。</dd>
-    <dt>前置</dt><dd>Stage B 通过 ✓(golden 帧库 + 校验脚本已入库 <code>platform-stage/stage_b_sim/</code>)。<strong>三条硬规范(Stage B 报告 §7)</strong>:① SQ 打包按 txMeta 结构体声明序(raddr@[119:56] 在前);② WQE 提交后 payload 主动推流;③ 大 WR 预切分 FIRST/MIDDLE/LAST。</dd>
+    <dt>前置</dt><dd>Stage B 通过 ✓(golden 帧库 + 校验脚本在代码仓 <code>vcu118-roce-platform</code> 的 <code>roce-rtl-sim/</code>)。<strong>三条硬规范(Stage B 报告 §7)</strong>:① SQ 打包按 txMeta 结构体声明序(raddr@[119:56] 在前);② WQE 提交后 payload 主动推流;③ 大 WR 预切分 FIRST/MIDDLE/LAST。</dd>
     <dt>操作</dt><dd><ol>
       <li><strong>doorbell 垫片 L0</strong>:AXI-Lite 从口若干寄存器(opcode/qpn/laddr/len/…,写"提交"寄存器时组包成 metaIntf beat 推入 <code>s_rdma_sq</code> 前的 FIFO);同一 AXI-Lite 空间挂 QP 配置写入器(→ <code>s_rdma_qp_interface</code>/<code>s_rdma_conn_interface</code>)、<strong>staging 写口</strong>(payload 经 AXI-Lite/AXI 写入 URAM)与<strong>五个调试计数器的读回</strong>——即 JTAG-to-AXI 板上能触达的全部东西;</li>
       <li><strong>staging 内存</strong>:先 URAM(仿真快、无校准问题;VU9P URAM 充裕且基线只用了 4.69%),把 <code>m_rdma_rd_req</code>/<code>m_rdma_wr_req</code> + AXI4S 数据口适配到 URAM 控制器;DDR4 MIG 版本推迟到容量需要时;</li>
@@ -483,7 +483,7 @@
   <tr><th>#</th><th>雷 / 决策点</th><th>事实与处置</th></tr>
   <tr><td class="num">1</td><td><strong>Vivado 版本:已锁定 2025.2(Stage A 实测,07-16)</strong></td><td>csim 经 <code>vitis-run --mode hls --tcl … &lt;/dev/null</code>(2025.2 无 vitis_hls;--csim 标志只配 --config 流)全流程通过,"CSim done with 0 errors",设计 9 源文件零改动编译。唯一真实 API 漂移:2025.2 <code>hls::stream&lt;T&gt;</code> 要求 T 可默认构造——影响 TB 构造 <code>stream&lt;psnPkg&gt;</code>(设计本体不受影响),TB 侧绑零初始化静态存储绕过。无需旁装 2022.2。证据:实验记录 A-4</td></tr>
   <tr><td class="num">2</td><td><strong>重传:分支间状态相反(勘误 07-16)</strong></td><td><strong>coyote-TCP-RDMA 分支(我们用的)默认开启</strong>:<code>rocev2_config.hpp.in</code> 无条件 <code>#define RETRANS_EN</code>,CMake 默认 <code>RETRANS_EN=1</code>(Stage A-3 实测源码);"被注释"的说法只适用于 fns master。BALBOA 重构核的重传缓冲设计在 HBM 通道 → VCU118 上重传缓冲要重置到 DDR4/URAM(§7);环回阶段若先关重传跑,需显式改 config,并记住一丢即挂。<strong>更新(07-18,平台可用期 ③)</strong>:重传缓冲已再安置到 URAM(替换 tie-off),B9 仿真闭案——丢 ACK → transport timer ~626µs → 重传帧逐字节=原帧(见决策摘要)</td></tr>
-  <tr><td class="num">3</td><td><strong>PMTU=4096 硬编码</strong></td><td><code>fns_config.hpp:6</code>。环回无所谓;将来对 CX-5 时要求对端 eth MTU ≥4200 且 QP path_mtu=4096(检查单 item 4)</td></tr>
+  <tr><td class="num">3</td><td><strong>PMTU 默认 4096</strong></td><td><code>rocev2_config.hpp.in:10</code>(由 <code>hls/rocev2/CMakeLists.txt:14</code> 的 <code>PMTU_BYTES</code> CACHE 变量注入,配置期可覆盖)。环回无所谓;将来对 CX-5 时要求对端 eth MTU ≥4200 且 QP path_mtu=4096(检查单 item 4)</td></tr>
   <tr><td class="num">4</td><td><strong>WRITE 无响应端 CQE</strong></td><td>IBTA 语义如此。环回内不影响;对 stock 网卡的实验从第一天按 WRITE_WITH_IMM 设计(imm 载压缩长度)</td></tr>
   <tr><td class="num">5</td><td><strong>ICRC 静默丢弃</strong></td><td>唯一可见性是计数器 → 五个调试计数器(ibv_rx/tx_pkg, crc_drop, psn_drop, retrans)在 Stage C 就接 AXI-Lite,永远第一眼看它们</td></tr>
   <tr><td class="num">6</td><td><strong>ETH scoop 风险</strong></td><td>BALBOA 论文原文:正在做"line-rate compression and decompression logic cores"。<strong>每季度</strong>盯 fpgasystems 仓库与 arXiv;我们的研究段 novelty 钉在 dual-length verbs 语义 + 实测 per-WR gate,不赌"首个内联压缩"。BALBOA 集中介绍与对比数字见 <a href="https://claude.ai/code/artifact/c3fd7041-528d-48a5-8cdd-c61920de5656#balboa">《三框架入门》§4</a></td></tr>
@@ -497,9 +497,9 @@
   <li><strong>完整 verb over PCIe(用户明确的"后续流程")</strong>:把板插进主机 PCIe 槽,启用 Corundum 的 PCIe/DMA + mqnic 驱动,做 L1 doorbell = host DRAM SQ ring + producer-index doorbell + DMA 取 WQE。这才解锁 per-WR 延迟组成、CQE 时序、以及真实 host→板 payload 通路。<strong>(③ 已先行落地片上 SQ 环 + producer doorbell,07-18 板上首验;host DRAM/PCIe 部分仍后置)</strong></li>
   <li><strong>片上 replay 引擎(吞吐扫频的前提)</strong>:payload 预载 staging + 片上描述符环背靠背发 WRITE,让 CMAC 侧计数器测到真实吞吐-消息尺寸曲线——绕开 JTAG 的慢速瓶颈,不必等 PCIe。</li>
   <li><strong>重传缓冲 DDR4/URAM 重置</strong>:把 HBM 假设换掉,受控丢包(app_block 故障注入)下验证 go-back-N——这同时是 dual-length-under-retransmission 实验的地基。<strong>(③ 已完成 URAM 再安置 + B9 仿真闭案 07-18;板级受控丢包注入器待做)</strong></li>
-  <li><strong>ConnectX-5 互操作</strong>:14 项检查单 + ~200 行 libibverbs 对端 harness(可先用 Soft-RoCE/rxe 调通)→ <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code> Part B。</li>
+  <li><strong>ConnectX-5 互操作</strong>:14 项检查单 + ~200 行 libibverbs 对端 harness(可先用 Soft-RoCE/rxe 调通)。<em>(14 项检查单尚未落盘)</em></li>
   <li><strong>codec 插入</strong>:channel-major/byte-transpose 变换 + Vitis DCL 动态-Huffman gzip CU(<code>gzip_compress_multicore_stream.cpp</code>,ap_ctrl_none 纯 AXI4-Stream)上 TX payload 路径;第一步用自描述 chunk(NetZIP 式)拿通路。<strong>(④ 已仿真级完成 07-19:定版 8 核/16KB gzip CU 存转发挂 staging Port A,双长度面全环打通;报告见仪表盘 ④ 行)</strong></li>
-  <li><strong>dual-length verbs 研究段(论文核心)</strong>:SQ 命令与协议管线扩展 wire-length/app-length 双记账(RETH/DMA-len/PSN/重传存储/放置/CQE),压缩载荷重传正确性;对比"引擎上游自包含压缩"与"verbs 内压缩"两种放置。BALBOA 对比数字与可比性 caveat → 同文档 Part A。</li>
+  <li><strong>dual-length verbs 研究段(论文核心)</strong>:SQ 命令与协议管线扩展 wire-length/app-length 双记账(RETH/DMA-len/PSN/重传存储/放置/CQE),压缩载荷重传正确性;对比"引擎上游自包含压缩"与"verbs 内压缩"两种放置。</li>
 </ol>
 
 <!-- ============================ §8 ============================ -->
@@ -557,7 +557,7 @@
 
 <div class="footnote">
   <p>文档家族:📡 <a href="https://claude.ai/code/artifact/5c9c5da5-4dce-4023-8958-7d738610025f">《RoCE v2 协议入门》</a> · 🧱 <a href="https://claude.ai/code/artifact/c3fd7041-528d-48a5-8cdd-c61920de5656">《三框架入门:fns · Corundum · BALBOA》</a> · 🧪 各阶段实验报告(入口见<a href="#dashboard">仪表盘</a>)· 设计文档 <code>platform-stage/DOORBELL_SQRING_RETRANS_DESIGN.md</code>(平台可用期 ③)/ <code>platform-stage/CODEC_INTEGRATION_DESIGN.md</code>(④)。分工(2026-07-17 用户决定):本仓库 <code>platform-stage/</code> 只存报告/数据/决策;<strong>实验代码统一在私有代码仓</strong> <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(git 开在 myDevbox <code>~/vcu118-roce-platform</code>;详见 <code>platform-stage/CODE.md</code>)。</p>
-  <p>事实来源:fpga-network-stack / Coyote / Corundum 源码逐文件核验(2026-07-16);BALBOA = arXiv 2507.20412(资源与延迟数字系论文图表像素测量,标注"约");Corundum app_block = 官方文档 <code>docs/source/modules/mqnic_app_block.rst</code>;CX-5 检查单与 BALBOA 对比表:仓库 <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code>。</p>
+  <p>事实来源:fpga-network-stack / Coyote / Corundum 源码逐文件核验(2026-07-16);BALBOA = arXiv 2507.20412(资源与延迟数字系论文图表像素测量,标注"约");Corundum app_block = 官方文档 <code>docs/source/modules/mqnic_app_block.rst</code>。</p>
   <p>WR-ZipGuard · Platform Stage · 学习与集成指南 v2.0 · 2026-07-19(由《集成手册》v1.0 + 《学习导览》v1.0 + 《阶段索引》三合一;§2/§3 拆分独立成文)</p>
 </div>
 </main>

@@ -9,7 +9,10 @@
 |---|---|
 | Stage A csim 脚本 + 签名 TB + csim golden | `stage_a_csim/` |
 | Stage B/C xsim 工作区(HLS RTL 含 SIM_ZERO_INIT 手补、Coyote 包装含 STAGE-B FIX、L0 三模块、TB、运行/校验脚本、帧捕获 golden) | `roce-rtl-sim/`(myDevbox `~/vcu118-roce-platform/roce-rtl-sim`) |
-| Stage D / E 代码 | 到站时新增 |
+| Stage D 载体集成 + 综合(rtl / sim / syn / xdc) | `stage_d_shell/` |
+| Stage E 上板环回(run_hw_axi tcl + RUNBOOK) | `stage_e/` |
+| 平台可用期 ④ codec(HLS csim/csynth + 数据) | `codec/` |
+| 上游依赖(fpga-network-stack 等 submodule) | `third_party/` |
 
 历史注记:`stage_b_sim/`、`stage_c_sim/` 曾短暂入库本仓库(提交 7696541 / 24941a0,
 历史中仍可见),按分工约定已从分支顶端移除,正本即上述代码仓库。

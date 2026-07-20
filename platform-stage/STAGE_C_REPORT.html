@@ -83,7 +83,7 @@
 <header>
   <div class="eyebrow">WR-ZipGuard · Platform Stage · 实验报告</div>
   <h1>Stage C:doorbell L0 + 内存胶水 —— 一次 AXI-Lite 写,走完 WRITE 全环</h1>
-  <p class="hero-sub">自造三件 surrounding modules(AXI-Lite doorbell 垫片、URAM staging、placement 写入器),把 Stage B 验证过的 <code>roce_stack</code> 变成"寄存器可驱动"的部件:主机侧只做 AXI-Lite 读写(= 板上 <code>run_hw_axi</code> 的动作),TX→RX 直连环回,单栈自话完成 取数→分段→打包→回灌→放置→ACK→CQE。</p>
+  <p class="hero-sub">自造三件 surrounding modules(AXI-Lite doorbell 垫片、URAM staging、placement 写入器),把 Stage B 验证过的 <code>roce_stack</code> 变成"寄存器可驱动"的部件:主机侧只做 AXI-Lite 读写(= 板上 <code>run_hw_axi</code> 的动作),TX→RX 直连环回,单栈自洽完成 取数→分段→打包→回灌→放置→ACK→CQE。</p>
   <span class="verdict">PASS · 2026-07-17</span>
 </header>
 
@@ -111,7 +111,7 @@
 <h3>golden 传递性:三级同帧</h3>
 <p>Stage A(csim)→ Stage B(RTL 直驱)→ Stage C(AXI-Lite 全链)用同一套签名值(QPN/PSN/RKEY/RADDR/payload)。协议引擎是确定性的:若周边模块无损地重现了 Stage B 的输入时序语义,输出帧必须逐字节相同,ICRC 相同。任何一字节漂移都指向新造模块的缺陷。这比自造期望值严苛得多,也是"三条硬规范是否真正落实"的最强检验。</p>
 <h3>TX→RX 直连:Stage E 的仿真彩排</h3>
-<p>Stage B 的回灌是捕获后手工注入;Stage C 直接把 <code>m_axis_tx</code> 连到 <code>s_axis_rx</code>——这正是 QSFP0═DAC═QSFP1 环回的仿真化身。单栈自话:请求方发 WRITE,响应方(同一栈)收包、放置、回 ACK;ACK 环回给请求方,出 CQE。全程无人工干预,事件链的每一环都在计数器上留痕。</p>
+<p>Stage B 的回灌是捕获后手工注入;Stage C 直接把 <code>m_axis_tx</code> 连到 <code>s_axis_rx</code>——这正是 QSFP0═DAC═QSFP1 环回的仿真化身。单栈自洽:请求方发 WRITE,响应方(同一栈)收包、放置、回 ACK;ACK 环回给请求方,出 CQE。全程无人工干预,事件链的每一环都在计数器上留痕。</p>
 <h3>非对齐 placement:协议决定地址,胶水消化偏移</h3>
 <p>placement 的目的地址来自 RETH VA(协议侧语义),内存胶水无权要求对齐。签名 RADDR <code>0x334455667788</code> mod 256KiB = <code>0x27788</code>,字内偏移 8——每个 64B 密集数据拍要按字节旋转后分裂成 56/8 两拍跨字写(字节使能)。发送侧则相反:payload 源地址由软件控制,L0 约束其 64B 对齐,省去读侧桶形移位。</p>
 
@@ -195,7 +195,7 @@
 <div class="tablebox"><table>
   <tr><th>地址</th><th>寄存器</th><th>说明</th></tr>
   <tr><td class="mono">0x000 / 0x004</td><td class="mono">ID / STATUS</td><td>ID=0x0C1A_0001;STATUS = {warn_magic, db_busy},bit1 写 1 清零(W1C)</td></tr>
-  <tr><td class="mono">0x010–0x02C</td><td class="mono">QP_*, QP_SUBMIT</td><td>state/qpn/rpsn/lpsn/rkey/vaddr(48b 分两写);SUBMIT 时打 184b 快照推 <code>s_rdma_qp_interface</code>;vaddr 命中 0xDEADBEEF/0xFEEDBEEF 置警戒位(带内部分更新魔数,手册 Stage C 故障表)</td></tr>
+  <tr><td class="mono">0x010–0x02C</td><td class="mono">QP_*, QP_SUBMIT</td><td>state/qpn/rpsn/lpsn/rkey/vaddr(48b 分两写);SUBMIT 时打 184b 快照推 <code>s_rdma_qp_interface</code>;vaddr 命中 0xDEADBEEF/0xFEEDBEEF 置警戒位(带内部分更新魔数,见<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#stage-c">《学习与集成指南》§5 Stage C 常见故障表</a>)</td></tr>
   <tr><td class="mono">0x030–0x04C</td><td class="mono">CONN_*, CONN_SUBMIT</td><td>local qpn / remote qpn / remote IP(128b 四写)/ UDP port;SUBMIT 快照推 conn 表</td></tr>
   <tr><td class="mono">0x050–0x070</td><td class="mono">WQE_*, DOORBELL</td><td>opcode/qpn(pid+vfid)/laddr/raddr(各 48b)/len/ctrl(last);写 DOORBELL 启动切分 FSM(忙时静默忽略——软件先轮询 busy)</td></tr>
   <tr><td class="mono">0x080–0x0AC</td><td class="mono">CNT_*, LAST_ACK</td><td>栈五计数器(ibv_tx/rx, crc_drop, psn_drop, retrans)+ 垫片六计数器(sq/cqe/wr_req/rd_req/tx_frm/rx_frm)+ 原始 32b ack_t</td></tr>
@@ -291,18 +291,18 @@ c_write12k(探针): doorbell 敲响后立刻改写 WQE_QPN=63 / WQE_CTRL.last=0
 <ul>
   <li><strong>L0 范围:</strong>RDMA WRITE only;READ 的取数命令被计数吞掉;不支持 SEND/IMM。吞吐/延迟扫频不在本阶段(JTAG/AXI-Lite 逐条驱动,payload 预载 8KB 就占 ~25µs 仿真时)。</li>
   <li><strong>pusher 源地址 64B 对齐</strong>是 L0 约束(仿真有断言);doorbell 忙时打门被静默忽略(软件轮询 busy)。<code>WQE_OPCODE</code> 寄存器是登记项、不驱动线(切分 FSM 决定 opcode)——审查判为文档疣,已在映射表标注。</li>
-  <li><strong>环回是自话:</strong>单栈同时当请求方与响应方,PSN 初值天然一致;双栈/真对端的 PSN 不一致、乱序、丢包等在 Stage E(环回仍自话)与 CX-5 互操作阶段才有意义。RX 侧 ICRC 校验在本分支被编译殿(B5)——环回里 TX ICRC 正确性靠离线复算兜底。</li>
+  <li><strong>环回是自洽:</strong>单栈同时当请求方与响应方,PSN 初值天然一致;双栈/真对端的 PSN 不一致、乱序、丢包等在 Stage E(环回仍自洽)与 CX-5 互操作阶段才有意义。RX 侧 ICRC 校验在本分支被编译禁用(B5)——环回里 TX ICRC 正确性靠离线复算兜底。</li>
   <li><strong>retrans buffer 仍是 TB 模型;</strong>B9(请求方定时重传在 RTL 窗口未观察到)仍开放——本轮环回 ACK 即时返回,retrans=0 属预期,不构成对 B9 的解答。</li>
   <li><strong>行为仿真不证 PPA:</strong>URAM 推断、250MHz 时序、FIFO 替身换真 IP,全部归 Stage D。</li>
 </ul>
 
 <h2 id="s7"><span class="no">§7</span>结论与移交</h2>
-<div class="callout pass"><span class="tag">PASS 判定</span>对照手册 Stage C 通过标准逐条:① 一次模拟 AXI-Lite 写发起的 WR 走完"取数→分段→打包→回灌→放置→ACK→m_rdma_ack"全环 ✓(三规模);② 输出帧与 Stage B golden 逐字节一致 ✓(64B/8KB 直接对拍,12KB 结构化 + ICRC);③ 计数器经 AXI-Lite 可读且数值正确 ✓(栈五 + 垫片六,两套互证)。另加四项超出标准的证据:MIDDLE 覆盖、非对齐 placement、魔数警戒、mid-WR 突变探针。</div>
+<div class="callout pass"><span class="tag">PASS 判定</span>对照<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#stage-c">《学习与集成指南》§5 Stage C</a> 通过标准逐条:① 一次模拟 AXI-Lite 写发起的 WR 走完"取数→分段→打包→回灌→放置→ACK→m_rdma_ack"全环 ✓(三规模);② 输出帧与 Stage B golden 逐字节一致 ✓(64B/8KB 直接对拍,12KB 结构化 + ICRC);③ 计数器经 AXI-Lite 可读且数值正确 ✓(栈五 + 垫片六,两套互证)。另加四项超出标准的证据:MIDDLE 覆盖、非对齐 placement、魔数警戒、mid-WR 突变探针。</div>
 
 <h3>移交 Stage D(载体集成 + 综合)</h3>
 <ol>
   <li><strong>集成单元就是 <code>roce_l0_top</code>:</strong>一个 AXI-Lite 从口(接 jtag_axi)、一对 512b AXIS(接 CMAC 胶水)、一组 mem 口(retrans buffer 再安置:URAM/DDR4 选型)。</li>
-  <li><strong>载体决策先行</strong>(手册 §5-D 第一件事):rev100 Corundum 拆 PCIe 依赖 vs 裸 CMAC shell。</li>
+  <li><strong>载体决策先行</strong>(<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#stage-d">《学习与集成指南》§5 Stage D</a> 第一件事):rev100 Corundum 拆 PCIe 依赖 vs 裸 CMAC shell。</li>
   <li><strong>综合观察项:</strong>URAM 双口 + 字节使能推断(C5);HLS Fmax 估计 151.9MHz vs 250 目标的 post-route 裁决(Stage B 移交项);FIFO 行为替身换 axis_data_fifo 真 IP。</li>
   <li><strong>寄存器映射即驱动文档:</strong>TB 的 cfg_qp_conn/preload/submit_wqe/poll_cqe 序列可逐行翻译成 run_hw_axi tcl(Stage E 的脚本骨架已经在 TB 里排练完毕)。</li>
 </ol>
@@ -313,8 +313,8 @@ c_write12k(探针): doorbell 敲响后立刻改写 WQE_QPN=63 / WQE_CTRL.last=0
 </ul>
 
 <div class="footnote">
-  <p>工件:myDevbox <code>~/vcu118-roce-platform/roce-rtl-sim/</code>(rtl/l0/ 三模块、tb/tb_stage_c.sv、out/ 全部日志与帧捕获);仓库 <code>platform-stage/stage_c_sim/</code>(源 + run_xsim_c.sh + check_stage_c.py)。对抗审查:9 agent(5 视角 + 4 怀疑者),2 确认 2 驳回,确认项均已修复并回归。</p>
-  <p>文档家族:🔌 <a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">集成手册</a> · 📇 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">阶段索引</a> · 🧪 <a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">Stage A 报告</a> · 🧪 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">Stage B 报告</a></p>
+  <p>工件:myDevbox <code>~/vcu118-roce-platform/roce-rtl-sim/</code>(rtl/l0/ 三模块、tb/tb_stage_c.sv、out/ 全部日志与帧捕获);代码正本:代码仓 <code>vcu118-roce-platform</code> 的 <code>roce-rtl-sim/</code>(源 + run_xsim_c.sh + check_stage_c.py;2026-07-17 仓库分工,详见 <code>platform-stage/CODE.md</code>)。对抗审查:9 agent(5 视角 + 4 怀疑者),2 确认 2 驳回,确认项均已修复并回归。</p>
+  <p>文档家族:🧭 <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#stage-c">学习与集成指南</a> · 🧪 <a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">Stage A 报告</a> · 🧪 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">Stage B 报告</a></p>
   <p>WR-ZipGuard · Platform Stage · Stage C 实验报告 · 2026-07-17</p>
 </div>
 </main>

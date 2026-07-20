@@ -45,9 +45,15 @@ WR-ZipGuard · VCU118 RoCE 平台阶段的全部文档(报告/设计/决策)。�
 
 ## 历史沿革(2026-07-19 文档重组)
 
-- 删除:`PLATFORM_INTEGRATION_GUIDE.html`(手册)、`LEARNING_ROADMAP.html`(导览)、
-  `STAGE_LOG.html`(索引)——内容并入 LEARNING_GUIDE,git 历史可追(commit `deb8728` 之前)。
-- 改名(git mv,commit `ec7ec45`):P3/P4 前缀文件 → 描述名(见上表"旧名"列)。
+- 三合一(commit `deb8728`):`PLATFORM_INTEGRATION_GUIDE.html` **改名**为 `LEARNING_GUIDE.html`
+  (git 识别为 rename,+218/−…);`LEARNING_ROADMAP.html`(导览,−245)与 `STAGE_LOG.html`(索引,−138)
+  **删除**,内容并入 LEARNING_GUIDE,git 历史可追(`deb8728` 之前)。同一 commit 另建两个迁移桩
+  `_stub_integration_guide.html` / `_stub_learning_roadmap.html` 占住旧 Artifact URL 做转发。
+- 迁移桩移除(commit `c10a953`,按用户要求):两个 stub 页删除 → **旧 URL `db3cafcb` /
+  `d5cc763b` 自此无转发页,成为真死链**(2026-07-20 已把四份报告里指向 `db3cafcb` 的链接清除)。
+- 改名(git mv,commit `ec7ec45`,共 3 个文件):`PLATFORM_USABLE_P3_DESIGN.md` →
+  `DOORBELL_SQRING_RETRANS_DESIGN.md`、`PLATFORM_USABLE_P4_CODEC_DESIGN.md` →
+  `CODEC_INTEGRATION_DESIGN.md`、`P4_CODEC_REPORT.html` → `CODEC_INTEGRATION_REPORT.html`。
   "P3/P4" = 平台可用期第 ③/④ 项的旧编号。
 - Artifact URL 变迁:`4e143779` 原为《阶段索引》,现为《学习与集成指南》(4/6 份报告的回链
   因此保持有效);原《集成手册》`db3cafcb` 与《学习导览》`d5cc763b` 两个 Artifact 已废弃

@@ -114,7 +114,7 @@
 <div class="tablebox"><table>
   <tr><th>组件</th><th>来源</th><th>说明</th></tr>
   <tr><td class="mono">rocev2_top RTL(139 .v)</td><td>csynth @2025.2,本实验产出</td><td>part=xcvu9p-flga2104-2L-e,4ns,27% uncertainty(Coyote 官方默认),reset all/low</td></tr>
-  <tr><td class="mono">roce_stack.sv + icrc.sv + 胶水(12 .sv)</td><td>Coyote 仓库 hw/hdl/network/rdma/(depth-1 clone)</td><td>TX: rocev2 → read_request_trimmer → icrc → m_axis_tx;RX: FIFO → ack_gap_enforcer → rocev2;含 rdma_flow(流控)与 rdma_mux_retrans(重传缓冲 mux)</td></tr>
+  <tr><td class="mono">roce_stack.sv + icrc.sv + 胶水(共 17 .sv)</td><td>Coyote 仓库 hw/hdl/network/rdma/(depth-1 clone)</td><td>TX: rocev2 → read_request_trimmer → icrc → m_axis_tx;RX: FIFO → ack_gap_enforcer → rocev2;含 rdma_flow(流控)与 rdma_mux_retrans(重传缓冲 mux)</td></tr>
   <tr><td class="mono">lynxTypes 包(782 行)</td><td>Jinja 模板 + 自写渲染器(render_lynx.py)</td><td>值取 Coyote FindCoyoteHW.cmake 官方默认(N_REGIONS=1, PMTU=4096, VADDR=48…)</td></tr>
   <tr><td class="mono">rocev2_ip 别名模块</td><td>脚本从 rocev2_top.v 端口表机械生成</td><td>顶替 Vivado IP 包装;TSTRB 输入绑 TKEEP</td></tr>
   <tr><td class="mono">FIFO 行为替身 ×2 族</td><td>自写(axis_fifo_stubs / axis_meta_fifo_stubs)</td><td>顶替 axis_data_fifo_512(_cc_tx) 与 meta_8…512 共 10 个 Vivado IP;指针式实现(见发现 B7)</td></tr>
@@ -243,7 +243,7 @@
 <h2><span class="secno">§4</span>我们做了什么</h2>
 <ol>
   <li><strong>综合出 RTL</strong>:按仓库官方 make.tcl.in 手工实例化(器件换 VU9P、时钟 4ns、不确定度 27%——后经查证与 Coyote 官方默认逐项一致),csynth 2 分钟通过,139 个 Verilog 文件。</li>
-  <li><strong>收齐依赖闭包</strong>:Coyote 包装层 12 个 .sv + 队列原语 + RAM 原语;lynxTypes 是 Jinja 模板 → 写渲染器按官方 CMake 默认值实例化(782 行,0 未解析);10 个 Vivado FIFO IP 写行为替身;<code>rocev2_ip</code> 别名模块从端口表机械生成。仿真器定案 xsim(SV interface 重度使用 + 与 Stage D 同工具链)。</li>
+  <li><strong>收齐依赖闭包</strong>:Coyote 包装层共 17 个 .sv(RDMA 逻辑 6 + 队列原语 7 + RAM 原语 4);lynxTypes 是 Jinja 模板 → 写渲染器按官方 CMake 默认值实例化(782 行,0 未解析);10 个 Vivado FIFO IP 写行为替身;<code>rocev2_ip</code> 别名模块从端口表机械生成。仿真器定案 xsim(SV interface 重度使用 + 与 Stage D 同工具链)。</li>
   <li><strong>三场硬仗</strong>(每场都是一个可复用的诊断手法,细节见 §6 发现):
     <ul>
       <li><strong>X 污染死锁</strong>:SQ 永不放行 → 逐级探针定位到 rdma_flow 指针表 BRAM 读出 X → 仿真侧零初始化(B6);</li>
@@ -268,7 +268,7 @@
 <pre><code>WR_REQ  vaddr=334455667788 len=64 last=1        ← 放置命令 = RETH 原文
 WR_DATA a0 a1 … df(64B,keep 全 1,LAST=1)     ← 放置数据 = 发出的 payload,位精确
 F1: 48B opcode=0x11 AETH syndrome=0x1f msn=1    ← 响应方自动回 ACK
-[10210us] ACK: opcode=11 pid=17 vfid=0          ← ACK 回灌后请求方 CQE 类比信号</code></pre>
+[10.21us] ACK: opcode=11 pid=17 vfid=0          ← ACK 回灌后请求方 CQE 类比信号</code></pre>
 <p>读法:放置 vaddr 与 RETH VA 一字不差、长度 64、数据逐字节等于签名 payload——<strong>单 QP WRITE 环回 bit-exact</strong>(手册 Stage B 通过标准第一条)。ACK 帧回灌后 m_rdma_ack 携带正确的 pid/vfid,rdma_flow 流控释放。附带确认:m_rdma_ack 的载荷是 32 位 ack_t(last 门控),不是 dack_t(发现 B8)。</p>
 <h3>5.3 write8k:切分结构</h3>
 <pre><code>F0: 4156B opcode=0x06(FIRST) psn=0x80ce4e RETH{va=334455667788, rkey=1234abcd, dmalen=4096} icrc=True
@@ -331,7 +331,7 @@ F1: 4140B opcode=0x08(LAST)  psn=0x80ce4f 无RETH  payload 从 4096 续,连续�
 <p><strong>移交给 Stage D:</strong>Fmax 估计 151.9MHz vs 250MHz 目标的 post-route 裁决(B1);行为替身换真 axis_data_fifo IP;本报告的资源数作为资源表基线。<strong>遗留:</strong>timer 自发重传观测(B9)。</p>
 
 <div class="footnote">
-  <p>工件(myDevbox):<code>~/vcu118-roce-platform/roce-rtl-sim/{run_xsim.sh, rtl/{hls,coyote,pkg,stubs}, tb/tb_stage_b.sv, check_golden_icrc.py, gen_neg_frame.py, out/*.log, out/rtl_tx_*.txt, out/rtl_placement_*.txt}</code>;csim golden:<code>~/fpga-network-stack-csim/tx_frame.txt</code>(RADDR48 版)。仓库留档:<code>platform-stage/stage_b_sim/</code>。相关文档:<a href="https://claude.ai/code/artifact/db3cafcb-e5c8-44a6-8c54-97f3d7e82986">《集成手册》</a> · <a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12">《阶段索引》</a> · <a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">《Stage A 报告》</a>。</p>
+  <p>工件(myDevbox):<code>~/vcu118-roce-platform/roce-rtl-sim/{run_xsim.sh, rtl/{hls,coyote,pkg,stubs}, tb/tb_stage_b.sv, check_golden_icrc.py, gen_neg_frame.py, out/*.log, out/rtl_tx_*.txt, out/rtl_placement_*.txt}</code>;csim golden:<code>~/fpga-network-stack-csim/tx_frame.txt</code>(RADDR48 版)。代码正本:代码仓 <code>vcu118-roce-platform</code> 的 <code>roce-rtl-sim/</code>(2026-07-17 仓库分工,详见 <code>platform-stage/CODE.md</code>)。相关文档:<a href="https://claude.ai/code/artifact/4e143779-6219-44e0-9849-bf027c75dd12#stage-b">《学习与集成指南》</a> · <a href="https://claude.ai/code/artifact/2b164b5e-ea63-4357-b2d6-608d064fdf6d">《Stage A 报告》</a>。</p>
   <p>WR-ZipGuard · Platform Stage · 实验报告 B · 2026-07-17</p>
 </div>
 </main>

@@ -108,7 +108,7 @@
   <div class="facet">
     <span class="fk">为什么</span><span class="why">Stage B 的核心工作就是逐字段校验 <code>m_axis_tx</code> 输出帧。注意上方勘误:本分支 RX 不校验 ICRC,环回平台内它不是故障源;但对端商品 RNIC(CX-5)会校验我们的 TX——互操作阶段"ICRC 错 = 静默丢包"仍是最阴的故障模式。</span>
     <span class="fk">动手</span><span class="fv ex">用 Wireshark 打开任一 RoCE v2 抓包(或 Stage B 产出的 golden pcap),手工核对 BTH 的 opcode/PSN/destQP 与 RETH 的 vaddr/rkey/DMALen;再手算一帧 ICRC 与工具比对。</span>
-    <span class="fk">入口</span><span>源码 <code>hdl/common/icrc.sv</code>, <code>hls/crc/</code> · Obsidian <code>003互联基础设施/rdma</code>(ib_pack.h 逐字段笔记)</span>
+    <span class="fk">入口</span><span>源码 Coyote <code>hw/hdl/network/rdma/icrc.sv</code>, fns <code>hls/crc/</code> · Obsidian <code>003互联基础设施/rdma</code>(ib_pack.h 逐字段笔记)</span>
   </div>
 </div>
 
@@ -145,7 +145,7 @@ L &gt; 4096      →  WRITE_FIRST  [BTH+RETH+4096B]   ← RETH 只在第一包
   <div class="facet">
     <span class="fk">为什么</span><span class="why">Stage B 通过标准里"≥PMTU 多包切分正确"就是它;WITH_IMM 是未来对 stock 网卡做压缩实验的接收通知设计,要从第一天留口。平台可用期 ④ 的双长度面(WQE len=压缩长)也建立在这张分段图上——线长必须 ceil4(IBTA PadCount 现实)。</span>
     <span class="fk">动手</span><span class="fv ex">拿 12KB 消息手画包序列(含每包长度与 PSN),再与 Stage B 仿真输出对照;找出 len 恰为 n×4096 时的边界情况。</span>
-    <span class="fk">入口</span><span><code>hls/fns_config.hpp</code>(PMTU 常量)</span>
+    <span class="fk">入口</span><span><code>hls/rocev2/rocev2_config.hpp.in:10</code>(PMTU 模板,值由 <code>hls/rocev2/CMakeLists.txt:14</code> 的 <code>PMTU_BYTES</code> CACHE 注入,默认 4096)</span>
   </div>
 </div>
 
