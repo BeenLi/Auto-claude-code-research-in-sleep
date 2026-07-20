@@ -373,7 +373,7 @@
 <div class="stage" id="stage-b">
   <div class="stage-head"><div class="stage-letter">B</div><div><h3>roce_stack 独立 RTL 仿真</h3><div class="stage-sub">零硬件 · 实际 1 天 · <strong>PASS 2026-07-17</strong></div></div></div>
   <div class="stage-body">
-  <div class="callout pass"><span class="tag">已完成</span>全部通过标准达成,九个发现(含三处包装层契约缝与 RX-不校验-ICRC 勘误)见 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 实验报告</a>。仿真器定案 xsim;工件与 TB/脚本统一在代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>roce-rtl-sim/</code>;myDevbox <code>~/roce-rtl-sim</code> 为符号链接)。</div>
+  <div class="callout pass"><span class="tag">已完成</span>全部通过标准达成,九个发现(含三处包装层契约缝与 RX-不校验-ICRC 勘误)见 <a href="https://claude.ai/code/artifact/cb8beb47-7788-4440-9158-8eb3520e253d">🧪 Stage B 实验报告</a>。仿真器定案 xsim;工件与 TB/脚本统一在代码仓 <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(<code>roce-rtl-sim/</code>;myDevbox <code>~/vcu118-roce-platform/roce-rtl-sim</code>)。</div>
   <dl class="fivepart">
     <dt>目标</dt><dd>在 RTL 层把"SQ 命令 → 合法 RoCE 帧 → 回灌 → 放置 + ACK"整环仿真通,建立 golden 帧库。</dd>
     <dt>前置</dt><dd>Stage A 通过;确定仿真器(xsim 或 Verilator;metaIntf/AXI4S 是 SV interface,Verilator 需确认支持度,不行就 xsim)。</dd>
@@ -556,7 +556,7 @@
 };  // 经普通 TCP socket 带外交换;对端 harness 拿它做 INIT→RTR→RTS</code></pre>
 
 <div class="footnote">
-  <p>文档家族:📡 <a href="https://claude.ai/code/artifact/5c9c5da5-4dce-4023-8958-7d738610025f">《RoCE v2 协议入门》</a> · 🧱 <a href="https://claude.ai/code/artifact/c3fd7041-528d-48a5-8cdd-c61920de5656">《三框架入门:fns · Corundum · BALBOA》</a> · 🧪 各阶段实验报告(入口见<a href="#dashboard">仪表盘</a>)· 设计文档 <code>platform-stage/DOORBELL_SQRING_RETRANS_DESIGN.md</code>(平台可用期 ③)/ <code>platform-stage/CODEC_INTEGRATION_DESIGN.md</code>(④)。分工(2026-07-17 用户决定):本仓库 <code>platform-stage/</code> 只存报告/数据/决策;<strong>实验代码统一在私有代码仓</strong> <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(git 开在 myDevbox <code>~/vcu118-roce-platform</code>,<code>~/roce-rtl-sim</code> 为符号链接;详见 <code>platform-stage/CODE.md</code>)。</p>
+  <p>文档家族:📡 <a href="https://claude.ai/code/artifact/5c9c5da5-4dce-4023-8958-7d738610025f">《RoCE v2 协议入门》</a> · 🧱 <a href="https://claude.ai/code/artifact/c3fd7041-528d-48a5-8cdd-c61920de5656">《三框架入门:fns · Corundum · BALBOA》</a> · 🧪 各阶段实验报告(入口见<a href="#dashboard">仪表盘</a>)· 设计文档 <code>platform-stage/DOORBELL_SQRING_RETRANS_DESIGN.md</code>(平台可用期 ③)/ <code>platform-stage/CODEC_INTEGRATION_DESIGN.md</code>(④)。分工(2026-07-17 用户决定):本仓库 <code>platform-stage/</code> 只存报告/数据/决策;<strong>实验代码统一在私有代码仓</strong> <a href="https://github.com/BeenLi/vcu118-roce-platform">vcu118-roce-platform</a>(git 开在 myDevbox <code>~/vcu118-roce-platform</code>;详见 <code>platform-stage/CODE.md</code>)。</p>
   <p>事实来源:fpga-network-stack / Coyote / Corundum 源码逐文件核验(2026-07-16);BALBOA = arXiv 2507.20412(资源与延迟数字系论文图表像素测量,标注"约");Corundum app_block = 官方文档 <code>docs/source/modules/mqnic_app_block.rst</code>;CX-5 检查单与 BALBOA 对比表:仓库 <code>review-stage/PLATFORM_BALBOA_CX5_NOTES.md</code>。</p>
   <p>WR-ZipGuard · Platform Stage · 学习与集成指南 v2.0 · 2026-07-19(由《集成手册》v1.0 + 《学习导览》v1.0 + 《阶段索引》三合一;§2/§3 拆分独立成文)</p>
 </div>
