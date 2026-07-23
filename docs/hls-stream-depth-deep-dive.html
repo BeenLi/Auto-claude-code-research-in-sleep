@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>#pragma HLS STREAM depth 深度解析 — 以 RoCEv2 核为标本</title>
+<style>
+  :root {
+    --bg: #fdfdfc;
+    --fg: #1f2328;
+    --muted: #57606a;
+    --accent: #0b5cad;
+    --accent2: #8b3fa8;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --bad: #c93c37;
+    --code-bg: #f4f5f7;
+    --border: #d8dee4;
+    --card: #ffffff;
+    --tier1: #7cb0e0; --tier2: #7ccdb8; --tier3: #e7c168; --tier4: #e2966d; --tier5: #c98ad4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 80px;
+    font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.75; font-size: 16px;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.9em; border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-top: 40px; }
+  h1 .sub { display:block; font-size: 0.55em; color: var(--muted); font-weight: normal; margin-top: 6px; }
+  h2 { font-size: 1.45em; margin-top: 2.2em; border-left: 5px solid var(--accent); padding-left: 12px; }
+  h3 { font-size: 1.15em; margin-top: 1.8em; color: var(--accent); }
+  code, pre {
+    font-family: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    font-size: 0.92em;
+  }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; overflow-x: auto; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.94em; }
+  th, td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; vertical-align: top; }
+  th { background: #eef2f6; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .note, .warn-box, .evidence, .fix {
+    border-radius: 8px; padding: 12px 18px; margin: 1.2em 0; border: 1px solid;
+  }
+  .note      { background: #eef6fd; border-color: #b6d5f0; }
+  .warn-box  { background: #fff8e6; border-color: #eed9a0; }
+  .evidence  { background: #f0faf2; border-color: #b5dfc0; }
+  .fix       { background: #fdf1f0; border-color: #ecc2c0; }
+  .note::before      { content: "💡 "; }
+  .warn-box::before  { content: "⚠️ "; }
+  .evidence::before  { content: "🔬 仓库实证  "; font-weight: bold; color: var(--ok); }
+  .fix::before       { content: "✏️ 纠错  "; font-weight: bold; color: var(--bad); }
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 28px; margin-top: 24px; }
+  .toc ol { margin: 6px 0; padding-left: 22px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .tag { display: inline-block; border-radius: 999px; padding: 0 10px; font-size: 0.8em; color: #fff; margin-right: 6px; }
+  .t1 { background: var(--tier1); } .t2 { background: var(--tier2); } .t3 { background: var(--tier3); }
+  .t4 { background: var(--tier4); } .t5 { background: var(--tier5); }
+  .bar-row { display: flex; align-items: center; margin: 4px 0; font-family: monospace; font-size: 0.9em; }
+  .bar-label { width: 90px; text-align: right; padding-right: 10px; color: var(--muted); }
+  .bar { height: 20px; border-radius: 3px; margin-right: 8px; }
+  .center { text-align: center; }
+  figure { margin: 1.5em 0; text-align: center; }
+  figcaption { color: var(--muted); font-size: 0.88em; margin-top: 8px; }
+  .filepath { color: var(--accent2); font-weight: 500; }
+  details { border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; margin: 1em 0; background: var(--card); }
+  summary { cursor: pointer; font-weight: bold; color: var(--accent); }
+  .kbd-seq { color: var(--muted); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  svg text { font-family: "PingFang SC", sans-serif; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>#pragma HLS STREAM depth 深度解析
+<span class="sub">以本仓库 RoCEv2 HLS 核为标本 · 每个论断均可在仓库文件中验证 · 2026-07</span></h1>
+
+<div class="toc">
+<strong>目录</strong>
+<ol>
+  <li><a href="#s1">一行 pragma 的两种命运:csim 里是空气,RTL 里是硅</a></li>
+  <li><a href="#s2">FIFO 的物理解剖:端口、延迟、存储介质</a></li>
+  <li><a href="#s3">流控的两侧:csim 只建模了一半</a></li>
+  <li><a href="#s4">法证一例:csim 报告里的"1999"是谁</a></li>
+  <li><a href="#s5">depth 分类学:本设计 89 条 pragma 的五个层级</a></li>
+  <li><a href="#s6">两种病理:欠深与过深</a></li>
+  <li><a href="#s7">工程方法论:depth 到底怎么定</a></li>
+  <li><a href="#s8">审计清单:什么时候必须复查 depth</a></li>
+  <li><a href="#appendix">附录:FIFO 完整清单与证据文件</a></li>
+</ol>
+</div>
+
+<div class="note">
+<strong>阅读前提。</strong>本文假定你已理解:<code>#pragma HLS DATAFLOW</code> 把函数调用变成并发常驻硬件进程、进程间只靠 <code>hls::stream</code> 通信、顶层 <code>rocev2_top</code> 是 <code>ap_ctrl_none</code> 自由运行核。本文聚焦一个问题:<strong>那条连接进程的管道,它的"深度"意味着什么、如何决定、错了会怎样。</strong>
+</div>
+
+<!-- ================================================================ -->
+<h2 id="s1">1. 一行 pragma 的两种命运</h2>
+
+<p>同一行代码:</p>
+<pre><code>static stream&lt;net_axis&lt;WIDTH&gt; &gt; rx_exh2dropFifo("rx_exh2dropFifo");
+#pragma HLS STREAM depth=32 variable=rx_exh2dropFifo</code></pre>
+
+<p>在两条工具链路径上,结局完全不同:</p>
+
+<h3>1.1 csim:pragma 被当作注释丢弃</h3>
+<p>csim 的构建就是普通 clang 编译(见 <span class="filepath">stage_a_csim/work_gui/hls/hls/csim/build/csim.mk</span>:<code>clang-16 -std=gnu++17 ... -Wno-unknown-pragmas</code>,最后链接成 <code>csim.exe</code>)。此时 <code>hls::stream</code> 是头文件里的一个软件类,底层是<strong>无界队列</strong>:</p>
+<ul>
+  <li><code>.write()</code> = push,<strong>永不阻塞、永不失败</strong> —— 写一万个也照收;</li>
+  <li><code>.read()/.empty()</code> = pop / 判空 —— 空的一侧是忠实建模的;</li>
+  <li><code>.full()</code> 恒为假 —— <code>depth=32</code> 这个数字<strong>没有任何运行时效力</strong>。</li>
+</ul>
+
+<h3>1.2 RTL:每条 stream 物化为一个 Verilog FIFO 模块</h3>
+<p>综合之后,每条内部 stream 变成一个真实的 FIFO 实例。本仓库 <span class="filepath">roce-rtl-sim/rtl/hls/</span> 下就躺着综合产物 —— 49 种 FIFO 模块,命名规则一目了然:<code>rocev2_top_fifo_w宽度_d深度_存储风格</code>。三条我们重点讨论的 FIFO,其 pragma → 物理模块的映射在顶层 <code>rocev2_top.v</code> 里可以逐字验证:</p>
+
+<div class="evidence">
+<table>
+<tr><th>C++ 里的 stream(pragma)</th><th>顶层 RTL 实例(实测)</th><th>说明</th></tr>
+<tr><td><code>rx_exh2dropFifo</code> depth=32<br>元素 <code>net_axis&lt;512&gt;</code>(577 逻辑位)</td><td><code>rocev2_top_fifo_w1024_d32_A rx_exh2dropFifo_U(...)</code></td><td>工具将 577 位负载对齐打包为 1024 位存储</td></tr>
+<tr><td><code>tx_pkgInfoFifo</code> depth=128</td><td><code>rocev2_top_fifo_w64_d128_A tx_pkgInfoFifo_U(...)</code></td><td>包描述符队列</td></tr>
+<tr><td><code>rt_freeListFifo</code> depth=META_TABLE_SIZE(=2000)</td><td><code>rocev2_top_fifo_w16_d2000_A rt_freeListFifo_U(...)</code></td><td>16 位指针 × 2000 格</td></tr>
+</table>
+出处:<span class="filepath">roce-rtl-sim/rtl/hls/rocev2_top.v</span>(grep 实例名即可复现)。
+</div>
+
+<p><strong>结论先立住:depth 是一份"物理容量合同",只有 RTL 才兑现;csim 对它的全部态度是 <code>-Wno-unknown-pragmas</code>。</strong>这决定了后文所有"csim 测不出"的病灶。</p>
+
+<!-- ================================================================ -->
+<h2 id="s2">2. FIFO 的物理解剖</h2>
+
+<h3>2.1 端口与握手</h3>
+<p>打开任意一个生成的 FIFO 模块(如 <span class="filepath">roce-rtl-sim/rtl/hls/rocev2_top_fifo_w24_d2_S.v</span>),接口就是流控的全部真相:</p>
+
+<pre><code>// 写侧(生产者可见)
+output if_full_n;     // 低 = 满,生产者必须停 —— 背压的源头
+input  if_write;
+input  [W-1:0] if_din;
+
+// 读侧(消费者可见)
+output if_empty_n;    // 低 = 空,消费者必须等
+input  if_read;
+output [W-1:0] if_dout;
+
+// FRP(First-Read Protocol)辅助
+output if_num_data_valid;  // 当前占用格数
+output if_fifo_cap;        // 总容量</code></pre>
+
+<p>C++ 里的 <code>!s.empty()</code> 综合成对 <code>if_empty_n</code> 的采样;而 C++ 里<strong>你从来不写</strong>的那半句 —— "写之前看看满不满" —— 综合器替你补上了:进程的流水线在 <code>if_full_n</code> 为低时整体停摆(stall)。这就是为什么 C 源码里看不见背压,但硬件里处处是背压。</p>
+
+<h3>2.2 穿越延迟:write → read 至少 1 拍</h3>
+<p>模块头部注释写着 <code>//RAW latency 1</code>:本拍写入的数据,下一拍才能被读侧看到。所以 dataflow 网络里<strong>每一跳 FIFO 至少贡献 1 个周期的固有延迟</strong> —— TX 路径十几跳串下来就是十几拍,这是 csim(同一次调用内 push 完就能 pop)完全不体现的。</p>
+
+<h3>2.3 存储介质:后缀 _S / _D / _A 的含义(实测)</h3>
+<table>
+<tr><th>后缀</th><th>MEM_STYLE(模块内参数实测)</th><th>物理映射</th><th>本设计中的使用规律</th></tr>
+<tr><td><code>_S</code></td><td><code>"shiftReg"</code></td><td>SRL16/SRL32 移位寄存器(LUT 内)</td><td>浅 FIFO:d2 / d3 / d4</td></tr>
+<tr><td><code>_D</code></td><td><code>"distributed"</code></td><td>LUTRAM(分布式 RAM)</td><td>中等:如 w145_d16、w50_d32</td></tr>
+<tr><td><code>_A</code></td><td><code>"auto"</code></td><td>工具按 宽×深 自选(大者落 BRAM)</td><td>d8 以上多数;w16_d2000 必然落 BRAM</td></tr>
+</table>
+
+<p>粗算两笔账,感受"深度不是免费的":</p>
+<ul>
+  <li><code>rt_freeListFifo</code>:16 bit × 2000 = 32 Kb ≈ <strong>正好一块 BRAM36</strong>(18b×2048 模式,36.9 Kb)。一条 pragma,一块 BRAM。</li>
+  <li><code>rx_exh2dropFifo</code>:1024 bit × 32 = 32 Kb —— 容量相同,但形状<strong>极宽极浅</strong>。若映射成 BRAM,受 BRAM36 最大 72 位口宽限制要并联 ~15 块、每块只用 32/512 深度,浪费 &gt;90%;所以 auto 在这种形状下通常选 LUTRAM/寄存器。<strong>同样的 bit 数,"形状"决定资源代价</strong> —— 这就是为什么加深一条 512 位数据 FIFO 远比加深一条 16 位指针 FIFO 昂贵。</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="s3">3. 流控的两侧:csim 只建模了一半</h2>
+
+<table>
+<tr><th></th><th>empty 侧(消费者流控)</th><th>full 侧(生产者流控 / 背压)</th></tr>
+<tr><td><strong>RTL</strong></td><td><code>if_empty_n</code>:空则消费者等</td><td><code>if_full_n</code>:满则生产者 stall,stall 沿上游<strong>链式传播</strong></td></tr>
+<tr><td><strong>csim</strong></td><td>✅ 忠实:<code>.empty()</code> 真实判空</td><td>❌ 缺失:无界队列永不满,<code>depth</code> 无效</td></tr>
+</table>
+
+<p>由此产生 stream depth 的<strong>第一定律</strong>:</p>
+<div class="warn-box">
+<strong>凡是错误症状要经由"FIFO 满"才能表达的 bug —— 降速、stall 链、死锁 —— csim 一律绿灯放行。</strong>你可以把本设计里任何一条 depth=32 改成 depth=2,csim 结果一个字节都不会变;差别只在 RTL 里爆发。
+</div>
+
+<p>但 csim 并非对深度问题毫无用处 —— 它在退出时会"坦白":</p>
+<pre><code>INFO [HLS SIM]: The maximum depth reached by any hls::stream() instance
+                in the design is 1999</code></pre>
+<p>这是 csim 对每条 stream 的<strong>峰值占用</strong>做的记录(它自己不限深,但它记账)。这个数字怎么用、有什么坑,见下一节的法证案例与 §7 方法论。</p>
+
+<!-- ================================================================ -->
+<h2 id="s4">4. 法证一例:csim 报告里的"1999"是谁</h2>
+
+<p>本仓库 Stage A 的 csim 日志(<span class="filepath">stage_a_csim/work_gui/hls/hls/csim/report/rocev2_top_csim.log</span>)结尾有两条与 FIFO 有关的输出:</p>
+<pre><code>WARNING [HLS SIM]: hls::stream 'rt_freeListFifo' contains leftover data,
+                   which may result in RTL simulation hanging.
+INFO    [HLS SIM]: The maximum depth reached by any hls::stream() instance
+                   in the design is 1999</code></pre>
+
+<p>两条都指向同一条 FIFO,而且数字能精确对账:</p>
+
+<h3>4.1 rt_freeListFifo 是什么:FIFO 用作"自由列表"</h3>
+<p>看 <span class="filepath">third_party/fpga-network-stack/hls/ib_transport_protocol/retransmitter/retransmitter.hpp</span>:</p>
+<pre><code>const uint32_t META_TABLE_SIZE = 2000;                       // :35
+#pragma HLS STREAM depth=META_TABLE_SIZE variable=rt_freeListFifo  // :595
+
+// freelist_handler —— 上电预填 + 回收 (:557-566)
+if (!rt_releaseFifo.empty()) {
+    rt_freeListFifo.write(rt_releaseFifo.read());            // ACK 后归还指针
+} else if (freeListCounter &lt; META_TABLE_SIZE && !rt_freeListFifo.full()) {
+    rt_freeListFifo.write(freeListCounter);                  // 初始化:灌入 0..1999
+    freeListCounter++;
+}
+
+// 插入重传条目时消费 (:341-343)
+else if (!tx2retrans_insertRequest.empty() && !freeListFifo.empty()) {
+    newMetaIdx = freeListFifo.read();   // 取一个空闲槽位指针</code></pre>
+
+<p>这条 FIFO 里装的不是数据流,而是<strong>重传元数据表的空闲槽位指针池</strong>:上电灌满 2000 个指针;每挂起一个未确认的 WR 取走一个;对端 ACK 后归还。<strong>FIFO 的占用数 = 当前空闲槽位数。</strong></p>
+
+<h3>4.2 对账:2000 − 1 = 1999</h3>
+<ol>
+  <li>TB 全程只发了一个 WRITE → 只发生一次 <code>inserting new meta ... occupying pointer 0x0</code>(日志可查),消费 1 个指针;</li>
+  <li>TB 从不回 ACK → 指针永不归还;</li>
+  <li>预填循环共写入 2000 个;峰值占用 = 2000 写 − 1 读 = <strong>1999,与工具报告分毫不差</strong>。</li>
+</ol>
+<p>一条匿名的工具统计,就此指认了具体 FIFO。这也演示了"csim 峰值占用报告"的正确读法:<strong>它是占用画像,不是错误告警。</strong></p>
+
+<h3>4.3 顺带纠一个错</h3>
+<div class="fix">
+本文档作者(Claude)在此前的对话中把 <code>leftover data</code> 警告解读为"重传互锁状态没归位、cosim 的头号拦路虎"。读完 freelist 源码应当修正:<strong>对这条 FIFO 而言,结束时非空是设计使然</strong> —— 自由列表非空恰恰意味着"还有空闲槽位",是健康状态。该警告是工具的通用启发式(任何残留都报),对 <em>数据</em> FIFO 是真告警,对 <em>池类</em> FIFO 是误报。读这类警告,必须先问:<strong>这条 FIFO 的语义是"流"还是"池"?</strong>
+</div>
+
+<!-- ================================================================ -->
+<h2 id="s5">5. depth 分类学:本设计 89 条 pragma 的五个层级</h2>
+
+<p>把 <span class="filepath">ib_transport_protocol.cpp</span>(75 条)+ <span class="filepath">rocev2.cpp</span>(14 条)的全部 STREAM pragma 按深度统计:</p>
+
+<div style="margin:1.2em 0;">
+  <div class="bar-row"><span class="bar-label">d2 ×58</span><div class="bar t1" style="width:87%;background:var(--tier1)"></div></div>
+  <div class="bar-row"><span class="bar-label">d4 ×13</span><div class="bar" style="width:19.5%;background:var(--tier2)"></div></div>
+  <div class="bar-row"><span class="bar-label">d8 ×8</span><div class="bar" style="width:12%;background:var(--tier2)"></div></div>
+  <div class="bar-row"><span class="bar-label">d16 ×2</span><div class="bar" style="width:3%;background:var(--tier3)"></div></div>
+  <div class="bar-row"><span class="bar-label">d32 ×4</span><div class="bar" style="width:6%;background:var(--tier3)"></div></div>
+  <div class="bar-row"><span class="bar-label">d64 ×2</span><div class="bar" style="width:3%;background:var(--tier4)"></div></div>
+  <div class="bar-row"><span class="bar-label">d128 ×1</span><div class="bar" style="width:1.5%;background:var(--tier4)"></div></div>
+  <div class="bar-row"><span class="bar-label">d2000 ×1</span><div class="bar" style="width:1.5%;background:var(--tier5)"></div></div>
+</div>
+
+<p>分布不是随机的 —— 每个深度档位对应一种<strong>截然不同的设计意图</strong>。逐层解剖:</p>
+
+<h3><span class="tag t1">Tier 1</span> depth=2 —— 弹性解耦(全场 65%)</h3>
+<p>两格是让相邻两个 II=1 进程互不卡死对方的最小配置:一格正被下游读,一格供上游写,吸收 1 拍握手抖动。它<strong>不为存数据,只为切开时序与控制耦合</strong> —— 相当于数字设计里的 skid buffer。典型:<code>rx_crc2ipFifo</code>、<code>stateTable2txIbh_rsp</code> 这类逐字/请求-响应通道。物理上全部落 <code>_S</code>(SRL),近乎免费。</p>
+<div class="note">为什么不是 depth=1?单格 FIFO 无法同拍读写并行,会把两个 II=1 进程降速到隔拍工作;两格是维持满线速的最小值。这也是 Vitis 把 stream 默认深度定为 2 的原因。</div>
+
+<h3><span class="tag t2">Tier 2</span> depth=4~8 —— 微观抖动吸收</h3>
+<p>出现在<strong>包头拼接/移位对齐</strong>路径:<code>tx_shift2ibhFifo</code>(d8)、<code>rx_exh2rethShiftFifo</code>(d4)等。这些进程不是每拍恒定一进一出 —— 拼头时会"憋两拍再连吐两拍"(回忆 <code>APPEND PAYLOAD</code> 的 HEADER→RETH_PAYLOAD→INFO 状态机)。深度 4~8 吸收这种<strong>拍级突发</strong>,避免瞬时波动传成上游 stall。判据:进程的"进出节奏差"有几拍,就给几格余量。</p>
+
+<h3><span class="tag t3">Tier 3</span> depth=16~32 —— fork-join 重汇聚偏差(最关键、最易错)</h3>
+<p>这是 dataflow 设计里 bug 密度最高的档位。看本设计最典型的一处 —— RX 方向的 <strong>PSN 检查 / 乱序丢弃</strong>结构(拓扑摘自 <span class="filepath">ib_transport_protocol.cpp:2540-2600</span>):</p>
+
+<figure>
+<svg viewBox="0 0 860 260" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker>
+  </defs>
+  <!-- fork node -->
+  <rect x="20" y="100" width="150" height="52" rx="8" fill="#eef2f6" stroke="#0b5cad" stroke-width="2"/>
+  <text x="95" y="122" text-anchor="middle" font-size="14" font-weight="bold">rx_process_ibh</text>
+  <text x="95" y="141" text-anchor="middle" font-size="11" fill="#57606a">解析 BTH(fork 点)</text>
+
+  <!-- meta path (top) -->
+  <rect x="250" y="20" width="130" height="46" rx="8" fill="#fff" stroke="#c98ad4" stroke-width="2"/>
+  <text x="315" y="39" text-anchor="middle" font-size="13">rx_ibh_fsm</text>
+  <text x="315" y="56" text-anchor="middle" font-size="10" fill="#57606a">查状态表·验 PSN</text>
+  <line x1="170" y1="112" x2="250" y2="46" stroke="#555" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="196" y="66" font-size="10" fill="#8b3fa8">meta (d2)</text>
+
+  <!-- decision fifo -->
+  <line x1="380" y1="43" x2="560" y2="110" stroke="#555" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="435" y="62" font-size="10" fill="#8b3fa8">rx_ibhDropFifo: bool 判决 (d2)</text>
+
+  <!-- data path (bottom) -->
+  <rect x="250" y="150" width="130" height="46" rx="8" fill="#fff" stroke="#7cb0e0" stroke-width="2"/>
+  <text x="315" y="169" text-anchor="middle" font-size="13">rx_process_exh</text>
+  <text x="315" y="186" text-anchor="middle" font-size="10" fill="#57606a">剥 EXH 头</text>
+  <line x1="170" y1="140" x2="250" y2="170" stroke="#555" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="188" y="168" font-size="10" fill="#0b5cad">数据字</text>
+
+  <rect x="430" y="150" width="115" height="46" rx="8" fill="#fff3d6" stroke="#e7c168" stroke-width="3"/>
+  <text x="487" y="169" text-anchor="middle" font-size="12" font-weight="bold">rx_exh2dropFifo</text>
+  <text x="487" y="186" text-anchor="middle" font-size="11" fill="#9a6700">depth=32 ★</text>
+  <line x1="380" y1="173" x2="430" y2="173" stroke="#555" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- join node -->
+  <rect x="595" y="120" width="130" height="52" rx="8" fill="#eef2f6" stroke="#0b5cad" stroke-width="2"/>
+  <text x="660" y="142" text-anchor="middle" font-size="14" font-weight="bold">drop_ooo_ibh</text>
+  <text x="660" y="160" text-anchor="middle" font-size="11" fill="#57606a">join:转发或丢弃</text>
+  <line x1="545" y1="173" x2="595" y2="160" stroke="#555" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- output -->
+  <line x1="725" y1="146" x2="800" y2="146" stroke="#555" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="762" y="136" font-size="10" fill="#57606a">d32</text>
+
+  <text x="430" y="240" text-anchor="middle" font-size="12" fill="#9a6700">判决未到期间,包体数据字在 ★ 中排队 —— 深度必须盖过判决路径的最坏延迟</text>
+</svg>
+<figcaption>fork-join 结构:同一个包在 fork 点分成"判决路"(慢,要查表)与"数据路"(快,逐字直达)。</figcaption>
+</figure>
+
+<p><strong>尺寸法则(本档位的核心公式):</strong></p>
+<pre><code>快路径缓冲深度 ≥ ⌈慢路径最坏延迟(拍)⌉ × 快路径速率(元素/拍) + 握手余量</code></pre>
+<p>这里数据路每拍可到 1 个 512 位字;判决路要过 d2 meta FIFO → <code>rx_ibh_fsm</code> 状态机 → 状态表 BRAM 读 → 判决 FIFO,最坏十几拍。depth=32 ≈ 判决延迟上界 × 1 字/拍,再留一倍工程余量。</p>
+<p><strong>违反的后果分两级:</strong>轻则数据路 FIFO 频繁写满 → 背压沿 exh→shift→ibh→udp→ip→crc 一路传回 MAC 口,吞吐塌陷;重则若背压环住了判决路本身依赖的资源(见 §6 死锁环),整网冻结。同档位的 <code>tx_appMetaFifo</code>(d32,软件下发的 WR 队列)、<code>rx_ackEventFifo</code>(d32,ACK 事件突发)同理。</p>
+
+<h3><span class="tag t4">Tier 4</span> depth=64~128 —— 速率解耦 / 在途事务(Little 定律)</h3>
+<p>这一档的 FIFO 面对的不再是"拍级抖动",而是<strong>两个子系统之间的延迟×吞吐乘积</strong>。用 Little 定律 <code>N = λ × T</code>(需要的在途量 = 速率 × 往返延迟)来读:</p>
+<table>
+<tr><th>FIFO</th><th>depth</th><th>解读</th></tr>
+<tr><td><code>rx_remoteMemCmd</code></td><td>64</td><td>RX 侧向主机内存发写命令。要在内存往返延迟 T 拍内维持线速,必须允许 λ×T 条命令在途。d64 允许 64 条未完成命令 —— 覆盖小消息(1 命令/包)高速率场景。</td></tr>
+<tr><td><code>tx_pkgInfoFifo</code></td><td>128</td><td>TX 侧每包写一条 <code>pkgInfo(类型, 字数)</code> 给 CRC 级(<span class="filepath">ib_transport_protocol.cpp:1168-1207</span>)。包描述符必须先于包体到齐,CRC 才知道边界;d128 = 允许 128 个包的描述符先行排队,把"描述符生产"与"包体穿过整条 TX 流水线"彻底解耦。</td></tr>
+</table>
+<div class="note">识别特征:这一档 FIFO 的元素是"命令/描述符"而非数据字,宽度窄(w64、w152),加深便宜;它们的深度编码的是<strong>系统级并发度</strong>(允许几个包/几条命令在飞),不是路径延迟差。</div>
+
+<h3><span class="tag t5">Tier 5</span> depth=池容量 —— FIFO 即数据结构</h3>
+<p><code>rt_freeListFifo</code>(d2000 = META_TABLE_SIZE)不在"缓冲"谱系里 —— 它是把 FIFO 直接<strong>用作并发安全的数据结构</strong>:自由列表 / 信用池。深度 = 池的全集大小,一格都不能少(否则初始化灌不满,凭空丢槽位)、多了纯浪费。同类惯用法:令牌桶、credit-based 流控的 credit 池、预分配缓冲句柄池。识别特征:<strong>上电预填、取走-归还成对、占用数有业务含义</strong>(此处 = 空闲重传槽数)。它的深度跟着数据结构常量走(<code>META_TABLE_SIZE</code>),与流水线时序完全无关。</p>
+
+<!-- ================================================================ -->
+<h2 id="s6">6. 两种病理:欠深与过深</h2>
+
+<h3>6.1 欠深病理 A:吞吐气泡(常见、隐蔽)</h3>
+<p>FIFO 未满时不影响任何行为;一旦频繁写满,生产者 stall,stall 逐级上传。症状是<strong>带宽上不去</strong>而非功能错误 —— 数据全对,速率减半。csim 完全无感;cosim 波形里表现为 <code>if_full_n</code> 周期性拉低、上游 <code>TREADY</code> 抖动。</p>
+
+<h3>6.2 欠深病理 B:死锁环(致命)</h3>
+<p>dataflow 网络死锁的形式条件:<strong>进程等待图中出现环</strong> —— 环上每条边要么是"等上游给数据"(empty-wait),要么是"等下游腾空间"(full-wait)。fork-join 欠深是最经典的成环方式。把上图的 ★ 假想改成 depth=2 推演一遍:</p>
+<ol>
+  <li>一个 64 字的包进入。<code>rx_process_exh</code> 写出 2 个字后,<code>rx_exh2dropFifo</code> 满 → <strong>full-wait,停</strong>;</li>
+  <li>它停了,就不再从上游 <code>rx_shift2exhFifo</code> 读 → 上游链条逐级写满、逐级停;</li>
+  <li>若 <code>rx_ibh_fsm</code> 的判决恰好依赖被卡进程尚未转发的信息(例如 meta FIFO 也在被堵的链条上),判决永远发不出 → <code>drop_ooo_ibh</code> <strong>empty-wait,永等</strong>;</li>
+  <li>环闭合:exh 等 drop 腾空间 ← drop 等判决 ← 判决等被 exh 堵住的上游。<strong>全网冻结,无任何错误信号。</strong></li>
+</ol>
+<div class="warn-box">死锁的狡猾之处:它只在"包长 &gt; 快路径深度 且 判决延迟 &gt; 某阈值"同时成立时触发 —— 小包测试全过,某天一个大包让系统当场石化。csim 永远绿灯(无界),小流量 cosim 也可能漏过。这就是 depth 审计必须<strong>按最坏情形分析而不是靠测试碰</strong>的原因。</div>
+
+<h3>6.3 过深病理:资源、时序与"掩盖"</h3>
+<ul>
+  <li><strong>资源:</strong>§2.3 的账 —— 一条 512 位数据 FIFO 每加深 64 格 ≈ 32 Kb 存储。全设计 89 条 FIFO,深度普涨一档,BRAM/LUTRAM 预算立刻可见地恶化。</li>
+  <li><strong>掩盖设计病:</strong>更隐蔽的害处 —— 把本该修拓扑的问题(判决路径太长、反馈环太深)用"加深扛过去"。深 FIFO 里长期高水位 = 系统在用缓冲抵消结构性速率失配,PMTU 一改、时钟一改就复发。<strong>先问"为什么会积压",再问"加几格"。</strong></li>
+  <li><strong>延迟:</strong>对延迟敏感路径(此处的 ACK 环路),深 FIFO 中的排队直接计入 RTT,进而影响重传定时行为。</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="s7">7. 工程方法论:depth 到底怎么定</h2>
+
+<h3>7.1 分析法(设计时,主方法)</h3>
+<p>对每条非 d2 的 FIFO 回答三个问题,对号入座五个层级:</p>
+<ol>
+  <li><strong>它是流、是队列、还是池?</strong> 池 → 深度=池容量(T5);队列 → Little 定律(T4);流 → 下一问;</li>
+  <li><strong>它在 fork-join 的快路径上吗?</strong> 是 → 深度 ≥ 慢路径最坏延迟 × 快路径速率(T3);</li>
+  <li><strong>生产/消费的拍级节奏差几拍?</strong> 突发拼头类给 4~8(T2),纯逐字给 2(T1)。</li>
+</ol>
+
+<h3>7.2 实验法(验证与校准)</h3>
+<table>
+<tr><th>手段</th><th>能给什么</th><th>局限</th></tr>
+<tr><td>csim 结束时的 max-depth 报告(§4)</td><td>C 语义下各流峰值占用的<strong>下界画像</strong>;池类 FIFO 的占用对账</td><td>无背压 → 占用被低估或畸变;只报全局最大值不报逐条(逐条需看 cosim)</td></tr>
+<tr><td>cosim + 通道剖析(Dataflow/Channel Profiling,报告每条 FIFO 峰值占用与满/空 stall 拍数)</td><td>真握手下的逐条占用画像;直接指出常满(欠深)与常空(过深)的通道</td><td>只覆盖测试激励走到的场景;最坏情形仍靠分析</td></tr>
+<tr><td>cosim 死锁检测(挂死时报告等待环上的进程与 FIFO)</td><td>死锁环的直接指认</td><td>事后诊断,且要激励能踩中</td></tr>
+<tr><td>板上 ILA 采 <code>if_full_n</code>/<code>prog_full</code></td><td>真实流量下的背压统计</td><td>综合迭代慢,放最后</td></tr>
+</table>
+
+<h3>7.3 本仓库现成的一条验证路径</h3>
+<p><span class="filepath">roce-rtl-sim/</span> 已有综合出的 RTL 与仿真脚手架 —— 最有教学价值的实验:把 <code>rx_exh2dropFifo</code> 的 depth 从 32 改小(如 4),重跑 csim(预期:全 PASS,一字节不变)再跑 RTL 仿真(预期:大包场景吞吐塌陷或挂死)。一次实验同时坐实 §3 第一定律与 §6 死锁推演。</p>
+
+<!-- ================================================================ -->
+<h2 id="s8">8. 审计清单:什么时候必须复查 depth</h2>
+<table>
+<tr><th>变更</th><th>牵连的 depth</th><th>原因</th></tr>
+<tr><td>改 PMTU(<span class="filepath">stage_a_csim/gen/rocev2_config.hpp</span>,当前 4096)</td><td>T3 全部(d16~d32)</td><td>包长(字数)变 → fork-join 快路径需缓冲的最坏字数变</td></tr>
+<tr><td>改 DATA_WIDTH(当前 512)</td><td>T3 + 所有数据通路 FIFO 的资源账</td><td>同一包的字数、FIFO 宽度同时变,"形状"重算</td></tr>
+<tr><td>慢路径上加进程 / 加查表级数</td><td>对应 fork-join 的快路径 FIFO</td><td>慢路径延迟↑ → 快路径深度下限↑</td></tr>
+<tr><td>改 META_TABLE_SIZE / 池类常量</td><td>T5(必须同步,代码里已用常量绑定 —— 好范式)</td><td>池深度=池容量,硬约束</td></tr>
+<tr><td>内存子系统延迟变化(换 DDR/HBM、加交换)</td><td>T4(d64/d128)</td><td>Little 定律的 T 变了</td></tr>
+<tr><td>提时钟频率</td><td>不改深度本身,但复查 _S/_D/_A 映射的时序</td><td>深宽 LUTRAM 可能成为关键路径</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="appendix">附录</h2>
+
+<details>
+<summary>附录 A:ib_transport_protocol.cpp + rocev2.cpp 全部 STREAM pragma(89 条)</summary>
+<table>
+<tr><th>depth</th><th>条数</th><th>变量(节选/全列)</th><th>层级</th></tr>
+<tr><td class="num">2</td><td class="num">58</td><td>rocev2 层 13 条(rx_crc2ipFifo、tx_ib2udpFifo、rx_ip2udpFifo …)+ ib 层 45 条(stateTable2*_rsp、msnTable2*_rsp、rx_ibh2shiftFifo、tx_ibhHeaderFifo、timer2retrans_req、qpi2stateTable_upd_req …)</td><td><span class="tag t1">T1</span></td></tr>
+<tr><td class="num">4</td><td class="num">13</td><td>tx_split2rethMerge、tx_split2aethShift、tx_rethMerge2rethShift、tx_rawPayFifo、tx_lengthFifo、tx_exhMetaFifo、tx_exh2payFifo、rx_rethSift2mergerFifo、rx_exhNoShiftFifo、rx_exh2rethShiftFifo、rx_exh2aethShiftFifo、rx_aethSift2mergerFifo、exh_lengthFifo</td><td><span class="tag t2">T2</span></td></tr>
+<tr><td class="num">8</td><td class="num">8</td><td>rx_ipUdpMetaFifo(rocev2 层)、tx_shift2ibhFifo、tx_ibhMetaFifo、tx_connTable2ibh_rsp、tx_appDataFifo、tx2retrans_insertAddrLen、rx_exh2drop_MetaFifo、retransmitter2exh_eventFifo</td><td><span class="tag t2">T2</span></td></tr>
+<tr><td class="num">16</td><td class="num">2</td><td>rx_readRequestFifo、retrans2rx_init</td><td><span class="tag t3">T3</span></td></tr>
+<tr><td class="num">32</td><td class="num">4</td><td>rx_exh2dropFifo ★、rx_ibhDrop2exhFifo、tx_appMetaFifo、rx_ackEventFifo</td><td><span class="tag t3">T3</span></td></tr>
+<tr><td class="num">64</td><td class="num">2</td><td>rx_remoteMemCmd、rx_readEvenFifo</td><td><span class="tag t4">T4</span></td></tr>
+<tr><td class="num">128</td><td class="num">1</td><td>tx_pkgInfoFifo</td><td><span class="tag t4">T4</span></td></tr>
+<tr><td class="num">2000</td><td class="num">1</td><td>rt_freeListFifo(= META_TABLE_SIZE,retransmitter.hpp)</td><td><span class="tag t5">T5</span></td></tr>
+</table>
+</details>
+
+<details>
+<summary>附录 B:综合产物中的 49 种物理 FIFO 模块(roce-rtl-sim/rtl/hls/)</summary>
+<p>按深度归类(模块种类数,多条同形 stream 共享同一模块定义):</p>
+<pre><code>d2    ×30 种   全部 _S (shiftReg)        w1..w512、w1024
+d3    ×1  种   w128_d3_S
+d4    ×3  种   w16/w178_S、w1024_A
+d8    ×6  种   全部 _A                    w145..w1024
+d16   ×2  种   w128_A、w145_D
+d32   ×3  种   w1024_A、w256_A、w50_D
+d64   ×2  种   w152_A、w178_A
+d128  ×1  种   w64_A      ← tx_pkgInfoFifo
+d2000 ×1  种   w16_A      ← rt_freeListFifo(≈1 块 BRAM36)</code></pre>
+</details>
+
+<details>
+<summary>附录 C:本文全部证据文件索引</summary>
+<table>
+<tr><th>论断</th><th>证据文件(仓库相对路径)</th></tr>
+<tr><td>csim = 普通 clang 编译,pragma 无效</td><td><code>stage_a_csim/work_gui/hls/hls/csim/build/csim.mk</code></td></tr>
+<tr><td>FIFO 端口/RAW latency 1/MEM_STYLE</td><td><code>roce-rtl-sim/rtl/hls/rocev2_top_fifo_w24_d2_S.v</code> 等</td></tr>
+<tr><td>pragma → 物理模块实例映射</td><td><code>roce-rtl-sim/rtl/hls/rocev2_top.v</code>(grep <code>_U(</code> 实例名)</td></tr>
+<tr><td>depth 清单</td><td><code>third_party/fpga-network-stack/hls/ib_transport_protocol/ib_transport_protocol.cpp:2242-2303</code>、<code>rocev2/rocev2.cpp:69-90</code></td></tr>
+<tr><td>freelist 语义与预填</td><td><code>.../retransmitter/retransmitter.hpp:35,341-343,557-566,595</code></td></tr>
+<tr><td>1999 对账、leftover 警告</td><td><code>stage_a_csim/work_gui/hls/hls/csim/report/rocev2_top_csim.log</code></td></tr>
+<tr><td>fork-join 拓扑</td><td><code>ib_transport_protocol.cpp:2540-2600</code>(rx_process_exh → drop_ooo_ibh → rx_exh_fsm)</td></tr>
+<tr><td>pkgInfo 生产点</td><td><code>ib_transport_protocol.cpp:1153-1207</code></td></tr>
+</table>
+</details>
+
+<hr style="margin-top:3em;border:none;border-top:1px solid var(--border)">
+<p style="color:var(--muted);font-size:0.85em">本文档由 Claude 基于仓库 vcu118-roce-platform 的源码、综合产物与仿真日志实证撰写(2026-07)。所有数字均可按附录 C 复现;若源码演进,请以最新代码为准。</p>
+
+</main>
+</body>
+</html>

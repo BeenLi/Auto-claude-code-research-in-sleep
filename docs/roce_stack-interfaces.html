@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>roce_stack 接口速查笔记</title>
+<style>
+  :root {
+    --bg: #fdfdfc;
+    --fg: #1f2328;
+    --muted: #57606a;
+    --accent: #0b5cad;
+    --accent2: #8b3fa8;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --bad: #c93c37;
+    --code-bg: #f4f5f7;
+    --border: #d8dee4;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 80px;
+    font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.75; font-size: 16px;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.9em; border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-top: 40px; }
+  h1 .sub { display:block; font-size: 0.55em; color: var(--muted); font-weight: normal; margin-top: 6px; }
+  h2 { font-size: 1.45em; margin-top: 2.2em; border-left: 5px solid var(--accent); padding-left: 12px; }
+  h3 { font-size: 1.15em; margin-top: 1.8em; color: var(--accent); }
+  code, pre {
+    font-family: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    font-size: 0.92em;
+  }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; overflow-x: auto; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.94em; }
+  th, td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; vertical-align: top; }
+  th { background: #eef2f6; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .note {
+    border-radius: 8px; padding: 12px 18px; margin: 1.2em 0;
+    background: #eef6fd; border: 1px solid #b6d5f0;
+  }
+  .note::before { content: "💡 "; }
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 28px; margin-top: 24px; }
+  .toc ol { margin: 6px 0; padding-left: 22px; }
+  .diagram-pre {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; overflow-x: auto; line-height: 1.45; font-size: 13px;
+  }
+  .foot { color: var(--muted); font-size: 0.85em; border-top: 1px solid var(--border); margin-top: 60px; padding-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>roce_stack 接口速查笔记
+  <span class="sub">控制面 / 用户数据面 / 重传缓冲面 / 网络面 / 统计计数 五类端口 + metaIntf / AXI4S 两种接口</span>
+</h1>
+
+<p><code>roce_stack</code> 是 Coyote/Lynx 侧对 HLS 生成的 RoCEv2 协议栈的 SV 顶层封装(含 iCRC 处理),
+其端口在 <a href="../roce-rtl-sim/rtl/coyote/roce_stack.sv">rtl/coyote/roce_stack.sv</a> 的 <code>module roce_stack</code> 中定义。</p>
+
+<p>本笔记按"<strong>控制面 / 用户数据面 / 重传缓冲面 / 网络面 / 统计计数</strong>"五类分别列出接口,
+并解释所用的两种自定义 SV 接口:<code>metaIntf</code> 与 <code>AXI4S</code>。</p>
+
+<ul>
+  <li>相关 TB 例化:<a href="../roce-rtl-sim/tb/tb_stage_b.sv">roce-rtl-sim/tb/tb_stage_b.sv</a>(L30–L80)</li>
+  <li>接口定义:
+    <ul>
+      <li><code>metaIntf</code> — <a href="../roce-rtl-sim/rtl/pkg/lynx_intf.sv">rtl/pkg/lynx_intf.sv</a>(L38–L92)</li>
+      <li><code>AXI4S</code> — <a href="../roce-rtl-sim/rtl/pkg/axi_intf.sv">rtl/pkg/axi_intf.sv</a>(L366–L410)</li>
+    </ul>
+  </li>
+  <li>payload struct(<code>req_t / dreq_t / ack_t</code>):<a href="../roce-rtl-sim/rtl/pkg/lynx_pkg.sv">rtl/pkg/lynx_pkg.sv</a>(L340–L380)</li>
+</ul>
+
+<div class="toc">
+<strong>目录</strong>
+<ol>
+  <li><a href="#s1">两种自定义 SV 接口</a></li>
+  <li><a href="#s2">控制面(metaIntf)</a></li>
+  <li><a href="#s3">用户数据面(AXI4S + req_t 描述符)</a></li>
+  <li><a href="#s4">重传缓冲面(AXI4S + 96b/32b metaIntf)</a></li>
+  <li><a href="#s5">网络面(AXI4S)</a></li>
+  <li><a href="#s6">统计计数(valid + 32 bit data)</a></li>
+  <li><a href="#s7">一张整体图</a></li>
+  <li><a href="#s8">为什么区分 metaIntf 与 AXI4S</a></li>
+  <li><a href="#s9">交叉参考</a></li>
+</ol>
+</div>
+
+<!-- ================================================================ -->
+<h2 id="s1">1. 两种自定义 SV 接口</h2>
+
+<h3>1.1 <code>metaIntf</code> — 通用元数据握手</h3>
+
+<pre><code>interface metaIntf #(parameter type STYPE = logic[63:0])
+    (input logic aclk, input logic aresetn);
+    logic  valid;
+    logic  ready;
+    STYPE  data;   // payload 类型由实例化时指定
+    modport s (input valid, output ready, input  data);
+    modport m (output valid, input  ready, output data);
+endinterface</code></pre>
+
+<ul>
+  <li>语义:一次握手传一个 struct 或位向量,<strong>没有 tlast/tkeep</strong>。</li>
+  <li>参数 <code>STYPE</code> 让同一个 interface 承载不同的 payload —— 常见形式是 <code>logic[N-1:0]</code> 的位向量或某个 <code>typedef struct packed</code>。</li>
+  <li>命名约定:<code>s_*</code> 端口是 slave(数据流入 DUT),<code>m_*</code> 是 master(数据流出 DUT)。</li>
+</ul>
+
+<h3>1.2 <code>AXI4S</code> — 标准 AXI-Stream</h3>
+
+<pre><code>interface AXI4S #(parameter AXI4S_DATA_BITS = ...);
+    logic [AXI4S_DATA_BITS-1:0]   tdata;   // 数据
+    logic [AXI4S_DATA_BITS/8-1:0] tkeep;   // byte-enable
+    logic  tlast;
+    logic  tvalid;
+    logic  tready;
+endinterface</code></pre>
+
+<ul>
+  <li>语义:<strong>多 beat 数据流</strong>,<code>tkeep</code> 表示尾节拍字节掩码,<code>tlast</code> 表示帧结束。</li>
+  <li><code>roce_stack</code> 里所有 <code>AXI4S</code> 都是 512 bit(每 beat 64 B)。</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="s2">2. 控制面(<code>metaIntf</code>)</h2>
+
+<p>一次握手一个 struct,用于 QP 配置、SQ 提交、CQ 通知。</p>
+
+<table>
+<tr><th>端口</th><th>metaIntf payload</th><th>方向</th><th>作用</th></tr>
+<tr><td><code>s_rdma_qp_interface</code></td><td><code>logic[183:0]</code></td><td>slave</td><td>写入 QP context(<code>qpContext</code>:qp_num / newState / remote_psn / local_psn / r_key / virtual_address)。由 HLS 内的 <code>qp_interface</code> 分发到 <code>state_table</code> 和 <code>msn_table</code></td></tr>
+<tr><td><code>s_rdma_conn_interface</code></td><td><code>logic[183:0]</code></td><td>slave</td><td>写入 QP 的对端连接信息(remote_ip、remote_qpn、remote_udp_port),落到 <code>conn_table</code></td></tr>
+<tr><td><code>s_rdma_sq</code></td><td><code>dreq_t</code>(两个 <code>req_t</code> 打包)</td><td>slave</td><td>Send Queue 请求提交。<code>dreq_t = {req_1(rd, local), req_2(wr, remote)}</code>,一次投递一个 RDMA 操作</td></tr>
+<tr><td><code>m_rdma_ack</code></td><td><code>ack_t</code>(32 bit)</td><td>master</td><td>完成通知(CQ)。注意是 <code>ack_t</code> 而非 <code>dack_t</code></td></tr>
+</table>
+
+<h3><code>qpContext</code> 184 bit 打包(源码:<code>third_party/fpga-network-stack/hls/rocev2/rocev2.hpp</code> 附近的 <code>qpContext</code>)</h3>
+
+<p>TB 侧写入示例见 <a href="../roce-rtl-sim/tb/tb_stage_b.sv">tb_stage_b.sv 的 <code>push_qp_ctx</code> / <code>push_conn</code> 任务</a>(L294–L309)。</p>
+
+<h3><code>dreq_t / req_t / ack_t</code></h3>
+
+<p>定义在 <a href="../roce-rtl-sim/rtl/pkg/lynx_pkg.sv">lynx_pkg.sv</a>(L340–L380):</p>
+
+<ul>
+  <li><code>req_t</code> 128 bit:<code>opcode / strm / mode / rdma / remote / host / dest / pid / last / vaddr / len / …</code></li>
+  <li><code>dreq_t</code> = <code>{req_1(rd, local), req_2(wr, remote)}</code>(read/local + write/remote 一对)</li>
+  <li><code>ack_t</code> 32 bit:<code>opcode / strm / remote / host / dest / pid / vfid / …</code></li>
+  <li><code>dack_t</code> = <code>{ack, last}</code>(本模块 CQ 用的是 <strong>裸 <code>ack_t</code></strong>,不带 last)</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="s3">3. 用户数据面(AXI4S + <code>req_t</code> 描述符)</h2>
+
+<p>用户应用(vFPGA / 上层逻辑)与 stack 之间的数据搬运。</p>
+
+<table>
+<tr><th>端口</th><th>类型</th><th>方向</th><th>作用</th></tr>
+<tr><td><code>m_rdma_rd_req</code></td><td><code>metaIntf&lt;req_t&gt;</code></td><td>master</td><td><strong>stack → 用户</strong>:请求用户提供 payload 的描述符(vaddr / len / last …)。<strong>只对 READ RESP 触发</strong>(Coyote/rdma_mux_retrans 语义)——WRITE payload 的取数不走这里</td></tr>
+<tr><td><code>m_rdma_wr_req</code></td><td><code>metaIntf&lt;req_t&gt;</code></td><td>master</td><td><strong>stack → 用户</strong>:告诉用户 "把 payload 放到这个 vaddr"(远端 WRITE 到达接收端时)</td></tr>
+<tr><td><code>s_axis_rdma_rd_req</code></td><td><code>AXI4S 512b</code></td><td>slave</td><td><strong>用户 → stack</strong>:WRITE 的 payload 输入(用户主动 push,见 <a href="../roce-rtl-sim/tb/tb_stage_b.sv">tb_stage_b.sv</a> L176–L196 的说明)</td></tr>
+<tr><td><code>s_axis_rdma_rd_rsp</code></td><td><code>AXI4S 512b</code></td><td>slave</td><td><strong>用户 → stack</strong>:READ 请求的响应 payload(收到 READ REQ 后由用户回填)</td></tr>
+<tr><td><code>m_axis_rdma_wr</code></td><td><code>AXI4S 512b</code></td><td>master</td><td><strong>stack → 用户</strong>:远端 RDMA WRITE 到达后,把 payload 落地到用户内存</td></tr>
+</table>
+
+<h3>Coyote 的一点关键约定</h3>
+
+<div class="note"><code>rdma_mux_retrans</code> 源码里的注释:<em>"WRITE 的 payload 不通过 <code>m_rdma_rd_req</code> 请求,用户侧应在提交 SQ 命令后<strong>自发</strong>把 payload 推入 <code>s_axis_rdma_rd_req</code>"</em>。
+TB 的 <code>push_payload()</code> 就是按这个约定实现的。</div>
+
+<!-- ================================================================ -->
+<h2 id="s4">4. 重传缓冲面(AXI4S + 96b/32b <code>metaIntf</code>)</h2>
+
+<p>模拟外挂 DDR/HBM,让 stack 在发出去以后能把 payload 存起来,遇到 NAK/超时时读回重传。
+命令/状态用的是 Xilinx datamover 的 96/32 bit 格式。</p>
+
+<table>
+<tr><th>端口</th><th>类型</th><th>方向</th><th>作用</th></tr>
+<tr><td><code>m_rdma_mem_rd_cmd</code></td><td><code>metaIntf&lt;logic[95:0]&gt;</code></td><td>master</td><td>stack → 缓冲:读命令(addr + len + ctl)</td></tr>
+<tr><td><code>m_rdma_mem_wr_cmd</code></td><td><code>metaIntf&lt;logic[95:0]&gt;</code></td><td>master</td><td>stack → 缓冲:写命令</td></tr>
+<tr><td><code>s_rdma_mem_rd_sts</code></td><td><code>metaIntf&lt;logic[31:0]&gt;</code></td><td>slave</td><td>缓冲 → stack:读状态</td></tr>
+<tr><td><code>s_rdma_mem_wr_sts</code></td><td><code>metaIntf&lt;logic[31:0]&gt;</code></td><td>slave</td><td>缓冲 → stack:写状态</td></tr>
+<tr><td><code>s_axis_rdma_mem_rd</code></td><td><code>AXI4S 512b</code></td><td>slave</td><td><strong>重传缓冲 → stack</strong>:把之前保存的 payload 读回来做重传</td></tr>
+<tr><td><code>m_axis_rdma_mem_wr</code></td><td><code>AXI4S 512b</code></td><td>master</td><td><strong>stack → 重传缓冲</strong>:把即将发出去的 payload stash 一份</td></tr>
+</table>
+
+<p>TB 里以字节数组 <code>rbuf[]</code> 作为重传缓冲的模型,配合 <code>mem_rd_cmd / mem_wr_cmd</code> 服务模型模拟 DDR。</p>
+
+<!-- ================================================================ -->
+<h2 id="s5">5. 网络面(AXI4S)</h2>
+
+<table>
+<tr><th>端口</th><th>类型</th><th>方向</th><th>作用</th></tr>
+<tr><td><code>s_axis_rx</code></td><td><code>AXI4S 512b</code></td><td>slave</td><td>从 UDP/IP 层收到的 RoCEv2 报文(含 BTH 及以下头部)</td></tr>
+<tr><td><code>m_axis_tx</code></td><td><code>AXI4S 512b</code></td><td>master</td><td>向 UDP/IP 层发送的 RoCEv2 报文</td></tr>
+<tr><td><code>local_ip_address</code></td><td><code>logic[31:0]</code></td><td>input</td><td>本地 IPv4 地址(供 iCRC 校验/伪首部使用)</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="s6">6. 统计计数(valid + 32 bit data)</h2>
+
+<p>一组独立的"事件计数器"输出,每个都是 <code>{valid, data[31:0]}</code> 的脉冲/最新值风格:</p>
+
+<table>
+<tr><th>信号</th><th>含义</th></tr>
+<tr><td><code>ibv_rx_pkg_count</code></td><td>收到的 RoCEv2 报文数</td></tr>
+<tr><td><code>ibv_tx_pkg_count</code></td><td>发出的 RoCEv2 报文数</td></tr>
+<tr><td><code>crc_drop_pkg_count</code></td><td>iCRC 校验失败丢包数</td></tr>
+<tr><td><code>psn_drop_pkg_count</code></td><td>PSN 检查失败丢包数</td></tr>
+<tr><td><code>retrans_count</code></td><td>触发的重传次数</td></tr>
+</table>
+
+<p>TB 里用 <code>always_ff</code> 把这些 pulse 锁存到 <code>r_cnt_*</code>,用于 phase 结束时统一打印。</p>
+
+<!-- ================================================================ -->
+<h2 id="s7">7. 一张整体图</h2>
+
+<pre class="diagram-pre">
+                          ┌──────────────────────────┐
+   host cfg               │                          │  ── m_axis_tx (512b) ──►  UDP/IP
+   ─── s_rdma_qp_iface ──►│                          │
+   ─── s_rdma_conn_iface─►│                          │◄── s_axis_rx (512b) ──   UDP/IP
+   ─── s_rdma_sq (dreq_t)►│      roce_stack (DUT)    │
+   ◄── m_rdma_ack (ack_t)─│                          │  m_rdma_rd_req  ────►  用户 (READ RESP 触发)
+                          │                          │  m_rdma_wr_req  ────►  用户 (远端 WRITE 落地)
+                          │                          │  s_axis_rdma_rd_req◄── 用户 (WRITE payload)
+                          │                          │  s_axis_rdma_rd_rsp◄── 用户 (READ resp payload)
+                          │                          │  m_axis_rdma_wr    ──► 用户 (对端 WRITE 落地)
+                          │                          │
+                          │                          │  m_rdma_mem_rd_cmd ──► 重传 buf
+                          │                          │  m_rdma_mem_wr_cmd ──► 重传 buf
+                          │                          │  s_rdma_mem_rd_sts ◄── 重传 buf
+                          │                          │  s_rdma_mem_wr_sts ◄── 重传 buf
+                          │                          │  s_axis_rdma_mem_rd◄── 重传 buf (重传读)
+                          │                          │  m_axis_rdma_mem_wr──► 重传 buf (发送 stash)
+                          └──────────────────────────┘
+                                                  ▲
+                                    统计计数: ibv_rx/tx_pkg_count, crc/psn_drop_pkg_count, retrans_count
+</pre>
+
+<!-- ================================================================ -->
+<h2 id="s8">8. 为什么区分 <code>metaIntf</code> 与 <code>AXI4S</code></h2>
+
+<ul>
+  <li><strong><code>metaIntf</code></strong> 适合"<strong>一次一条</strong>的控制消息":QP 上下文、SQ 请求、CQ ack、DMA 描述符、DMA 状态。
+    这些消息本质上是一个 struct,一 beat 传完,不需要 <code>tlast/tkeep</code>,用 <code>valid/ready + data</code> 就够。</li>
+  <li><strong><code>AXI4S</code></strong> 适合"<strong>多 beat 的字节流</strong>":网络报文、RDMA payload、重传缓冲搬运。
+    需要 <code>tkeep</code> 表尾节拍字节掩码,<code>tlast</code> 表帧结束。</li>
+</ul>
+
+<p>因此 <code>roce_stack</code> 的端口很自然地就分成:<strong>控制面 = metaIntf</strong> + <strong>数据/网络面 = AXI4S</strong> 两大风格,
+用户数据面上还额外挂了一组 <code>metaIntf&lt;req_t&gt;</code> 作为 AXI4S 的"描述符伴随通道"。</p>
+
+<!-- ================================================================ -->
+<h2 id="s9">9. 交叉参考</h2>
+
+<ul>
+  <li>QP 配置 / state_table 底层实现见 <a href="../roce-rtl-sim/rtl/hls/rocev2_top_qp_interface_0_s.v">rocev2_top_qp_interface_0_s.v</a>、<a href="../roce-rtl-sim/rtl/hls/rocev2_top_state_table_0_s.v">rocev2_top_state_table_0_s.v</a></li>
+  <li>HLS 源码:<a href="../third_party/fpga-network-stack/hls/ib_transport_protocol/">third_party/fpga-network-stack/hls/ib_transport_protocol/</a>
+    <ul>
+      <li><code>qp_interface</code> → <a href="../third_party/fpga-network-stack/hls/ib_transport_protocol/ib_transport_protocol.cpp">ib_transport_protocol.cpp</a> 的 <code>void qp_interface(...)</code></li>
+      <li><code>stateTableEntry</code> → <a href="../third_party/fpga-network-stack/hls/ib_transport_protocol/state_table.hpp">state_table.hpp</a></li>
+      <li><code>msn_table</code> → <a href="../third_party/fpga-network-stack/hls/ib_transport_protocol/msn_table.hpp">msn_table.hpp</a></li>
+    </ul>
+  </li>
+  <li>更宏观的 verbs / Coyote 关系:<a href="./verbs-coyote-platform.html">verbs-coyote-platform.html</a></li>
+</ul>
+
+<div class="foot">
+<p>WR-ZipGuard · Platform Stage · docs/roce_stack-interfaces.html(由 roce_stack-interfaces.md 转换)</p>
+</div>
+
+</main>
+</body>
+</html>

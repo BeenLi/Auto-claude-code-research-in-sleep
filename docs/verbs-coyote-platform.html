@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三层世界:verbs 栈 · Coyote shell · 本平台 — RDMA 抽象的重组与取舍</title>
+<style>
+  :root {
+    --bg: #fdfdfc;
+    --fg: #1f2328;
+    --muted: #57606a;
+    --accent: #0b5cad;
+    --accent2: #8b3fa8;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --bad: #c93c37;
+    --code-bg: #f4f5f7;
+    --border: #d8dee4;
+    --card: #ffffff;
+    --lv: #7cb0e0; --lc: #7ccdb8; --lp: #e7c168;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 80px;
+    font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.75; font-size: 16px;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.9em; border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-top: 40px; }
+  h1 .sub { display:block; font-size: 0.55em; color: var(--muted); font-weight: normal; margin-top: 6px; }
+  h2 { font-size: 1.45em; margin-top: 2.2em; border-left: 5px solid var(--accent); padding-left: 12px; }
+  h3 { font-size: 1.15em; margin-top: 1.8em; color: var(--accent); }
+  code, pre {
+    font-family: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    font-size: 0.92em;
+  }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; overflow-x: auto; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.94em; }
+  th, td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; vertical-align: top; }
+  th { background: #eef2f6; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .note, .warn-box, .evidence, .fix {
+    border-radius: 8px; padding: 12px 18px; margin: 1.2em 0; border: 1px solid;
+  }
+  .note      { background: #eef6fd; border-color: #b6d5f0; }
+  .warn-box  { background: #fff8e6; border-color: #eed9a0; }
+  .evidence  { background: #f0faf2; border-color: #b5dfc0; }
+  .fix       { background: #fdf1f0; border-color: #ecc2c0; }
+  .note::before      { content: "💡 "; }
+  .warn-box::before  { content: "⚠️ "; }
+  .evidence::before  { content: "🔬 仓库实证  "; font-weight: bold; color: var(--ok); }
+  .fix::before       { content: "✏️ 案例  "; font-weight: bold; color: var(--bad); }
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 28px; margin-top: 24px; }
+  .toc ol { margin: 6px 0; padding-left: 22px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .tag { display: inline-block; border-radius: 999px; padding: 0 10px; font-size: 0.8em; color: #fff; margin-right: 6px; }
+  .tv { background: var(--lv); } .tc { background: var(--lc); } .tp { background: var(--lp); color:#5c4400; }
+  .filepath { color: var(--accent2); font-weight: 500; }
+  figure { margin: 1.5em 0; text-align: center; }
+  figcaption { color: var(--muted); font-size: 0.88em; margin-top: 8px; }
+  details { border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; margin: 1em 0; background: var(--card); }
+  summary { cursor: pointer; font-weight: bold; color: var(--accent); }
+  .foot { color: var(--muted); font-size: 0.85em; border-top: 1px solid var(--border); margin-top: 60px; padding-top: 16px; }
+  svg text { font-family: "PingFang SC", sans-serif; }
+  .diagram { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 680px; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>三层世界:verbs 栈 · Coyote shell · 本平台
+  <span class="sub">RDMA 抽象的重组与取舍 —— 从 fns txMeta 看"哪些机制被砍掉了、谁在哪一层补回来"</span>
+</h1>
+
+<p><span class="tag tv">verbs</span>标准 RDMA 软件栈(libibverbs + 商品 RNIC,如 CX-5)&nbsp;&nbsp;
+<span class="tag tc">Coyote</span>ETH Zurich 完整 PCIe shell(vFPGA + 虚拟内存 + 调度)&nbsp;&nbsp;
+<span class="tag tp">本平台</span>VCU118 裸 CMAC + fns RoCEv2 核 + 自研 doorbell(Stage B–E)</p>
+
+<p>本文整理自 Stage B 代码导览讨论(2026-07-22),回答一个贯穿性问题:<strong>fns 的 SQ 接口(txMeta)相比 verbs 规定的 WQE 少了什么?这些"少掉的机制"在完整 Coyote shell 里以什么形态存在?在我们的裸机平台上又由谁兜底?</strong>每一处对照都尽量给出仓库内的代码锚点(标 🔬 的为本仓库亲手验证;verbs / Mellanox / Coyote 论文侧的描述为公开知识,标注于文末)。</p>
+
+<div class="toc">
+<strong>目录</strong>
+<ol>
+  <li><a href="#s1">三层全景对照</a></li>
+  <li><a href="#s2">词汇精确化:WR、WQE、doorbell 是三个不同的东西</a></li>
+  <li><a href="#s3">txMeta ↔ verbs WQE 字段逐项对照</a></li>
+  <li><a href="#s4">dreq_t 的双端点设计与 B2 案例:跨世界契约为什么会断</a></li>
+  <li><a href="#s5">保护机制的三种形态:钥匙 → 地图 → 构造即安全</a></li>
+  <li><a href="#s6">完成机制的三种形态:CQE+cookie → 计数器 → 32 位 ack_t</a></li>
+  <li><a href="#s7">Scatter/Gather:被"搬走"而不是被"删掉"的自由度</a></li>
+  <li><a href="#s8">取舍总结:为什么敢砍、代价是什么、谁兜底</a></li>
+  <li><a href="#s9">附:证据锚点与知识来源</a></li>
+  <li><a href="#s10">L2 三条路与 CX-5 站落点(2026-07-23 决策)</a></li>
+</ol>
+</div>
+
+<!-- ================================================================ -->
+<h2 id="s1">§1 三层全景对照</h2>
+
+<p>先给全图。同一件事(把一段本地数据写进远端内存)在三层世界里的机制分布:</p>
+
+<table>
+<tr><th>维度</th><th><span class="tag tv">verbs</span>标准栈</th><th><span class="tag tc">Coyote</span>完整 PCIe shell</th><th><span class="tag tp">本平台</span>VCU118 裸机</th></tr>
+<tr><td>命令格式</td><td>WR(<code>ibv_send_wr</code>)→ 厂商 WQE 写入 SQ 环</td><td><code>dreq_t</code>(256b 双端点)→ 打包成 fns <code>txMeta</code>(248b)</td><td>同 Coyote 格式;由自研 doorbell(L0 寄存器 / P3 起 L1 SQ 环)产生</td></tr>
+<tr><td>命令粒度</td><td><strong>消息级</strong>(HCA 传输层自动切 FIRST/MID/LAST)</td><td>消息级(shell 的 <code>dreq_rdma_parser_wr</code> 切分后喂报文级 SQ)</td><td><strong>报文级</strong>:doorbell 内置切分器(Stage B 发现 B4)</td></tr>
+<tr><td>本地内存保护</td><td>MR 注册 + lkey 逐 WR 校验("钥匙")</td><td>虚拟内存:TLB 翻译 + 缺页,按 <code>{vfid,pid}</code> 隔离("地图")</td><td>固定 URAM staging,单 QP 单租户("构造即安全")</td></tr>
+<tr><td>远端内存保护</td><td>rkey 校验(RETH 携带,接收方验)</td><td>RETH rkey 名义存在;实际防线是落地时的 MMU 翻译</td><td>同左,且无 MMU——RETH VA 直达放置命令(Stage B rx_loop 实测)</td></tr>
+<tr><td>payload 获取</td><td>HCA 按 SGE 自主 DMA gather</td><td rowspan="1" colspan="2"><strong>用户侧主动推流</strong>(B3):提交 WR 后立刻把数据推上 <code>s_axis_rdma_rd_req</code>;引擎不会来"要"WRITE 数据</td></tr>
+<tr><td>Scatter/Gather</td><td><code>sg_list[] + num_sge</code>,逐 SGE 带 lkey</td><td colspan="2">单一 <code>laddr+len</code>;拼接自由度移到推流机实现里(§7)</td></tr>
+<tr><td>完成通知</td><td>CQE 队列 + <code>wr_id</code> cookie,可乱序对号</td><td><code>cq_*</code> 接口 + 按 pid 的 <code>checkCompleted</code> 计数器,轮询</td><td>32 位 <code>ack_t</code>(last 门控,B8)→ Stage C 起锁存为 AXI-Lite CQE 寄存器</td></tr>
+<tr><td>QP 传输参数</td><td><code>ibv_modify_qp</code>(PSN/对端 QPN/地址向量)+ 每 WR 带 rkey</td><td colspan="2">三表:<code>qp_interface</code>(state/PSN/<strong>rkey</strong>/vaddr)+ <code>conn_interface</code>(对端 IP/QPN/UDP 端口)+ SQ 命令(每次变的部分)</td></tr>
+<tr><td>线上行为(PSN/ACK/重传/ICRC)</td><td>RNIC 固件/硬件</td><td colspan="2">fns HLS 引擎(rocev2)+ Coyote SV 包装(icrc.sv 物化 TX ICRC;RX 校验被分支禁用,B5)</td></tr>
+</table>
+
+<p>一句话概括三层的关系:<strong>verbs 把"描述一次搬运"做成一套富对象(WR/SGE/MR/CQE);Coyote 把它拆散重装成 OS 风格服务(虚拟内存、进程隔离、计数器);本平台在单租户前提下进一步降级为"契约 + 构造"。</strong>机制没有凭空消失——它们要么改变了形态,要么把责任推给了上游生产者。</p>
+
+<!-- ================================================================ -->
+<h2 id="s2">§2 词汇精确化:WR、WQE、doorbell 是三个不同的东西</h2>
+
+<p>这三个词常被混用,严格区分后,很多项目里的设计(乃至 bug)会突然清晰:</p>
+
+<ul>
+  <li><strong>WR(Work Request)</strong>:<em>API 层</em>的请求对象,即 <code>ibv_send_wr</code> 结构体。活在用户内存里,可链成链表(<code>*next</code>),生命周期到 <code>ibv_post_send()</code> 返回为止。verbs 标准规定,跨厂商可移植。</li>
+  <li><strong>WQE(Work Queue Element)</strong>:<em>队列层</em>的硬件可消费编码。厂商私有二进制格式(如 mlx5 的 ctrl 段 + rdma 段 + data 段),由驱动写进 QP 的 SQ <strong>环形缓冲</strong>(DMA 可达内存),网卡自己 DMA 取走。</li>
+  <li><strong>doorbell</strong>:一次 MMIO 寄存器写,作用只有一个——告诉网卡"环里有新 WQE 了,去取"。</li>
+</ul>
+
+<p>所以 <code>ibv_post_send()</code> 内部 = <strong>WR→WQE 翻译 + 写环 + 敲铃</strong> 三件事。对应到本项目:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 700 190" xmlns="http://www.w3.org/2000/svg" font-size="12">
+  <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#57606a"/></marker></defs>
+  <text x="20" y="30" font-weight="bold" fill="#0b5cad">verbs:</text>
+  <rect x="90" y="12" width="140" height="30" rx="6" fill="#eef6fd" stroke="#7cb0e0"/><text x="160" y="32" text-anchor="middle">WR (ibv_send_wr)</text>
+  <rect x="300" y="12" width="160" height="30" rx="6" fill="#eef6fd" stroke="#7cb0e0"/><text x="380" y="32" text-anchor="middle">WQE(厂商格式,SQ环)</text>
+  <rect x="530" y="12" width="150" height="30" rx="6" fill="#eef6fd" stroke="#7cb0e0"/><text x="605" y="32" text-anchor="middle">HCA DMA 取走执行</text>
+  <line x1="230" y1="27" x2="296" y2="27" stroke="#57606a" marker-end="url(#ar)"/><text x="263" y="20" text-anchor="middle" fill="#57606a" font-size="10">post_send 翻译</text>
+  <line x1="460" y1="27" x2="526" y2="27" stroke="#57606a" marker-end="url(#ar)"/><text x="493" y="20" text-anchor="middle" fill="#57606a" font-size="10">doorbell</text>
+
+  <text x="20" y="100" font-weight="bold" fill="#8b3fa8">本平台:</text>
+  <rect x="90" y="82" width="140" height="30" rx="6" fill="#f7f0fa" stroke="#c98ad4"/><text x="160" y="102" text-anchor="middle">dreq_t(Coyote 命令)</text>
+  <rect x="300" y="82" width="160" height="30" rx="6" fill="#f7f0fa" stroke="#c98ad4"/><text x="380" y="102" text-anchor="middle">txMeta(248b 平铺)</text>
+  <rect x="530" y="82" width="150" height="30" rx="6" fill="#f7f0fa" stroke="#c98ad4"/><text x="605" y="102" text-anchor="middle">fns 引擎取走执行</text>
+  <line x1="230" y1="97" x2="296" y2="97" stroke="#57606a" marker-end="url(#ar)"/><text x="263" y="90" text-anchor="middle" fill="#57606a" font-size="10">roce_stack 打包</text>
+  <line x1="460" y1="97" x2="526" y2="97" stroke="#57606a" marker-end="url(#ar)"/><text x="493" y="90" text-anchor="middle" fill="#57606a" font-size="10">sq valid/ready</text>
+
+  <text x="90" y="155" fill="#57606a" font-size="11">dreq_t 站在 WR 的位置(通用 API 面);txMeta 站在 WQE 的位置(引擎方言);</text>
+  <text x="90" y="173" fill="#57606a" font-size="11">roce_stack.sv 的打包 always_comb 就是 post_send 里"翻译"那一步;Stage C doorbell 补的是"写环 + 敲铃"。</text>
+</svg>
+<figcaption>两个世界的投递链一一对应。B2 用这套词汇重新表述就一句话:<strong>post_send 的 WR→WQE 翻译代码写错了字段偏移。</strong></figcaption>
+</figure>
+
+<div class="note">项目里"SQ""doorbell""WQE"这些词的出处正是 verbs 世界;但要时刻记得本平台的"WQE"(txMeta)在抽象层级上比 verbs WQE <em>低一级</em>(报文级 vs 消息级,见 §3 差异①)。</div>
+
+<!-- ================================================================ -->
+<h2 id="s3">§3 txMeta ↔ verbs WQE 字段逐项对照</h2>
+
+<p>fns 的 SQ 命令格式声明于 <span class="filepath">third_party/fpga-network-stack/hls/ib_transport_protocol/ib_transport_protocol.hpp:220</span>:</p>
+
+<pre><code>struct txMeta {
+    ibOpCode    op_code;   // enum → 32 位
+    ap_uint&lt;16&gt; qpn;       // Coyote 复合编码 {vfid, pid}
+    ap_uint&lt;1&gt;  host;  ap_uint&lt;1&gt; lst;  ap_uint&lt;6&gt; offs;
+    ap_uint&lt;64&gt; raddr;     // 声明序:raddr 在 laddr 之前(B2 的关键)
+    ap_uint&lt;64&gt; laddr;
+    ap_uint&lt;32&gt; len;  ap_uint&lt;32&gt; imm;      // 合计 248 位
+};</code></pre>
+
+<table>
+<tr><th>verbs <code>ibv_send_wr</code></th><th>fns <code>txMeta</code></th><th>差异说明</th></tr>
+<tr><td><code>opcode</code>(消息级,<code>IBV_WR_RDMA_WRITE</code>)</td><td><code>op_code</code></td><td><strong>层级不同</strong>:txMeta 用 IBTA <em>线上 BTH opcode</em>(0x0A=WRITE_ONLY、0x06=FIRST、0x08=LAST,ACK=0x11)</td></tr>
+<tr><td><code>sg_list[] + num_sge</code></td><td><code>laddr + len</code></td><td>单一平坦缓冲,无散布列表(§7)</td></tr>
+<tr><td><code>sg_list[].lkey</code></td><td>—</td><td>无 lkey / MR 保护概念(§5)</td></tr>
+<tr><td><code>wr.rdma.remote_addr</code></td><td><code>raddr</code></td><td>对应;但高 16 位被 Coyote 征用为 <code>{10'b0, strm, dest}</code>,会原样出现在线上 RETH VA 高位(§4)</td></tr>
+<tr><td><code>wr.rdma.rkey</code></td><td>—</td><td><strong>搬进 QP 上下文表</strong>:一个 QP 绑一个 rkey,发帧时查表盖进 RETH</td></tr>
+<tr><td><code>imm_data</code></td><td><code>imm</code></td><td>对应(包装层用 <code>{req_2.offs[3:0], req_2.len}</code> 拼凑,隐契约)</td></tr>
+<tr><td><code>wr_id</code>(完成 cookie)</td><td>—</td><td>无;完成只带 pid,靠顺序对应(§6)</td></tr>
+<tr><td><code>send_flags</code>(SIGNALED/INLINE/FENCE)</td><td>约等于 <code>lst</code> 一个位</td><td><code>lst</code> 粗略对应 SIGNALED:不置位则不计完成、不发 cq ack(lynx_pkg.sv:348 注释)</td></tr>
+<tr><td>(post 到哪个 QP,不在 WR 里)</td><td><code>qpn</code> 显式字段</td><td>且是 <code>{vfid,pid}</code> 复合编码,不是线上 QPN(经 conn 表翻译)</td></tr>
+<tr><td>—</td><td><code>host / offs</code></td><td>verbs 没有的 Coyote 内部管线字段;<code>offs</code> 是流控盖的重传槽号(rdma_flow.sv:130)</td></tr>
+</table>
+
+<h3>三个实质性差异,各连着一个 Stage B 发现</h3>
+
+<p><strong>差异① 抽象层级降一级:消息 → 报文(→ 发现 B4)。</strong>verbs WQE 说"把这 8KB 写过去",HCA 传输层自己切报文;txMeta 的 opcode 直接就是线上报文 opcode,于是 &gt;PMTU 切分成了 <em>SQ 生产者的职责</em>。Stage B 的 write8k 用例必须下发 WRITE_FIRST(4096)+WRITE_LAST(4096) 两条预切分命令,直接喂 8KiB WRITE_ONLY 会产出协议非法帧。且 FIRST 帧的 RETH.DMALen 是<em>本命令长度</em>(4096)而非 IBTA 语义的总消息长度(8192)——与严格接收方(CX-5)互操作时的观察项。</p>
+
+<p><strong>差异② 稳定字段搬进"三表"(→ Stage A 发现 5 / 三表语义)。</strong>verbs 把 rkey 放进每条 WR(一个 QP 可访问多个远端 MR);fns 简化为一 QP 一 rkey,连同 PSN、对端信息一起进配置表。verbs 里分散在 <code>ibv_modify_qp</code> 和每条 WR 里的信息,fns 重新分配为:</p>
+
+<pre><code>qp_interface   {vaddr, rkey, lpsn, rpsn, qpn, state}   ← rkey 在这!≈ modify_qp 的传输参数
+conn_interface {udp, rip, rqpn, qpn}                    ← ≈ 地址向量 / 路径信息
+txMeta         {opcode, qpn, laddr, raddr, len, imm}    ← 只剩每次都变的部分</code></pre>
+
+<p><strong>差异③ 保护/完成机制整体缺席(→ §5 §6)。</strong>无 MR、无 lkey/rkey 本地校验、无 wr_id、无 SG。fns 实现的是 <em>RC 传输层的线上行为</em>(PSN/ACK/重传/ICRC),verbs 的资源管理层由使用者兜底——完整 Coyote 用 shell 兜,本平台用 doorbell + 构造兜。</p>
+
+<div class="evidence">TB 用线上 opcode 直接下命令并得到教科书反应:<span class="filepath">roce-rtl-sim/tb/tb_stage_b.sv:381-392</span>(0x06/0x08/0x0A);回灌 ACK opcode=0x11、PSN 跳变得到 AETH syndrome 0x60 的 NAK(Stage B 报告 §5.4)。</div>
+
+<!-- ================================================================ -->
+<h2 id="s4">§4 dreq_t 的双端点设计与 B2 案例</h2>
+
+<h3>4.1 一条命令,两个端点描述符</h3>
+
+<p>Coyote 的 SQ 是<em>通用</em>命令口(本地拷贝/卸载/TCP/RDMA 同一格式),世界观是"任何搬运有两个端点,各配一份完整描述符"(<span class="filepath">roce-rtl-sim/rtl/pkg/lynx_pkg.sv:362-365</span>):</p>
+
+<pre><code>typedef struct packed {
+    req_t req_1; // rd, local   ← 本地端:数据从哪来(WRITE 时 = staging laddr)
+    req_t req_2; // wr, remote  ← 远端:数据到哪去(WRITE 时 = raddr → RETH VA)
+} dreq_t;</code></pre>
+
+<p>TB 的构造一目了然(<span class="filepath">roce-rtl-sim/tb/tb_stage_b.sv:311-330</span>):填好 <code>req_1</code> 后整体复制给 <code>req_2</code>,再只改 <code>vaddr</code>。"local/remote"的分工恒定,变的只是读写方向——支持 RDMA READ 时填法不变。</p>
+
+<p>包装层把 256 位 <code>dreq_t</code> <em>压</em>成 248 位 txMeta 时,从两半各摘所需;远端地址 64 位中只有 48 位是真地址,<strong>高 16 位被征用为 <code>{10'b0, strm, dest}</code></strong> 并原样上线(RETH VA 高位)——对端 shell 靠它决定数据落到哪条流。这就是 RADDR 签名值从 64 位重新注册为 48 位(0x334455667788)的原因。</p>
+
+<h3>4.2 B2 案例:一个 struct 身上的两套顺序</h3>
+
+<div class="fix"><strong>B2:laddr/raddr 在包装层与 HLS 之间互换。</strong>症状:帧其余 116 字节全对,唯 RETH VA 全零。任何编译器、lint、单侧仿真都不报警——类型全对(都是 64 位)、握手全对。</div>
+
+<p>根因是同一个 struct 同时存在两套"顺序",两个世界各信了一套:</p>
+
+<pre><code>struct txMeta {
+    ...
+    ap_uint&lt;64&gt; raddr;     // ① 声明序:raddr 在前 → 物理布局 [119:56]
+    ap_uint&lt;64&gt; laddr;     //          laddr 在后 → 物理布局 [183:120]
+    ...
+    txMeta(..., ap_uint&lt;64&gt; laddr, ap_uint&lt;64&gt; raddr, ...)   // ② 参数序:laddr 在前!
+        : ..., raddr(raddr), laddr(laddr), ... {}             // ③ 按"名字"赋值
+};</code></pre>
+
+<table>
+<tr><th>世界</th><th>信息靠什么传递</th><th>结果</th></tr>
+<tr><td>csim(C++)</td><td><strong>名字</strong>:构造函数按名字赋值(③),引擎按名字取 <code>meta.raddr</code></td><td>参数序②再乱也永远正确 → Stage A 全绿,雷安然埋着</td></tr>
+<tr><td>RTL(综合后)</td><td><strong>位号</strong>:名字蒸发,只剩 <code>TDATA[247:0]</code>;csynth 按声明序①解码(先声明在低位)</td><td>上游 Coyote 手工打包时错把参数序②当字段顺序 → laddr 的值装进了 [119:56]</td></tr>
+</table>
+
+<p>于是引擎从 [119:56] 解出的"raddr"其实是 laddr(=0),RETH VA 全零。修复即本仓库 <span class="filepath">roce-rtl-sim/rtl/coyote/roce_stack.sv:100-105</span> 的 <code>STAGE-B FIX</code>:按声明序回装。</p>
+
+<div class="warn-box"><strong>三种位序约定同场,是这类 bug 的温床:</strong>Vitis HLS 聚合(先声明在<em>低位</em>)、SV packed struct(先声明在<em>高位</em>)、Coyote 手工按位偏移。跨语言位级契约的唯一权威是"决定物理布局的那套规则";参数序、注释、变量名等源码便利层<strong>没有约束力</strong>。Stage C 规范:打包一律从声明序推导,最好直接对照 csynth 生成的解码位切片,并用签名值回归(给 raddr/laddr 各喂独一无二的值,看帧里各自落在哪)。</div>
+
+<div class="note">顺带解释布局里的"空洞":<code>ibOpCode</code> 是 enum → 占 32 位,所以 opcode 只用 [4:0]、qpn 却从 bit 32 开始——读打包代码时的 [31:5] 空段不是 bug,是 enum 填充。</div>
+
+<!-- ================================================================ -->
+<h2 id="s5">§5 保护机制的三种形态:钥匙 → 地图 → 构造即安全</h2>
+
+<table>
+<tr><th></th><th><span class="tag tv">verbs</span>"钥匙"</th><th><span class="tag tc">Coyote</span>"地图"</th><th><span class="tag tp">本平台</span>"构造"</th></tr>
+<tr><td>机制</td><td>MR 注册产生 lkey/rkey;每次访问验钥匙</td><td>真·虚拟内存:<code>getMem</code> 映射 → 驱动填 shell 里的 TLB;DMA 前做 vaddr→PA 翻译;未映射 → 缺页由驱动处理</td><td>固定 URAM staging 物理缓冲;单 QP 单租户;地址空间就那么大</td></tr>
+<tr><td>隔离单位</td><td>PD(保护域)</td><td><code>{vfid, pid}</code>:每 vFPGA 区域 × 每 Coyote 线程一个地址空间(HPID 跟着请求走)</td><td>无第二租户,无需隔离</td></tr>
+<tr><td>拒绝形式</td><td>校验失败 → NAK(Remote Access Error)</td><td>TLB 无翻译 → 缺页/失败</td><td>不存在拒绝路径;越界即回卷(TB 模型里 <code>&amp; (MEM_BYTES-1)</code>)</td></tr>
+</table>
+
+<p>两个语义要点:</p>
+<ul>
+<li><strong>rkey 在线上是"摆设化"的</strong>:协议要求 RETH 携带 rkey,fns 发送侧从 QP 表查出盖章;但接收侧的实际防线不是验钥匙——完整 Coyote 里是落地时的 MMU 翻译,本平台则完全无校验(Stage B rx_loop 实测:放置命令的 vaddr 就是 RETH VA 原文,<code>roce_stack</code> 层不做任何检查)。</li>
+<li><strong>与 B5 同构</strong>:RX 侧 ICRC 校验也被分支硬编码禁用(<span class="filepath">third_party/fpga-network-stack/hls/crc/crc.hpp:38</span> 无条件 <code>#define DISABLE_CRC_CHECK</code>)。环回实验无碍(两端都是自己),接商品 RNIC 时对端会验我们的 TX(没问题),但我们的 RX 不设防——保护降级是这条分支的<em>一贯</em>姿态,不是孤例。</li>
+</ul>
+
+<div class="evidence">Coyote 侧证据(渲染包中保留的类型参数):<span class="filepath">roce-rtl-sim/rtl/pkg/lynx_pkg.sv:84-96</span> 的 TLB 两级页表参数(<code>TLB_S_ORDER=10</code> 小页 / <code>TLB_L_ORDER=9</code> 大页 / <code>N_TLB_ACTV=16</code>)、<span class="filepath">lynx_pkg.sv:114</span> 的 <code>HPID_BITS=32</code>。这些类型能被渲染出来,本身就说明完整 shell 的虚拟内存服务是一等公民。</div>
+
+<!-- ================================================================ -->
+<h2 id="s6">§6 完成机制的三种形态:CQE+cookie → 计数器 → 32 位 ack_t</h2>
+
+<table>
+<tr><th></th><th><span class="tag tv">verbs</span></th><th><span class="tag tc">Coyote</span></th><th><span class="tag tp">本平台</span></th></tr>
+<tr><td>形态</td><td>CQE 队列条目,携带 <code>wr_id</code> cookie</td><td><code>cq_*</code> 接口 + 按 pid 的 <code>checkCompleted</code> 计数器</td><td><code>m_rdma_ack</code> 上的 32 位 <code>ack_t</code>(<strong>last 门控</strong>入队,B8)</td></tr>
+<tr><td>对号方式</td><td>cookie 乱序对号</td><td>"发了几个 / 完成了几个"顺序对应</td><td>同左;Stage C 起锁存为 AXI-Lite CQE 读回寄存器,布局按 <code>ack_t</code></td></tr>
+<tr><td>触发粒度</td><td>SIGNALED 标志逐 WR 控制</td><td colspan="2"><code>last</code> 位 = "要不要计一次完成":不置位则流尾无 tlast、不增计数、不发 cq ack(<span class="filepath">lynx_pkg.sv:348</span> 注释原文)</td></tr>
+</table>
+
+<div class="warn-box"><strong>B8 的教训:</strong><code>rdma_flow</code> 的 CQ 队列只搬 32 位 ack 本体、由 <code>data.last</code> 门控入队(<span class="filepath">roce-rtl-sim/rtl/coyote/rdma_flow.sv:143-145</span>)。TB 最初按 33 位 <code>dack_t</code> 解读,所有字段整体错 1 位。设计 CQE 读回寄存器时按 <code>ack_t</code> 布局,别按 <code>dack_t</code>。</div>
+
+<p>另一个容易踩的形态差异:fns 的五个调试计数器(tx/rx/crc_drop/psn_drop/retrans)是 <strong><code>ap_vld</code> 脉冲语义</strong>——值只在 valid 拍有效。TB 必须锁存(<span class="filepath">roce-rtl-sim/tb/tb_stage_b.sv:55-61</span>),上板后同理要用 AXI-Lite 寄存器锁存;且 crc_drop 在本分支恒 0(B5),文档必须加注。</p>
+
+<!-- ================================================================ -->
+<h2 id="s7">§7 Scatter/Gather:被"搬走"而不是被"删掉"的自由度</h2>
+
+<p>verbs 的 <code>sg_list</code> 是 <code>ibv_sge {addr, length, lkey}</code> 数组,<code>num_sge</code> 为项数,语义随方向而变:</p>
+<ul>
+<li><strong>发送 = gather(聚集)</strong>:线上一条消息 = 各段本地缓冲按序拼接。典型:应用头在缓冲 A、payload 在缓冲 B,网卡发送时自己按序读两处拼成连续消息——零拷贝。</li>
+<li><strong>接收 = scatter(散布)</strong>:入帧按序填进列出的各段缓冲。</li>
+<li>每个 SGE 自带 lkey(各缓冲可属不同 MR)——"钥匙"模型的一贯性。</li>
+</ul>
+
+<p><strong>fns 为什么敢砍成恒 num_sge=1?因为数据接口是流式的。</strong>payload 不是引擎去内存里各处捡,而是用户一拍一拍<em>推</em>进来的(B3:提交 WR 后必须立刻主动推流,<code>rdma_mux_retrans</code> 对 WRITE 只登记序列+发重传缓冲写命令,<code>m_rdma_rd_req</code> 仅在 READ 响应时发出;Coyote 源码注释原话:"Shouldn't it be automatically delivered to the stack?")。在流式世界里 gather 是伪需求——<strong>谁产生这条流,谁就有机会在推流之前把任意几块内存拼好</strong>。</p>
+
+<div class="note"><strong>对 Stage C / P4 的设计输入:</strong>SG 的自由度没有消失,只是从"WQE 里的描述符列表"搬进了"推流机的实现"。将来 codec 场景若需"压缩头 + 压缩数据"两段拼接发送,不用改 SQ 格式——doorbell 的推流控制器按序读两个 staging 区间即可,你自己就是 gather 引擎。</div>
+
+<!-- ================================================================ -->
+<h2 id="s8">§8 取舍总结:为什么敢砍、代价是什么、谁兜底</h2>
+
+<h3>8.1 砍的理由(每条都有前提)</h3>
+<table>
+<tr><th>被砍机制</th><th>敢砍的前提</th><th>形态转移到</th></tr>
+<tr><td>lkey/MR 校验</td><td>生产者可信(自家 shell / 自家 doorbell),单租户</td><td>Coyote:TLB;本平台:固定 staging 构造</td></tr>
+<tr><td>逐 WR rkey</td><td>一个 QP 只对一个远端缓冲区(应用模式简单)</td><td>QP 上下文表(一 QP 一 rkey)</td></tr>
+<tr><td>HCA 切分器</td><td>SQ 生产者愿意遵守"报文级契约"</td><td>Coyote:shell 的 <code>dreq_rdma_parser_wr</code>;本平台:doorbell 内置切分器(B4)</td></tr>
+<tr><td>SG 列表</td><td>数据通路是流式的</td><td>推流机实现(§7)</td></tr>
+<tr><td>CQE + wr_id</td><td>完成天然按序(RC 顺序语义 + 单飞/浅流水)</td><td>计数器 / 32 位 ack_t(B8)</td></tr>
+<tr><td>RX ICRC 校验</td><td>(存疑——更像分支的省事之举,B5)</td><td>无;接商品 RNIC 时 RX 不设防,需知情</td></tr>
+</table>
+
+<p>共同的动机是 FPGA 现实:逐 WR 校验逻辑、TLB、CQE ring 都是面积与时序;fns 的目标是把 <em>RC 传输层数据通路</em>做进可综合的 HLS,资源管理留给载体。这与本平台"数据通路原型优先"的目标一致。</p>
+
+<h3>8.2 代价:契约取代校验,而契约没有机器检查</h3>
+
+<p>砍掉运行时校验后,正确性靠<strong>约定</strong>维持——而约定散落在结构体声明序、打包代码、源码注释里,编译器和仿真器都不替你检查。Stage B 抓获的三条缝(B2 打包序、B3 推流契约、B4 切分契约)全部位于 fns 与 Coyote 的交界面上,<em>单独测任何一方都测不出来</em>。这正是 Stage B 作为独立阶段存在的理由,也是三件补偿性工程的由来:</p>
+<ol>
+<li><strong>手册化规范</strong>:打包以声明序为准;WQE 提交后立刻推流;大 WR 预切分 ≤PMTU;CQE 按 ack_t 布局(Stage B 报告 §7 移交清单)。</li>
+<li><strong>签名值回归</strong>:每个字段喂独一无二的值,帧内容逐字节对拍 golden(check_golden_icrc.py 入库复用)。</li>
+<li><strong>独立参考实现</strong>:ICRC 用零共同血统的 30 行 Python 双算互证;它还能构造电路造不出的"合法坏帧"(负测试)。</li>
+</ol>
+
+<h3>8.3 谁兜底:doorbell 的真实身份</h3>
+
+<p>把 §1–§7 收拢成一句话:<strong>本平台的 doorbell 不是 verbs 的 <code>post_send</code>,而是"post_send + HCA 传输层切分器 + 三表管理者 + gather 推流机"四合一。</strong>它要补的正是 txMeta 与真 verbs WQE 之间的全部差距——这份差距清单,就是 Stage C 的需求规格。</p>
+
+<!-- ================================================================ -->
+<h2 id="s9">§9 附:证据锚点与知识来源</h2>
+
+<h3>9.1 仓库实证(本仓库可直接打开验证)</h3>
+<table>
+<tr><th>断言</th><th>锚点</th></tr>
+<tr><td>txMeta 声明序 raddr 在前 / 构造函数参数序相反</td><td><span class="filepath">third_party/fpga-network-stack/hls/ib_transport_protocol/ib_transport_protocol.hpp:220</span></td></tr>
+<tr><td>STAGE-B FIX:按声明序回装 raddr/laddr;高 16 位征用 {strm,dest}</td><td><span class="filepath">roce-rtl-sim/rtl/coyote/roce_stack.sv:100-105</span></td></tr>
+<tr><td>dreq_t 双端点定义(rd,local / wr,remote)</td><td><span class="filepath">roce-rtl-sim/rtl/pkg/lynx_pkg.sv:362-365</span></td></tr>
+<tr><td>last 位 → checkCompleted / cq_* 语义</td><td><span class="filepath">roce-rtl-sim/rtl/pkg/lynx_pkg.sv:348</span>(注释原文)</td></tr>
+<tr><td>Coyote shell TLB / HPID 类型参数</td><td><span class="filepath">roce-rtl-sim/rtl/pkg/lynx_pkg.sv:84-96, 114</span></td></tr>
+<tr><td>三表编程(qp / conn / SQ)与签名值</td><td><span class="filepath">roce-rtl-sim/tb/tb_stage_b.sv:294-335, 373-374</span></td></tr>
+<tr><td>B3 主动推流契约 + Coyote 困惑注释</td><td><span class="filepath">roce-rtl-sim/tb/tb_stage_b.sv:176-196</span>;<span class="filepath">roce-rtl-sim/rtl/coyote/rdma_mux_retrans.sv:107</span></td></tr>
+<tr><td>B4 预切分(FIRST/LAST 两条命令)</td><td><span class="filepath">roce-rtl-sim/tb/tb_stage_b.sv:377-389</span></td></tr>
+<tr><td>B5 RX ICRC 校验被禁用</td><td><span class="filepath">third_party/fpga-network-stack/hls/crc/crc.hpp:38</span></td></tr>
+<tr><td>B8 ack_t 32 位 + last 门控</td><td><span class="filepath">roce-rtl-sim/rtl/coyote/rdma_flow.sv:143-145</span>;<span class="filepath">tb_stage_b.sv:36-37</span></td></tr>
+<tr><td>ap_vld 脉冲需锁存</td><td><span class="filepath">roce-rtl-sim/tb/tb_stage_b.sv:55-61</span></td></tr>
+<tr><td>流控盖重传槽号进 req_1.offs</td><td><span class="filepath">roce-rtl-sim/rtl/coyote/rdma_flow.sv:130</span></td></tr>
+</table>
+
+<h3>9.2 公开知识(非本仓库验证,书写时依据通行文献)</h3>
+<ul>
+<li>verbs 对象模型与 <code>ibv_send_wr</code>/<code>ibv_sge</code>/<code>ibv_post_send</code> 语义:libibverbs man pages / IBTA 规范。</li>
+<li>WQE 厂商格式(mlx5 ctrl/rdma/data 段)、doorbell = MMIO、HCA DMA 取 WQE:Mellanox/NVIDIA PRM 公开描述。</li>
+<li>Coyote 的 OS 抽象定位(vFPGA、虚拟内存、调度):ETH Zurich, <em>Do OS Abstractions Make Sense on FPGAs?</em> (OSDI'20) 及 Coyote v2 资料。</li>
+<li>IBTA RC 线上 opcode 编码(0x06/0x08/0x0A/0x11 等):IBTA 规范 BTH opcode 表(与本仓库 TB/报告观测一致,交叉印证)。</li>
+</ul>
+
+
+<!-- ================================================================ -->
+<h2 id="s10">§10 L2 三条路与 CX-5 站落点(2026-07-23 决策)</h2>
+
+<p>Stage D 的帧从 IPv4 打头、线上没有一个 Ethernet 字节 —— 这不是缺陷,是接缝:在完整 Coyote 里,<span class="filepath">roce_stack</span> 的下游本来就站着 fns 自家的 L2 封装站(<span class="filepath">third_party/fpga-network-stack/hls/mac_ip_encode/</span>),Stage D 选择裸 CMAC 环回时把这一站(连同 ARP/ICMP)整体省掉了。环回两端同栈:没有对端要 MAC、没人发 ARP 查询,一个字节的 L2 都不需要。补口的三条候选路线与判定:</p>
+
+<table>
+<tr><th>路线</th><th>内容</th><th>判定</th></tr>
+<tr><td><strong>fns 自家套装</strong></td><td>mac_ip_encode(TX 造头:ARP 查表 + 子网/网关路由判断)+ ip_handler(RX 剥头分流,自带专用 <code>m_axis_ROCE</code> 出口)+ arp_server_subnet + icmp_server + ethernet_frame_padding_512</td><td><strong>✅ 选定</strong> —— 同门血统、512 位被 Coyote 100G 生产部署验证、<code>dataIn</code> 格式与 <code>roce_stack.m_axis_tx</code> 零适配;白送标准 ARP 应答与 ping 可达性(联调时把 L2/L3 问题与 RDMA 问题解耦)</td></tr>
+<tr><td>verilog-ethernet <code>eth_axis_tx/rx</code></td><td>纯 RTL 造头/剥头 + 双端静态 MAC 配置</td><td>备胎:最轻,但无 ARP/ICMP,CX-5 主机侧需手配静态邻居表</td></tr>
+<tr><td>Corundum 作载体</td><td>整 NIC 框架</td><td>❌ 不可行(过重、架构不匹配,此前已论证)</td></tr>
+</table>
+
+<p><strong>落点:CX-5 互操作站开工时插装;Stage D 保持认证态不动。</strong>理由:① 环回里 L2 三大功能(DMAC 查表 / ARP / 路由判断)全部空转,收益为零;② 集成需 csynth 多个 HLS IP + 时序重收敛 + 重出 bit + golden 口径重定(TX capture 会多 14 字节帧头,校验链全得动),等于 Stage D gate 全套重考;③ post-route 认证件(<span class="filepath">stage_d_shell/syn/proj/out_stage_d_certified/impl.dcp</span> 与配套 .bit)作废,阶段审计链被搅乱。</p>
+
+<figure class="diagram">
+<pre>
+TX:  roce_stack.m_axis_tx ──→ mac_ip_encode ──→ (ethernet_frame_padding_512) ──→ CMAC
+RX:  CMAC ──→ ip_handler ──m_axis_ROCE──→ roce_l0_top.s_axis_rx
+                └── 一比一替换 rx_udp4791_filter(乞丐版退役)
+</pre>
+<figcaption>CX-5 站插装草图:一进一出,接口零适配(<span class="filepath">mac_ip_encode.hpp:41-47</span> / <span class="filepath">ip_handler.hpp:40-48</span>)。padding_512 顺带把 48B ACK runt 帧补到 64B 合规(802.3 最小帧)。</figcaption>
+</figure>
+
+<div class="note"><strong>勘误(2026-07-23 实测)</strong>:此前"本仓库只快照了 fns 的 rdma/ 子集、届时需重新 clone"的说法<em>作废</em> —— <span class="filepath">third_party/fpga-network-stack/hls/</span> 下 mac_ip_encode / ip_handler / arp_server_subnet / icmp_server / ethernet_frame_padding_512 五件套源码全部在仓(ls 实测确认),无需任何外部拉取。</div>
+
+<div class="foot">
+<p>整理自 Stage B 代码导览讨论(2026-07-22)。相关文档:<em>Stage B 实验报告</em>(claude.ai artifact <code>cb8beb47</code>)· <span class="filepath">docs/hls-stream-depth-deep-dive.html</span> · Stage B 报告 §6 发现 B2/B3/B4/B5/B8 与 §7 移交清单。</p>
+<p>WR-ZipGuard · Platform Stage · docs/verbs-coyote-platform.html</p>
+</div>
+
+</main>
+</body>
+</html>
