@@ -1,0 +1,882 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoCE 数据流图集 — mux · RoCEv2 核 · rdma_flow</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --panel: #fbfcfd;
+    --panel2: #f1f4f7;
+    --ink: #1c2430;
+    --muted: #5c6b7d;
+    --line: #ccd4dd;
+    --line-soft: #dde3ea;
+    --blue: #2563eb;
+    --teal: #0d9488;
+    --amber: #d97706;
+    --flow: #33415e;
+    --ctrl: #8a97a8;
+    --code-bg: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c;
+      --surface: #1a2028;
+      --panel: #1e2530;
+      --panel2: #232b38;
+      --ink: #e4eaf2;
+      --muted: #93a3b5;
+      --line: #323c4a;
+      --line-soft: #2a3340;
+      --blue: #6aa1f8;
+      --teal: #34d3bc;
+      --amber: #f0a63a;
+      --flow: #aab9d0;
+      --ctrl: #6b7889;
+      --code-bg: #232b38;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161c; --surface: #1a2028; --panel: #1e2530; --panel2: #232b38;
+    --ink: #e4eaf2; --muted: #93a3b5; --line: #323c4a; --line-soft: #2a3340;
+    --blue: #6aa1f8; --teal: #34d3bc; --amber: #f0a63a; --flow: #aab9d0;
+    --ctrl: #6b7889; --code-bg: #232b38;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --surface: #ffffff; --panel: #fbfcfd; --panel2: #f1f4f7;
+    --ink: #1c2430; --muted: #5c6b7d; --line: #ccd4dd; --line-soft: #dde3ea;
+    --blue: #2563eb; --teal: #0d9488; --amber: #d97706; --flow: #33415e;
+    --ctrl: #8a97a8; --code-bg: #eef1f5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    margin: 0;
+    padding: 40px 28px 64px;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: 0.08em; color: var(--muted);
+    margin-bottom: 6px;
+  }
+  h1 {
+    font-size: 26px; line-height: 1.3; margin: 0 0 8px; text-wrap: balance;
+    font-weight: 700;
+  }
+  h1 code { font-size: 24px; }
+  .lede { color: var(--muted); max-width: 62em; margin: 0 0 22px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.92em;
+    background: var(--code-bg);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  /* legend */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px 22px;
+    padding: 12px 16px; margin-bottom: 18px;
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px;
+    font-size: 13px; color: var(--muted); align-items: center;
+  }
+  .legend .item { display: inline-flex; align-items: center; gap: 8px; }
+  .lg-num {
+    display: inline-flex; width: 19px; height: 19px; border-radius: 50%;
+    color: #fff; font-size: 11px; font-weight: 700;
+    align-items: center; justify-content: center; flex: none;
+  }
+  .lg-swatch { display: inline-block; width: 26px; height: 0; border-top: 3px solid; border-radius: 2px; flex: none; }
+  .lg-dash { border-top-style: dashed; border-top-width: 2px; }
+  /* diagram */
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    overflow-x: auto;
+    margin-bottom: 26px;
+  }
+  .diagram svg { display: block; min-width: 1240px; }
+  /* svg classes */
+  .blk { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  .blk-mux { fill: var(--panel2); stroke: var(--line); stroke-width: 1.6; }
+  .ibox { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; }
+  .chip { fill: var(--surface); stroke: var(--ctrl); stroke-width: 1; }
+  .t-title { font-size: 14px; font-weight: 700; fill: var(--ink); }
+  .t-sub   { font-size: 10.5px; fill: var(--muted); }
+  .t-mono  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .t-port  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; font-weight: 700; fill: var(--ink); }
+  .t-map   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 9.5px; fill: var(--muted); }
+  .t-note  { font-size: 9.5px; fill: var(--muted); }
+  .t-ref   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 8.5px; fill: var(--ctrl); }
+  .t-judge { font-size: 10.5px; }
+  .ln-flow  { stroke: var(--flow);  stroke-width: 2.4; fill: none; }
+  .ln-blue  { stroke: var(--blue);  stroke-width: 2.4; fill: none; }
+  .ln-teal  { stroke: var(--teal);  stroke-width: 2.4; fill: none; }
+  .ln-amber { stroke: var(--amber); stroke-width: 2.4; fill: none; }
+  .ln-ctrl  { stroke: var(--ctrl);  stroke-width: 1.7; fill: none; stroke-dasharray: 5 4; }
+  .badge-blue  { fill: var(--blue); }
+  .badge-teal  { fill: var(--teal); }
+  .badge-amber { fill: var(--amber); }
+  .badge-txt { fill: #fff; font-size: 10px; font-weight: 700; }
+  /* flow cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-bottom: 26px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px;
+    padding: 16px 18px 14px;
+  }
+  .card h3 { display: flex; align-items: center; gap: 9px; font-size: 15px; margin: 0 0 10px; }
+  .card ol { margin: 0; padding-left: 20px; font-size: 13.5px; color: var(--muted); }
+  .card ol li { margin-bottom: 6px; }
+  .card ol li strong { color: var(--ink); font-weight: 600; }
+  .card .ref { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; color: var(--ctrl); margin-top: 8px; }
+  /* table */
+  h2 { font-size: 18px; margin: 0 0 12px; }
+  .tblwrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; margin-bottom: 26px; }
+  table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; background: var(--panel2); }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; }
+  .d-blue { background: var(--blue); } .d-teal { background: var(--teal); }
+  .d-amber { background: var(--amber); } .d-flow { background: var(--flow); }
+  .dir { font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+  /* notes */
+  .note {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px;
+    padding: 14px 18px; font-size: 13.5px; color: var(--muted); margin-bottom: 12px;
+  }
+  .note strong { color: var(--ink); }
+  .toc {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 30px;
+  }
+  .toc a {
+    display: inline-block; padding: 6px 14px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); text-decoration: none; font-size: 13px;
+  }
+  .toc a:hover, .toc a:focus-visible { border-color: var(--flow); outline: none; }
+  .sec-eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin: 44px 0 4px;
+  }
+  section > h2.sec-title { font-size: 21px; margin: 0 0 10px; }
+  .sec-lede { color: var(--muted); max-width: 62em; margin: 0 0 18px; font-size: 14.5px; }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">vcu118-roce-platform · roce-rtl-sim / third_party/fpga-network-stack</div>
+  <h1>RoCE 数据流图集</h1>
+  <p class="lede">
+    三幅相互衔接的数据流图:<strong>图 1</strong> 是 <code>rdma_mux_retrans</code> 重传复用器(payload 数据面);
+    <strong>图 2</strong> 深入 HLS RoCEv2 核内部,展开 RX/TX 流水线与五张可靠性状态表;
+    <strong>图 3</strong> 是 <code>rdma_flow</code> 发送窗口流控(SQ 命令面)及贯穿全链的 <code>offs</code> 槽号。
+  </p>
+  <nav class="toc">
+    <a href="#sec-mux">图 1 · rdma_mux_retrans 重传复用</a>
+    <a href="#sec-core">图 2 · RoCEv2 核内部数据流</a>
+    <a href="#sec-flow">图 3 · rdma_flow 发送窗口</a>
+  </nav>
+
+  <section id="sec-mux">
+  <div class="sec-eyebrow">FIG.1 · rtl/coyote/rdma_mux_retrans.sv</div>
+  <h2 class="sec-title"><code>rdma_mux_retrans</code> — 重传复用器与三条流</h2>
+  <p class="sec-lede">
+    把 HLS 核的<strong>一个取数命令口</strong>(<code>s_req_net</code>)按三种场景分流——
+    向用户请求 READ 响应数据、把发送的 WRITE payload 存底进重传缓冲、丢包时从缓冲回放——
+    并把三路 payload 汇合成一条发包数据流(<code>m_axis_net</code>)送回 HLS 核打包。
+  </p>
+
+  <div class="legend">
+    <span class="item"><span class="lg-num" style="background:var(--blue)">1</span><span class="lg-swatch" style="border-color:var(--blue)"></span>WRITE 发送:用户自发推 payload,tee 一式两份(发包 + 存底)</span>
+    <span class="item"><span class="lg-num" style="background:var(--teal)">2</span><span class="lg-swatch" style="border-color:var(--teal)"></span>READ 响应:先发描述符请求,用户回填数据</span>
+    <span class="item"><span class="lg-num" style="background:var(--amber)">3</span><span class="lg-swatch" style="border-color:var(--amber)"></span>重传:从缓冲回放,不打扰用户</span>
+    <span class="item"><span class="lg-swatch lg-dash" style="border-color:var(--ctrl)"></span>控制(seq 队列给数据 Mux 编程)</span>
+    <span class="item"><span class="lg-swatch" style="border-color:var(--flow)"></span>汇合数据 / 混合命令</span>
+  </div>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1280 880" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="rdma_mux_retrans 与上下游的数据流框图">
+    <defs>
+      <marker id="aFlow"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--flow)"/></marker>
+      <marker id="aBlue"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--blue)"/></marker>
+      <marker id="aTeal"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--teal)"/></marker>
+      <marker id="aAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--amber)"/></marker>
+      <marker id="aCtrl"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ctrl)"/></marker>
+    </defs>
+
+    <!-- ============ outer blocks ============ -->
+    <rect class="blk" x="40" y="160" width="160" height="540" rx="9"/>
+    <text class="t-title" x="120" y="192" text-anchor="middle">HLS RoCEv2 核</text>
+    <text class="t-sub t-mono" x="120" y="210" text-anchor="middle">rocev2_top</text>
+    <text class="t-note" x="120" y="640" text-anchor="middle">发出取数命令,</text>
+    <text class="t-note" x="120" y="654" text-anchor="middle">收汇合数据并打包发送</text>
+    <text class="t-ref" x="120" y="676" text-anchor="middle">(roce_stack.sv 内部)</text>
+
+    <rect class="blk-mux" x="280" y="110" width="520" height="680" rx="10"/>
+    <text class="t-title t-mono" x="540" y="138" text-anchor="middle">rdma_mux_retrans</text>
+
+    <rect class="blk" x="980" y="150" width="270" height="320" rx="9"/>
+    <text class="t-title" x="1115" y="240" text-anchor="middle">用户逻辑(vFPGA)</text>
+    <text class="t-sub t-mono" x="1115" y="259" text-anchor="middle">TB: tb_stage_b</text>
+    <text class="t-note" x="1115" y="285" text-anchor="middle" style="fill:var(--blue)">WRITE:SQ 提交后自发推 payload</text>
+    <text class="t-note" x="1115" y="300" text-anchor="middle" style="fill:var(--blue)">push_payload() L181</text>
+    <text class="t-note" x="1115" y="322" text-anchor="middle" style="fill:var(--teal)">READ 响应:收描述符 → 回填数据</text>
+    <text class="t-note" x="1115" y="337" text-anchor="middle" style="fill:var(--teal)">serve_payload() L157</text>
+    <text class="t-note" x="1115" y="440" text-anchor="middle">RX WRITE 落地(m_rdma_wr_req +</text>
+    <text class="t-note" x="1115" y="454" text-anchor="middle">m_axis_rdma_wr)不经本模块,直连</text>
+
+    <rect class="blk" x="980" y="520" width="270" height="320" rx="9"/>
+    <text class="t-title" x="1115" y="560" text-anchor="middle">重传缓冲区</text>
+    <text class="t-sub t-mono" x="1115" y="579" text-anchor="middle">rdma_retrans_uram</text>
+    <text class="t-note" x="1115" y="596" text-anchor="middle">16 slot × 4 KiB URAM,按 offs 索引</text>
+    <text class="t-note" x="1115" y="775" text-anchor="middle">仅存 WRITE payload;READ 响应不存底</text>
+    <text class="t-note" x="1115" y="790" text-anchor="middle">*_sts 状态口无人消费 → tie-off</text>
+    <text class="t-ref" x="1115" y="812" text-anchor="middle">TB 行为模型: tb_stage_b.sv L209+</text>
+
+    <!-- ============ internal: command mux ============ -->
+    <rect class="ibox" x="320" y="150" width="180" height="180" rx="7"/>
+    <text class="t-title" x="410" y="180" text-anchor="middle" style="font-size:13px">命令 Mux(三选一)</text>
+    <text class="t-judge" x="410" y="215" text-anchor="middle" style="fill:var(--teal)">actv=1 &amp; rd → 用户取数 ②</text>
+    <text class="t-judge" x="410" y="248" text-anchor="middle" style="fill:var(--blue)">actv=1 &amp; !rd → 只发存底命令 ①</text>
+    <text class="t-judge" x="410" y="278" text-anchor="middle" style="fill:var(--amber)">actv=0 → 回放命令 ③</text>
+    <text class="t-ref" x="410" y="316" text-anchor="middle">L94–144 · WRITE 分支 req_user.valid=0</text>
+
+    <!-- seq queue chip -->
+    <rect class="chip" x="580" y="346" width="120" height="48" rx="6"/>
+    <text class="t-sub" x="640" y="366" text-anchor="middle" style="fill:var(--ink)">seq 队列</text>
+    <text class="t-map" x="640" y="382" text-anchor="middle">{rd,actv,len} L147</text>
+
+    <!-- data mux trapezoid -->
+    <path class="ibox" d="M 660 440 L 660 600 L 580 560 L 580 480 Z"/>
+    <text class="t-sub" x="618" y="514" text-anchor="middle" style="fill:var(--ink)">数据</text>
+    <text class="t-sub" x="618" y="530" text-anchor="middle" style="fill:var(--ink)">Mux</text>
+    <text class="t-ref" x="620" y="618" text-anchor="middle">L313–361</text>
+
+    <!-- net fifo -->
+    <rect class="ibox" x="360" y="496" width="140" height="48" rx="6"/>
+    <text class="t-map" x="430" y="516" text-anchor="middle" style="fill:var(--ink)">axis_data_fifo_512</text>
+    <text class="t-note" x="430" y="532" text-anchor="middle">net 方向</text>
+
+    <!-- ddr fifo -->
+    <rect class="ibox" x="665" y="600" width="120" height="48" rx="6"/>
+    <text class="t-map" x="725" y="620" text-anchor="middle" style="fill:var(--ink)">axis_data_fifo_512</text>
+    <text class="t-note" x="725" y="636" text-anchor="middle">存底镜像方向</text>
+
+    <!-- meta queue chips on cmd lines -->
+    <rect class="chip" x="640" y="176" width="70" height="28" rx="5"/>
+    <text class="t-map" x="675" y="194" text-anchor="middle">queue</text>
+    <rect class="chip" x="620" y="666" width="70" height="28" rx="5"/>
+    <text class="t-map" x="655" y="684" text-anchor="middle">queue</text>
+    <rect class="chip" x="620" y="720" width="70" height="28" rx="5"/>
+    <text class="t-map" x="655" y="738" text-anchor="middle">queue</text>
+
+    <!-- ============ left ports ============ -->
+    <path class="ln-flow" d="M 200 240 H 316" marker-end="url(#aFlow)"/>
+    <text class="t-port" x="258" y="228" text-anchor="middle">s_req_net</text>
+    <text class="t-map" x="258" y="258" text-anchor="middle">取数命令 metaIntf&lt;req_t&gt;</text>
+    <text class="t-note" x="258" y="271" text-anchor="middle">由 rd_cmd 拼装 :209</text>
+
+    <path class="ln-flow" d="M 360 520 H 206" marker-end="url(#aFlow)"/>
+    <path class="ln-flow" d="M 580 520 H 500"/>
+    <text class="t-port" x="280" y="508" text-anchor="middle">m_axis_net</text>
+    <text class="t-map" x="280" y="538" text-anchor="middle">AXI4S 512b → 打包发送</text>
+
+    <!-- ============ control (dashed) ============ -->
+    <path class="ln-ctrl" d="M 500 230 H 640 V 342" marker-end="url(#aCtrl)"/>
+    <path class="ln-ctrl" d="M 640 394 V 446" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="662" y="420" text-anchor="start">选路 + 拍数</text>
+
+    <!-- ============ flow 2: READ response (teal) ============ -->
+    <path class="ln-teal" d="M 500 190 H 974" marker-end="url(#aTeal)"/>
+    <path class="ln-teal" d="M 980 430 H 750 V 510 H 666" marker-end="url(#aTeal)"/>
+
+    <!-- ============ flow 1: WRITE send (blue) ============ -->
+    <path class="ln-blue" d="M 980 380 H 725 V 470"/>
+    <path class="ln-blue" d="M 725 470 H 666" marker-end="url(#aBlue)"/>
+    <!-- tee branch, hops over teal(510) & amber(550) -->
+    <path class="ln-blue" d="M 725 470 V 502 A 8 8 0 0 1 725 518 V 542 A 8 8 0 0 1 725 558 V 596" marker-end="url(#aBlue)"/>
+    <circle cx="725" cy="470" r="4.5" fill="var(--blue)"/>
+    <text class="t-note" x="738" y="590" text-anchor="start" style="fill:var(--blue)">一式两份 L359</text>
+    <!-- mirror data out of ddr fifo -->
+    <path class="ln-blue" d="M 785 624 H 974" marker-end="url(#aBlue)"/>
+    <!-- ddr write command, hops over net line(520) -->
+    <path class="ln-blue" d="M 500 310 H 525 V 512 A 8 8 0 0 1 525 528 V 734 H 974" marker-end="url(#aBlue)"/>
+
+    <!-- ============ flow 3: retrans (amber) ============ -->
+    <path class="ln-amber" d="M 980 550 H 666" marker-end="url(#aAmber)"/>
+    <path class="ln-amber" d="M 500 290 H 555 V 512 A 8 8 0 0 1 555 528 V 680 H 974" marker-end="url(#aAmber)"/>
+
+    <!-- ============ right port labels ============ -->
+    <text class="t-port" x="806" y="178">m_req_user</text>
+    <text class="t-map" x="806" y="207">= m_rdma_rd_req</text>
+    <text class="t-note" x="806" y="220">READ 响应取数描述符(仅此场景)</text>
+
+    <text class="t-port" x="806" y="368">s_axis_user_req</text>
+    <text class="t-map" x="806" y="396">= s_axis_rdma_rd_req</text>
+    <text class="t-note" x="806" y="409">WRITE payload · 用户自发推</text>
+
+    <text class="t-port" x="806" y="424">s_axis_user_rsp</text>
+    <text class="t-map" x="806" y="446">= s_axis_rdma_rd_rsp</text>
+    <text class="t-note" x="806" y="459">READ 响应 payload · 用户回填</text>
+
+    <text class="t-port" x="806" y="544">s_axis_ddr</text>
+    <text class="t-map" x="806" y="566">= s_axis_rdma_mem_rd</text>
+    <text class="t-note" x="806" y="579">重传回放数据</text>
+
+    <text class="t-port" x="806" y="618">m_axis_ddr</text>
+    <text class="t-map" x="806" y="640">= m_axis_rdma_mem_wr</text>
+    <text class="t-note" x="806" y="653">payload 存底镜像</text>
+
+    <text class="t-port" x="806" y="674">m_req_ddr_rd</text>
+    <text class="t-map" x="806" y="694">= m_rdma_mem_rd_cmd · 回放命令</text>
+
+    <text class="t-port" x="806" y="728">m_req_ddr_wr</text>
+    <text class="t-map" x="806" y="748">= m_rdma_mem_wr_cmd · 存底命令</text>
+
+    <!-- ============ flow badges ============ -->
+    <g>
+      <circle class="badge-teal" cx="780" cy="190" r="8.5"/><text class="badge-txt" x="780" y="193.5" text-anchor="middle">2</text>
+      <circle class="badge-blue" cx="780" cy="380" r="8.5"/><text class="badge-txt" x="780" y="383.5" text-anchor="middle">1</text>
+      <circle class="badge-teal" cx="780" cy="430" r="8.5"/><text class="badge-txt" x="780" y="433.5" text-anchor="middle">2</text>
+      <circle class="badge-amber" cx="780" cy="550" r="8.5"/><text class="badge-txt" x="780" y="553.5" text-anchor="middle">3</text>
+      <circle class="badge-blue" cx="945" cy="624" r="8.5"/><text class="badge-txt" x="945" y="627.5" text-anchor="middle">1</text>
+      <circle class="badge-amber" cx="780" cy="680" r="8.5"/><text class="badge-txt" x="780" y="683.5" text-anchor="middle">3</text>
+      <circle class="badge-blue" cx="780" cy="734" r="8.5"/><text class="badge-txt" x="780" y="737.5" text-anchor="middle">1</text>
+    </g>
+  </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3><span class="lg-num" style="background:var(--blue)">1</span><span style="color:var(--blue)">WRITE 发送 — 请求环节被省掉</span></h3>
+      <ol>
+        <li>HLS 核在 <code>s_req_net</code> 发取数命令(actv=1, !rd),命令 Mux <strong>不转发给用户</strong>(<code>req_user.valid=0</code>),只生成 <code>m_req_ddr_wr</code> 存底命令,len 入 seq 队列。</li>
+        <li>用户提交 SQ 后<strong>自发</strong>把 payload 推进 <code>s_axis_user_req</code>,不等任何请求。</li>
+        <li>数据 Mux 按 len 计数切段,tee 点<strong>一式两份</strong>:一份经 net FIFO → <code>m_axis_net</code> 发包;一份经 ddr FIFO → <code>m_axis_ddr</code> 存进重传缓冲。</li>
+      </ol>
+      <div class="ref">rdma_mux_retrans.sv L106–114 / L326–331 / L359–361</div>
+    </div>
+    <div class="card">
+      <h3><span class="lg-num" style="background:var(--teal)">2</span><span style="color:var(--teal)">READ 响应 — 完整的请求→回数握手</span></h3>
+      <ol>
+        <li>远端 READ 请求到达,要读的 vaddr/len 用户事先不知道。</li>
+        <li>命令 Mux(actv=1, rd)把描述符经 <code>m_req_user</code>(= <code>m_rdma_rd_req</code>)递给用户。</li>
+        <li>用户取数回填 <code>s_axis_user_rsp</code> → 经 net FIFO 发包。<strong>不存底</strong>(不进重传缓冲)。</li>
+      </ol>
+      <div class="ref">rdma_mux_retrans.sv L97–105 / L317–324</div>
+    </div>
+    <div class="card">
+      <h3><span class="lg-num" style="background:var(--amber)">3</span><span style="color:var(--amber)">重传 — 缓冲回放,用户无感</span></h3>
+      <ol>
+        <li>requester 定时器超时 / NAK,HLS 核发 <code>actv=0</code> 命令。</li>
+        <li>命令 Mux 生成 <code>m_req_ddr_rd</code> 回放命令(地址 = {vfid,pid,offs} 拼装)。</li>
+        <li>缓冲区把存底的 payload 从 <code>s_axis_ddr</code> 推回 → 直接发包,<strong>全程不打扰用户</strong>。</li>
+      </ol>
+      <div class="ref">rdma_mux_retrans.sv L116–124 / L128–141 / L334–341</div>
+    </div>
+  </div>
+
+  <h2>端口映射(三层命名对照)</h2>
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr><th>流</th><th>mux 端口</th><th>roce_stack 连线</th><th>方向</th><th>承载内容</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="dot d-flow"></span>混合</td><td><code>s_req_net</code></td><td>内部 <code>rdma_rd_req</code>(由 HLS 核 rd_cmd 拼装,:209–224)</td><td class="dir">HLS 核 → mux</td><td>取数命令 req_t,三种场景共用一口</td></tr>
+        <tr><td><span class="dot d-flow"></span>混合</td><td><code>m_axis_net</code></td><td>接 HLS 核 TX 数据入口</td><td class="dir">mux → HLS 核</td><td>三路汇合后的发包 payload</td></tr>
+        <tr><td><span class="dot d-teal"></span>②</td><td><code>m_req_user</code></td><td><code>m_rdma_rd_req</code>(:250)</td><td class="dir">mux → 用户</td><td>READ 响应取数描述符(<strong>仅此场景触发</strong>)</td></tr>
+        <tr><td><span class="dot d-blue"></span>①</td><td><code>s_axis_user_req</code></td><td><code>s_axis_rdma_rd_req</code>(:252)</td><td class="dir">用户 → mux</td><td>WRITE payload,用户自发推(名字是模板遗留)</td></tr>
+        <tr><td><span class="dot d-teal"></span>②</td><td><code>s_axis_user_rsp</code></td><td><code>s_axis_rdma_rd_rsp</code>(:253)</td><td class="dir">用户 → mux</td><td>READ 响应 payload,按描述符回填</td></tr>
+        <tr><td><span class="dot d-blue"></span>①</td><td><code>m_req_ddr_wr</code></td><td><code>m_rdma_mem_wr_cmd</code>(:257)</td><td class="dir">mux → 缓冲</td><td>存底命令 {addr,len},每个 WRITE 段一条</td></tr>
+        <tr><td><span class="dot d-blue"></span>①</td><td><code>m_axis_ddr</code></td><td><code>m_axis_rdma_mem_wr</code>(:259)</td><td class="dir">mux → 缓冲</td><td>payload 存底镜像(tee 的另一份)</td></tr>
+        <tr><td><span class="dot d-amber"></span>③</td><td><code>m_req_ddr_rd</code></td><td><code>m_rdma_mem_rd_cmd</code>(:256)</td><td class="dir">mux → 缓冲</td><td>回放命令,仅超时/NAK 时触发</td></tr>
+        <tr><td><span class="dot d-amber"></span>③</td><td><code>s_axis_ddr</code></td><td><code>s_axis_rdma_mem_rd</code>(:258)</td><td class="dir">缓冲 → mux</td><td>回放数据,重发时替代用户供数</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <strong>命名错位的由来:</strong><code>s_axis_user_req</code> 的名字来自 Coyote 通用模板——"配合读请求通道(<code>m_req_user</code>)回数的数据流"。
+    retrans 变体把 WRITE 路的"请求半边"内部化了(命令只用来做存底 + 给计数器编程),"数据半边"沿用了模板名,
+    于是名字叫 <em>rd_req</em>、实际扛的是 WRITE 发送 payload。匹配全靠<strong>顺序 + 长度</strong>:用户必须按 SQ 提交顺序推,长度严格等于命令 len,无 vaddr 校验兜底。
+  </div>
+  <div class="note">
+    <strong>不经过本模块的路径:</strong>远端 WRITE 到达本端的落地路(<code>m_rdma_wr_req</code> 描述符 + <code>m_axis_rdma_wr</code> 数据)由 HLS 核直连用户,与本 mux 无关;
+    本图只覆盖发送方向的三条流。
+  </div>
+  </section>
+
+  <section id="sec-core">
+  <div class="sec-eyebrow">FIG.2 · third_party/fpga-network-stack/hls — rocev2.cpp / ib_transport_protocol.cpp(2830 行)</div>
+  <h2 class="sec-title">RoCEv2 核内部数据流 — RX/TX 流水线与五张状态表</h2>
+  <p class="sec-lede">
+    HLS 核外层是 crc→IPv4→UDP 组帧壳(crc 实为直通,真 iCRC 由 roce_stack 的 Verilog 模块补算),
+    内层 <code>ib_transport_protocol</code> 是核心:上半 RX 流水线(meta 与载荷分离行进),
+    中间五张 per-QP 状态表,下半 TX 流水线(事件仲裁 → 头部拼装,自右向左)。
+    连线经 190 条断言对源码逐一核对。
+  </p>
+  <div class="legend">
+    <span class="item"><span class="lg-swatch" style="border-color:var(--blue)"></span>载荷 / 包数据流</span>
+    <span class="item"><span class="lg-swatch" style="border-color:var(--teal)"></span>元数据 / 命令 / 事件</span>
+    <span class="item"><span class="lg-swatch" style="border-color:var(--amber)"></span>可靠性(重传表 / 定时器)</span>
+    <span class="item"><span class="lg-swatch lg-dash" style="border-color:var(--ctrl)"></span>状态表查询 / 控制</span>
+  </div>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1460 1200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RoCEv2 核内部数据流">
+
+    <!-- ===== roce_stack patches & framing shell ===== -->
+    <rect class="chip" x="25" y="150" width="160" height="60" rx="6"/>
+    <text class="t-sub" x="105" y="172" text-anchor="middle" style="fill:var(--ink)">MAC RX 修补</text>
+    <text class="t-note" x="105" y="188" text-anchor="middle">FIFO + ack_gap_enforcer</text>
+    <text class="t-note" x="105" y="201" text-anchor="middle">(ACK 间 85T IPG)</text>
+    <rect class="chip" x="215" y="150" width="150" height="60" rx="6"/>
+    <text class="t-sub" x="290" y="172" text-anchor="middle" style="fill:var(--ink)">解帧</text>
+    <text class="t-note" x="290" y="188" text-anchor="middle">crc(直通)·IPv4·UDP</text>
+    <text class="t-ref" x="290" y="201" text-anchor="middle">rocev2.cpp:95-149</text>
+    <rect class="chip" x="215" y="1000" width="150" height="60" rx="6"/>
+    <text class="t-sub" x="290" y="1022" text-anchor="middle" style="fill:var(--ink)">组帧</text>
+    <text class="t-note" x="290" y="1038" text-anchor="middle">UDP·IPv4·crc(直通)</text>
+    <text class="t-ref" x="290" y="1051" text-anchor="middle">generate_udp / generate_ipv4</text>
+    <rect class="chip" x="25" y="1000" width="160" height="60" rx="6"/>
+    <text class="t-sub" x="105" y="1022" text-anchor="middle" style="fill:var(--ink)">MAC TX 修补</text>
+    <text class="t-note" x="105" y="1038" text-anchor="middle">read_request_trimmer</text>
+    <text class="t-note" x="105" y="1051" text-anchor="middle">→ icrc(真 iCRC 在此)</text>
+    <path class="ln-blue" d="M 185 180 H 211" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 365 180 H 426" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 215 1030 H 189" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 410 1015 H 369" marker-end="url(#aBlue)"/>
+
+    <!-- ===== ib_transport_protocol container ===== -->
+    <rect class="blk-mux" x="400" y="100" width="850" height="1080" rx="10"/>
+    <text class="t-title t-mono" x="415" y="128" text-anchor="start">ib_transport_protocol(IB 传输层核心)</text>
+
+    <!-- ===== RX band ===== -->
+    <rect class="ibox" x="430" y="150" width="150" height="64" rx="7"/>
+    <text class="t-port" x="505" y="172" text-anchor="middle">rx_process_ibh</text>
+    <text class="t-sub" x="505" y="188" text-anchor="middle">解析 BTH</text>
+    <text class="t-note" x="505" y="202" text-anchor="middle">PSN·opcode·destQP</text>
+
+    <path class="ln-blue" d="M 580 180 H 746" marker-end="url(#aBlue)"/>
+    <rect class="chip" x="606" y="164" width="60" height="32" rx="5"/>
+    <text class="t-map" x="636" y="184" text-anchor="middle">−BTH 12B</text>
+
+    <rect class="ibox" x="750" y="150" width="150" height="64" rx="7"/>
+    <text class="t-port" x="825" y="172" text-anchor="middle">rx_process_exh</text>
+    <text class="t-sub" x="825" y="188" text-anchor="middle">解析 RETH/AETH</text>
+    <text class="t-note" x="825" y="202" text-anchor="middle">numPkg 计算</text>
+
+    <rect class="ibox" x="930" y="150" width="140" height="64" rx="7"/>
+    <text class="t-port" x="1000" y="172" text-anchor="middle">drop_ooo_ibh</text>
+    <text class="t-sub" x="1000" y="188" text-anchor="middle">乱序整包丢弃</text>
+    <text class="t-ref" x="1000" y="202" text-anchor="middle">L788 / L2563</text>
+
+    <rect class="ibox" x="1100" y="150" width="130" height="64" rx="7"/>
+    <text class="t-sub" x="1165" y="170" text-anchor="middle" style="fill:var(--ink)">剥 RETH/AETH</text>
+    <text class="t-port" x="1165" y="186" text-anchor="middle" style="font-size:10px">merge_rx_pkgs</text>
+    <text class="t-note" x="1165" y="201" text-anchor="middle">−16B / −4B 合流</text>
+
+    <path class="ln-blue" d="M 900 180 H 926" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 1070 180 H 1096" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 1230 180 H 1262" marker-end="url(#aBlue)"/>
+
+    <rect class="ibox" x="520" y="280" width="160" height="70" rx="7"/>
+    <text class="t-port" x="600" y="300" text-anchor="middle">rx_ibh_fsm</text>
+    <text class="t-sub" x="600" y="316" text-anchor="middle">PSN 序检查·重复窗</text>
+    <text class="t-note" x="600" y="330" text-anchor="middle">NAK 门控 retryCounter</text>
+    <text class="t-ref" x="600" y="344" text-anchor="middle">L256</text>
+
+    <rect class="ibox" x="750" y="280" width="170" height="90" rx="7"/>
+    <text class="t-port" x="835" y="300" text-anchor="middle">rx_exh_fsm</text>
+    <text class="t-sub" x="835" y="316" text-anchor="middle">按 opcode 分发执行</text>
+    <text class="t-note" x="835" y="331" text-anchor="middle">落地命令·读请求·事件</text>
+    <text class="t-note" x="835" y="345" text-anchor="middle">WRITE 游标 ↔ msn_table</text>
+    <text class="t-ref" x="835" y="361" text-anchor="middle">L484</text>
+
+    <path class="ln-teal" d="M 505 214 V 315 H 516" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="498" y="256" text-anchor="end">ibhMeta+PSN</text>
+    <path class="ln-teal" d="M 790 214 V 255 H 640 V 276" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="712" y="248" text-anchor="middle">exhMeta{isNak,numPkg}</text>
+    <path class="ln-teal" d="M 860 214 V 276" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="866" y="250" text-anchor="start">ExHeader</text>
+    <path class="ln-teal" d="M 680 315 H 746" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="713" y="308" text-anchor="middle">放行 meta</text>
+    <path class="ln-ctrl" d="M 680 290 H 710 V 240 H 784 A 6 6 0 0 0 796 240 H 854 A 6 6 0 0 0 866 240 H 1000 V 218" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="935" y="233" text-anchor="middle">drop?</text>
+
+    <path class="ln-teal" d="M 920 295 H 1262" marker-end="url(#aTeal)"/>
+    <path class="ln-teal" d="M 920 330 H 1262" marker-end="url(#aTeal)"/>
+    <path class="ln-teal" d="M 920 358 H 1240 V 682 A 6 6 0 0 1 1240 694 V 785 H 1140 V 796" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="1246" y="432" text-anchor="end">readRequest{vaddr,len,psn}</text>
+
+    <!-- ===== state tables band ===== -->
+    <rect class="ibox" x="430" y="470" width="150" height="80" rx="7"/>
+    <text class="t-port" x="505" y="492" text-anchor="middle">state_table</text>
+    <text class="t-note" x="505" y="508" text-anchor="middle">resp_epsn / req_next_psn</text>
+    <text class="t-note" x="505" y="522" text-anchor="middle">重复窗·retryCounter(3b)</text>
+    <text class="t-ref" x="505" y="539" text-anchor="middle">state_table.hpp:122</text>
+
+    <rect class="ibox" x="640" y="470" width="150" height="80" rx="7"/>
+    <text class="t-port" x="715" y="492" text-anchor="middle">msn_table</text>
+    <text class="t-note" x="715" y="508" text-anchor="middle">MSN·多包 vaddr 游标</text>
+    <text class="t-note" x="715" y="522" text-anchor="middle">r_key</text>
+    <text class="t-ref" x="715" y="539" text-anchor="middle">msn_table.hpp:92</text>
+
+    <rect class="ibox" x="820" y="455" width="160" height="120" rx="7"/>
+    <text class="t-port" x="900" y="477" text-anchor="middle">retransmitter</text>
+    <text class="t-note" x="900" y="494" text-anchor="middle">PSN→{laddr,raddr,len,offs}</text>
+    <text class="t-note" x="900" y="508" text-anchor="middle">per-QP 链表·2000 项池</text>
+    <text class="t-note" x="900" y="522" text-anchor="middle">ACK 释放·NAK 定点重放</text>
+    <text class="t-note" x="900" y="536" text-anchor="middle">超时全量重放</text>
+    <text class="t-note" x="900" y="550" text-anchor="middle">READ_RESP 部分更新</text>
+    <text class="t-ref" x="900" y="566" text-anchor="middle">retransmitter.hpp:570</text>
+
+    <rect class="ibox" x="1010" y="470" width="110" height="80" rx="7"/>
+    <text class="t-port" x="1065" y="490" text-anchor="middle" style="font-size:10px">transport_timer</text>
+    <text class="t-note" x="1065" y="506" text-anchor="middle">1/5/12/64ms·×12</text>
+    <text class="t-note" x="1065" y="520" text-anchor="middle">武装:generate_exh</text>
+    <text class="t-note" x="1065" y="534" text-anchor="middle">清零:收有效响应</text>
+
+    <rect class="ibox" x="1150" y="470" width="100" height="80" rx="7"/>
+    <text class="t-port" x="1200" y="492" text-anchor="middle" style="font-size:10.5px">conn_table</text>
+    <text class="t-note" x="1200" y="508" text-anchor="middle">remote qpn/IP</text>
+    <text class="t-note" x="1200" y="521" text-anchor="middle">udp_port</text>
+
+    <path class="ln-amber" d="M 1010 512 H 984" marker-end="url(#aAmber)"/>
+    <text class="t-note" x="997" y="505" text-anchor="middle">超时</text>
+
+    <!-- table lookups & reliability (RX side) -->
+    <path class="ln-ctrl" d="M 560 350 V 466" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="566" y="412" text-anchor="start">查/写 epsn·retry</text>
+    <path class="ln-ctrl" d="M 770 370 V 466" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="764" y="400" text-anchor="end">MSN·vaddr 游标</text>
+    <path class="ln-amber" d="M 870 370 V 451" marker-end="url(#aAmber)"/>
+    <text class="t-note" x="864" y="434" text-anchor="end" style="fill:var(--amber)">NAK 重放</text>
+    <path class="ln-amber" d="M 900 455 V 374" marker-end="url(#aAmber)"/>
+    <text class="t-note" x="906" y="416" text-anchor="start" style="fill:var(--amber)">laddr 前递</text>
+    <path class="ln-amber" d="M 610 350 V 600 H 694 A 6 6 0 0 0 706 600 H 799 A 6 6 0 0 0 811 600 H 900 V 579" marker-end="url(#aAmber)"/>
+    <text class="t-note" x="616" y="592" text-anchor="start" style="fill:var(--amber)">ACK 释放表项(+清定时器)</text>
+
+    <!-- ACK/NAK event crossing RX -> TX -->
+    <path class="ln-teal" d="M 805 370 V 594 A 6 6 0 0 1 805 606 V 645 H 830 V 656" marker-end="url(#aTeal)"/>
+    <text class="t-map" transform="rotate(-90 796 520)" x="796" y="520" text-anchor="middle">ACK/NAK·完成事件</text>
+
+    <!-- ===== TX band (right to left) ===== -->
+    <rect class="ibox" x="1030" y="660" width="200" height="80" rx="7"/>
+    <text class="t-port" x="1130" y="682" text-anchor="middle">local_req_handler</text>
+    <text class="t-sub" x="1130" y="698" text-anchor="middle">SQ 命令入口</text>
+    <text class="t-note" x="1130" y="713" text-anchor="middle">重传事件优先于新 WQE</text>
+    <text class="t-ref" x="1130" y="729" text-anchor="middle">L1074</text>
+
+    <rect class="ibox" x="820" y="660" width="170" height="80" rx="7"/>
+    <text class="t-port" x="905" y="682" text-anchor="middle">meta_merger</text>
+    <text class="t-sub" x="905" y="698" text-anchor="middle">事件仲裁</text>
+    <text class="t-note" x="905" y="713" text-anchor="middle">ACK &gt; 读响应 &gt; 本地/重传</text>
+    <text class="t-ref" x="905" y="729" text-anchor="middle">L1327</text>
+
+    <rect class="ibox" x="640" y="660" width="150" height="80" rx="7"/>
+    <text class="t-port" x="715" y="682" text-anchor="middle">generate_exh</text>
+    <text class="t-sub" x="715" y="698" text-anchor="middle">RETH/AETH 生成</text>
+    <text class="t-note" x="715" y="713" text-anchor="middle">武装定时器·算 udpLen</text>
+    <text class="t-ref" x="715" y="729" text-anchor="middle">L1499</text>
+
+    <rect class="ibox" x="450" y="660" width="150" height="80" rx="7"/>
+    <text class="t-port" x="525" y="682" text-anchor="middle">generate_ibh</text>
+    <text class="t-sub" x="525" y="698" text-anchor="middle">BTH·PSN 分配</text>
+    <text class="t-note" x="525" y="713" text-anchor="middle">req_next_psn += numPkg</text>
+    <text class="t-ref" x="525" y="729" text-anchor="middle">L1401</text>
+
+    <rect class="ibox" x="1030" y="800" width="200" height="80" rx="7"/>
+    <text class="t-port" x="1130" y="822" text-anchor="middle">handle_read_requests</text>
+    <text class="t-sub" x="1130" y="838" text-anchor="middle">远端 READ 按 PMTU 切分</text>
+    <text class="t-note" x="1130" y="853" text-anchor="middle">每段: 读命令+事件(psn++)</text>
+    <text class="t-ref" x="1130" y="869" text-anchor="middle">L922</text>
+
+    <rect class="ibox" x="820" y="800" width="170" height="80" rx="7"/>
+    <text class="t-port" x="905" y="822" text-anchor="middle">mem_cmd_merger</text>
+    <text class="t-sub" x="905" y="838" text-anchor="middle">命令合流(远端读优先)</text>
+    <text class="t-note" x="905" y="853" text-anchor="middle">1:1 发 pkgInfo 顺序契约</text>
+    <text class="t-ref" x="905" y="869" text-anchor="middle">L1149</text>
+
+    <rect class="ibox" x="640" y="800" width="150" height="80" rx="7"/>
+    <text class="t-port" x="715" y="822" text-anchor="middle">tx_pkg_arbiter</text>
+    <text class="t-sub" x="715" y="838" text-anchor="middle">载荷三路分流</text>
+    <text class="t-note" x="715" y="853" text-anchor="middle">AETH/RETH/RAW·PMTU 截断</text>
+    <text class="t-ref" x="715" y="869" text-anchor="middle">L1222</text>
+
+    <rect class="ibox" x="450" y="800" width="150" height="80" rx="7"/>
+    <text class="t-port" x="525" y="822" text-anchor="middle">append_payload</text>
+    <text class="t-sub" x="525" y="838" text-anchor="middle">拼 EXH+载荷</text>
+    <text class="t-note" x="525" y="853" text-anchor="middle">左移 4B/16B 腾位</text>
+    <text class="t-ref" x="525" y="869" text-anchor="middle">L1757</text>
+
+    <rect class="ibox" x="410" y="980" width="150" height="70" rx="7"/>
+    <text class="t-port" x="485" y="1002" text-anchor="middle" style="font-size:10.5px">prepend_ibh_header</text>
+    <text class="t-sub" x="485" y="1018" text-anchor="middle">填 BTH 发包</text>
+    <text class="t-note" x="485" y="1033" text-anchor="middle">整包已左移 12B</text>
+
+    <!-- TX edges -->
+    <path class="ln-blue" d="M 1262 690 H 1234" marker-end="url(#aBlue)"/>
+    <path class="ln-teal" d="M 1030 690 H 994" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="1012" y="683" text-anchor="middle">事件</text>
+    <path class="ln-blue" d="M 1100 740 V 770 H 940 V 796" marker-end="url(#aBlue)"/>
+    <text class="t-map" x="1022" y="763" text-anchor="middle">本地取数命令</text>
+    <path class="ln-amber" d="M 1150 660 V 620 H 935 V 579" marker-end="url(#aAmber)"/>
+    <text class="t-map" x="1100" y="613" text-anchor="middle" style="fill:var(--amber)">登记{addr,len,offs}</text>
+    <path class="ln-amber" d="M 955 575 V 612 A 10 10 0 0 1 955 632 V 640 H 1070 V 656" marker-end="url(#aAmber)"/>
+    <text class="t-map" x="1016" y="653" text-anchor="middle" style="fill:var(--amber)">重传重放(优先)</text>
+    <path class="ln-amber" d="M 530 660 V 648 H 694 A 6 6 0 0 0 706 648 H 845 V 606 A 6 6 0 0 0 845 594 V 579" marker-end="url(#aAmber)"/>
+    <text class="t-map" x="560" y="641" text-anchor="start" style="fill:var(--amber)">登记{psn,opcode}</text>
+    <path class="ln-teal" d="M 820 690 H 794" marker-end="url(#aTeal)"/>
+    <path class="ln-teal" d="M 860 740 V 760 H 736 A 6 6 0 0 0 724 760 H 560 V 746" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="820" y="772" text-anchor="middle">ibhMeta</text>
+    <path class="ln-teal" d="M 730 740 V 775 H 570 V 796" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="742" y="768" text-anchor="start">EXH 头+packetInfo</text>
+    <path class="ln-ctrl" d="M 820 820 H 794" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="807" y="813" text-anchor="middle">pkgInfo</text>
+    <path class="ln-blue" d="M 1262 940 H 810 V 860 H 794" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 905 880 V 910 H 1262" marker-end="url(#aBlue)"/>
+    <path class="ln-teal" d="M 1030 830 H 965 V 776 A 6 6 0 0 0 965 764 V 746" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="1000" y="823" text-anchor="middle">读响应事件</text>
+    <path class="ln-blue" d="M 1030 850 H 994" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 640 840 H 604" marker-end="url(#aBlue)"/>
+    <path class="ln-blue" d="M 525 880 V 976" marker-end="url(#aBlue)"/>
+    <path class="ln-teal" d="M 450 700 H 420 V 976" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="426" y="870" text-anchor="start">BTH</text>
+    <path class="ln-ctrl" d="M 505 660 V 554" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="511" y="610" text-anchor="start">取/写 PSN</text>
+    <path class="ln-ctrl" d="M 700 660 V 554" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="706" y="610" text-anchor="start">查 msn/r_key</text>
+    <path class="ln-ctrl" d="M 930 656 V 630 H 1180 V 554" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="1055" y="624" text-anchor="middle">查 remote_qpn/IP/port</text>
+
+    <!-- ===== external port labels (right gap) ===== -->
+    <text class="t-port" x="1272" y="174">m_axis_mem_write_data</text>
+    <text class="t-note" x="1272" y="192">→ m_axis_rdma_wr(直连用户)</text>
+    <text class="t-port" x="1272" y="289">m_axis_mem_write_cmd</text>
+    <text class="t-note" x="1272" y="307">→ m_rdma_wr_req(不经 mux)</text>
+    <text class="t-port" x="1272" y="324">m_axis_rx_ack_meta</text>
+    <text class="t-note" x="1272" y="342">→ rdma_flow → CQ(图 3)</text>
+    <text class="t-port" x="1272" y="684">s_axis_sq_meta</text>
+    <text class="t-note" x="1272" y="702">← rdma_flow(txMeta·含 offs)</text>
+    <text class="t-port" x="1272" y="904">m_axis_mem_read_cmd</text>
+    <text class="t-note" x="1272" y="922">→ mux s_req_net(图 1)</text>
+    <text class="t-port" x="1272" y="936">s_axis_mem_read_data</text>
+    <text class="t-note" x="1272" y="958">← mux m_axis_net 汇合载荷</text>
+  </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3><span style="color:var(--teal)">RX:meta 与载荷分离行进</span></h3>
+      <ol>
+        <li><code>rx_process_ibh</code> 把每包拆成两路:meta(ibhMeta+PSN)走 <code>rx_ibh_fsm</code>,数据剥 BTH 后由 <code>rx_process_exh</code> 解析 RETH/AETH。</li>
+        <li><code>rx_ibh_fsm</code> 是守门员:<strong>epsn==psn 才按序放行</strong>;重复窗内 READ 重执行、WRITE 丢载荷但补 ACK、其余静默丢;完全无效 PSN 只 NAK 一次(retryCounter 门控)。载荷由 <code>drop_ooo_ibh</code> 整包丢弃。</li>
+        <li><code>rx_exh_fsm</code> 按 opcode 执行:WRITE 首包取 RETH.vaddr、后续从 <code>msn_table</code> 游标续写;<strong>READ 响应落地地址不来自包头</strong>,来自 retransmitter 前递的 laddr;READ REQ 交 <code>handle_read_requests</code> 切段。</li>
+      </ol>
+      <div class="ref">ib_transport_protocol.cpp L48–1070 / L2522–2627</div>
+    </div>
+    <div class="card">
+      <h3><span style="color:var(--blue)">TX:命令与头部两条汇聚路径</span></h3>
+      <ol>
+        <li>命令面:本地 SQ(<code>local_req_handler</code>)与远端读(<code>handle_read_requests</code>)两路取数命令在 <code>mem_cmd_merger</code> 合流(远端读优先)发往图 1 的 mux;每条命令 <strong>1:1 写 pkgInfo</strong>,返回载荷全靠顺序对号入座——"按命令序回数"契约的出处。</li>
+        <li>头部面:<code>meta_merger</code> 固定优先级仲裁(ACK &gt; 读响应 &gt; 本地/重传);<code>generate_exh</code> 生成 RETH/AETH,<code>append_payload</code> 拼接,整包左移 12B 后 <code>generate_ibh</code> 分配 PSN 填 BTH。</li>
+        <li>PSN 分配唯一发生在 <code>generate_ibh</code>:READ REQ 一次预留 ⌈len/PMTU⌉ 个 PSN;读响应/ACK/重传自带 PSN 跳过查表。destQP 经 conn_table 反馈环填入(源码自注 "hack")。</li>
+      </ol>
+      <div class="ref">ib_transport_protocol.cpp L1074–2020 / L2634–2713</div>
+    </div>
+    <div class="card">
+      <h3><span style="color:var(--amber)">可靠性闭环:登记 → 触发 → 重放</span></h3>
+      <ol>
+        <li>每个可重传包的表项<strong>由两半拼成</strong>:<code>local_req_handler</code> 登记 {addr,len,offs},<code>generate_ibh</code> 登记 {psn,opcode},按序配对存入 per-QP 链表(全局 2000 项池)。</li>
+        <li>两种触发:定时器超时(1/5/12/64ms 退避,上限 12 次)从链表头<strong>全量重放</strong>;RX 收 NAK <strong>定点重放</strong>。重放事件回注 local_req_handler,优先于新 SQ,PSN 用原值。</li>
+        <li>ACK 到达:释放表项 + 清定时器;READ_RESP FIRST/MIDDLE 只对表头增量更新(addr+=PMTU、len−=PMTU、psn+1)。<code>RETRANS_EN</code> 未定义则整套不编译。</li>
+      </ol>
+      <div class="ref">retransmitter.hpp:570 / transport_timer.hpp:90</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>外壳修补(不在 HLS 里):</strong>HLS 的 crc 块因 <code>DISABLE_CRC_*</code> 实为直通,真 iCRC 由 roce_stack 的 Verilog <code>icrc</code> 模块在 TX 出口补算(RX 侧 <code>extract_icrc</code> 把帧尾 4B 剥掉);RX 进核前有 FIFO + <code>ack_gap_enforcer</code>(连续 ACK 强制 85 周期间隔);READ REQUEST 出包经 <code>read_request_trimmer</code> 裁剪以兼容 Mellanox 网卡。<strong>层级勘误(2026-07-23 源码核实):</strong>组帧壳(crc/ipv4/udp)与 <code>ib_transport_protocol</code> 是 <code>rocev2()</code> 内平级的四兄弟(rocev2.cpp:95/121/133/149),组帧本体在 IB 层之外;但 TX 组帧所需的 <code>ipUdpMeta</code>(对端 IP/port + udpLen)由 <strong>IB 层内部</strong>的 <code>tx_ipUdpMetaMerger</code>(ib_transport_protocol.cpp:2060,例化 :2710)汇合 conn_table 查表结果与 generate_exh 的 udpLen 后经 <code>m_axis_tx_meta</code> 递出——此前该函数名误标在组帧 chip 上,现已改署 <code>generate_udp / generate_ipv4</code>。
+  </div>
+  <div class="note">
+    <strong>已停用的部件:</strong><code>read_req_table</code> 与 <code>multi_queue</code> 的实例化整体被注释(cpp:2742–2761),READ 响应落地地址改由 retransmitter 的 <code>retrans2rx_init</code> 前递;<code>drop_ooo_ibh</code> 定义处的注释 "Currently not used!!" 已过时——它实际在载荷主通路上。
+  </div>
+  </section>
+
+  <section id="sec-flow">
+  <div class="sec-eyebrow">FIG.3 · rtl/coyote/rdma_flow.sv(205 行)+ roce_stack.sv 接线</div>
+  <h2 class="sec-title"><code>rdma_flow</code> — 发送窗口流控与 offs 的一生</h2>
+  <p class="sec-lede">
+    坐在 SQ 命令面上的滑动窗:上游是 doorbell(Stage C)或 TB(Stage B)推来的 <code>dreq_t</code> 命令,
+    下游是 HLS 核的 <code>s_axis_sq_meta</code>。它按 {读/写, vfid, pid} 查 16 项指针表决定放行或阻塞,
+    放行时把窗口槽号写进 <code>req_1.offs</code>——这个 offs 一路贯穿 HLS 核、mux 和重传 URAM。
+  </p>
+  <div class="legend">
+    <span class="item"><span class="lg-swatch" style="border-color:var(--blue)"></span>SQ 请求方向</span>
+    <span class="item"><span class="lg-swatch" style="border-color:var(--teal)"></span>ACK / CQ 方向</span>
+    <span class="item"><span class="lg-swatch" style="border-color:var(--amber)"></span>offs 槽号旅程</span>
+    <span class="item"><span class="lg-swatch lg-dash" style="border-color:var(--ctrl)"></span>指针表读写</span>
+  </div>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1360 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="rdma_flow 发送窗口流控数据流">
+    <!-- upstream: doorbell / TB -->
+    <rect class="blk" x="40" y="140" width="240" height="280" rx="9"/>
+    <text class="t-title" x="160" y="168" text-anchor="middle">SQ 生产者(上游)</text>
+    <text class="t-sub t-mono" x="160" y="192" text-anchor="middle">Stage C: rdma_doorbell_l0</text>
+    <text class="t-note" x="160" y="210" text-anchor="middle">SQ ring 深 16 · BUDGET=8 in-flight</text>
+    <text class="t-note" x="160" y="225" text-anchor="middle">PMTU=4096 预切 FIRST/MID/LAST</text>
+    <text class="t-note" x="160" y="240" text-anchor="middle">每段一个 dreq(offs='0)</text>
+    <text class="t-sub t-mono" x="160" y="270" text-anchor="middle">Stage B: TB push_cmd()</text>
+    <text class="t-note" x="160" y="288" text-anchor="middle">write8k 手工预切 0x06+0x08</text>
+    <text class="t-note" x="160" y="392" text-anchor="middle">收 CQE → sq_compl++</text>
+    <text class="t-ref" x="160" y="408" text-anchor="middle">rdma_doorbell_l0.sv:315-338 / :495</text>
+
+    <!-- rdma_flow container -->
+    <rect class="blk-mux" x="360" y="100" width="540" height="560" rx="10"/>
+    <text class="t-title t-mono" x="380" y="128" text-anchor="start">rdma_flow(发送窗口流控)</text>
+
+    <rect class="ibox" x="390" y="150" width="170" height="110" rx="7"/>
+    <text class="t-sub" x="475" y="172" text-anchor="middle" style="fill:var(--ink)">5 态 FSM</text>
+    <text class="t-note" x="475" y="190" text-anchor="middle">IDLE 仲裁:ACK 优先</text>
+    <text class="t-note" x="475" y="205" text-anchor="middle">REQ_LUP: !issued||head≠tail</text>
+    <text class="t-note" x="475" y="220" text-anchor="middle">→ 放行并 head+1</text>
+    <text class="t-note" x="475" y="235" text-anchor="middle">ACK_LUP: tail+1 退休一槽</text>
+    <text class="t-ref" x="475" y="252" text-anchor="middle">L46 / L94 / L141</text>
+
+    <rect class="ibox" x="390" y="320" width="170" height="120" rx="7"/>
+    <text class="t-port" x="475" y="342" text-anchor="middle">inst_pntr_table</text>
+    <text class="t-note" x="475" y="359" text-anchor="middle">ram_sp_nc·16b/项</text>
+    <text class="t-note" x="475" y="374" text-anchor="middle">地址 {is_rd, vfid, pid}</text>
+    <text class="t-note" x="475" y="389" text-anchor="middle">{issued, head[3:0], tail[3:0]}</text>
+    <text class="t-note" x="475" y="404" text-anchor="middle">读/写窗口各一套</text>
+    <text class="t-ref" x="475" y="424" text-anchor="middle">L64-74 · L112-115</text>
+
+    <path class="ln-ctrl" d="M 475 260 V 316" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+    <text class="t-note" x="483" y="292" text-anchor="start">1 拍 RAM(LUP_WAIT)</text>
+
+    <rect class="chip" x="640" y="170" width="220" height="48" rx="6"/>
+    <text class="t-port" x="750" y="190" text-anchor="middle" style="font-size:10.5px">inst_sq(queue_meta ×16)</text>
+    <text class="t-note" x="750" y="207" text-anchor="middle">req_1.offs ← head 覆写</text>
+
+    <rect class="chip" x="640" y="400" width="220" height="48" rx="6"/>
+    <text class="t-port" x="750" y="420" text-anchor="middle" style="font-size:10.5px">inst_cq(queue_meta ×16)</text>
+    <text class="t-note" x="750" y="437" text-anchor="middle">仅 last-ACK 入队 → 每 WR 一个 CQE</text>
+
+    <!-- SQ direction -->
+    <path class="ln-blue" d="M 280 190 H 386" marker-end="url(#aBlue)"/>
+    <text class="t-map" x="330" y="183" text-anchor="middle">s_rdma_sq</text>
+    <text class="t-note" x="330" y="206" text-anchor="middle">dreq_t</text>
+    <path class="ln-blue" d="M 560 194 H 636" marker-end="url(#aBlue)"/>
+    <text class="t-map" x="598" y="187" text-anchor="middle">放行的 dreq</text>
+    <path class="ln-blue" d="M 860 194 H 976" marker-end="url(#aBlue)"/>
+    <text class="t-map" x="916" y="187" text-anchor="middle">m_req</text>
+    <path class="ln-blue" d="M 1160 190 H 1196" marker-end="url(#aBlue)"/>
+
+    <!-- ACK direction -->
+    <path class="ln-teal" d="M 1200 420 H 1164" marker-end="url(#aTeal)"/>
+    <path class="ln-teal" d="M 980 420 H 910 V 230 H 564" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="930" y="413" text-anchor="middle">s_ack</text>
+    <path class="ln-teal" d="M 560 250 H 600 V 370 H 750 V 396" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="668" y="363" text-anchor="middle">last-ACK(完成)</text>
+    <path class="ln-teal" d="M 640 424 H 320 V 384 H 284" marker-end="url(#aTeal)"/>
+    <text class="t-map" x="460" y="417" text-anchor="middle">m_rdma_ack(CQE)</text>
+
+    <!-- repack + HLS core + unpack -->
+    <rect class="chip" x="980" y="150" width="180" height="80" rx="6"/>
+    <text class="t-sub" x="1070" y="172" text-anchor="middle" style="fill:var(--ink)">248b txMeta 重打包</text>
+    <text class="t-note" x="1070" y="190" text-anchor="middle">offs @ bit[55:50]</text>
+    <text class="t-note" x="1070" y="205" text-anchor="middle">raddr 先于 laddr(FIX)</text>
+    <text class="t-ref" x="1070" y="220" text-anchor="middle">roce_stack.sv:89-109</text>
+
+    <rect class="blk" x="1200" y="100" width="120" height="460" rx="9"/>
+    <text class="t-title t-mono" x="1260" y="130" text-anchor="middle" style="font-size:13px">rocev2_ip</text>
+    <text class="t-note" x="1260" y="148" text-anchor="middle">(HLS 核,图 2)</text>
+    <text class="t-note" x="1260" y="180" text-anchor="middle">s_axis_sq_meta ↓</text>
+    <text class="t-note" x="1260" y="196" text-anchor="middle">local_req_handler</text>
+    <text class="t-note" x="1260" y="212" text-anchor="middle">消费·登记 offs</text>
+    <text class="t-note" x="1260" y="300" text-anchor="middle">offs 原样带回</text>
+    <text class="t-note" x="1260" y="316" text-anchor="middle">mem_*_cmd</text>
+    <text class="t-note" x="1260" y="430" text-anchor="middle">m_axis_rx_ack_meta ↑</text>
+
+    <rect class="chip" x="980" y="380" width="180" height="80" rx="6"/>
+    <text class="t-sub" x="1070" y="402" text-anchor="middle" style="fill:var(--ink)">ACK meta 解包</text>
+    <text class="t-note" x="1070" y="420" text-anchor="middle">→ dack_t{ack_t, last}</text>
+    <text class="t-ref" x="1070" y="436" text-anchor="middle">roce_stack.sv:115-126</text>
+
+    <!-- offs journey strip -->
+    <text class="t-sub" x="60" y="608" text-anchor="start" style="fill:var(--ink); font-weight:700">offs 的一生 —— 窗口槽号 = 重传缓冲槽号(贯穿图 1 / 图 2 / 图 3)</text>
+    <rect class="chip" x="60" y="640" width="200" height="70" rx="6"/>
+    <text class="t-sub" x="160" y="662" text-anchor="middle" style="fill:var(--ink)">rdma_flow 放行</text>
+    <text class="t-map" x="160" y="680" text-anchor="middle">req_1.offs = head</text>
+    <text class="t-ref" x="160" y="696" text-anchor="middle">rdma_flow.sv:130</text>
+    <rect class="chip" x="310" y="640" width="200" height="70" rx="6"/>
+    <text class="t-sub" x="410" y="662" text-anchor="middle" style="fill:var(--ink)">txMeta 打包</text>
+    <text class="t-map" x="410" y="680" text-anchor="middle">offs @ bit[55:50]</text>
+    <text class="t-ref" x="410" y="696" text-anchor="middle">roce_stack.sv:99</text>
+    <rect class="chip" x="560" y="640" width="200" height="70" rx="6"/>
+    <text class="t-sub" x="660" y="662" text-anchor="middle" style="fill:var(--ink)">HLS 原样带回</text>
+    <text class="t-map" x="660" y="680" text-anchor="middle">mem_*_cmd.offs</text>
+    <text class="t-ref" x="660" y="696" text-anchor="middle">roce_stack.sv:224/242</text>
+    <rect class="chip" x="810" y="640" width="200" height="70" rx="6"/>
+    <text class="t-sub" x="910" y="662" text-anchor="middle" style="fill:var(--ink)">mux 组地址</text>
+    <text class="t-map" x="910" y="680" text-anchor="middle">(offs≪12)≪27</text>
+    <text class="t-ref" x="910" y="696" text-anchor="middle">rdma_mux_retrans.sv:128-141</text>
+    <rect class="chip" x="1060" y="640" width="240" height="70" rx="6"/>
+    <text class="t-sub" x="1180" y="662" text-anchor="middle" style="fill:var(--ink)">rdma_retrans_uram 槽</text>
+    <text class="t-map" x="1180" y="680" text-anchor="middle">slot = addr[42:39] · 16×4KiB</text>
+    <text class="t-ref" x="1180" y="696" text-anchor="middle">rdma_retrans_uram.sv:58</text>
+    <path class="ln-amber" d="M 260 675 H 306" marker-end="url(#aAmber)"/>
+    <path class="ln-amber" d="M 510 675 H 556" marker-end="url(#aAmber)"/>
+    <path class="ln-amber" d="M 760 675 H 806" marker-end="url(#aAmber)"/>
+    <path class="ln-amber" d="M 1010 675 H 1056" marker-end="url(#aAmber)"/>
+    <text class="t-note" x="60" y="742" text-anchor="start">重传时:retransmitter 表项带原 offs → 重放的取数命令命中同一槽(HLS 内部旁路,ib_transport_protocol.cpp:1112/1140)</text>
+  </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3><span style="color:var(--blue)">窗口机制:满窗即阻塞</span></h3>
+      <ol>
+        <li>窗口按 <code>{读/写, vfid, pid}</code> 独立——指针表地址的最高位区分 READ / WRITE,<strong>读写各一套 head/tail/issued</strong>。</li>
+        <li>满窗条件:<code>issued &amp;&amp; head==tail</code>(16 个段在途);此时 <code>s_req.ready</code> 保持 0,上游被反压。窗空是同样的 head==tail 但 issued=0。</li>
+        <li>每收一个段 ACK 就 tail+1 退休一槽——<strong>隐含按序 ACK 假设</strong>。FSM 在 IDLE 里 ACK 优先于新请求,满窗一定能被 ACK 解锁,无死锁。单事务 3–4 拍(查表等 1 拍 RAM)。</li>
+        <li><code>RDMA_N_WR_OUTSTANDING=16</code>(lynx_pkg.sv:218);OFFS_BITS=6 但窗口只用低 4 位。</li>
+      </ol>
+      <div class="ref">rdma_flow.sv L94 / L141–184</div>
+    </div>
+    <div class="card">
+      <h3><span style="color:var(--teal)">CQ 语义与上游分工</span></h3>
+      <ol>
+        <li>只有 <code>last=1</code> 的 ACK 进 CQ 队列 → <strong>每个 WR 一个 CQE</strong>,多段 WR 的中间段 ACK 只退窗、不上报。</li>
+        <li>roce_stack 自己不切大 WR:<strong>&gt;PMTU 的切分在上游完成</strong>——Stage C 由 doorbell 预切 FIRST/MIDDLE/LAST,Stage B 由 TB 手工推两段;每段独立过 rdma_flow 拿一个 offs("one offs per segment")。</li>
+        <li>doorbell 收 CQE 后 <code>sq_compl++</code>,且自身另有 SQ_BUDGET=8 的在途 WR 节流,与这里的 16 段窗口叠加。</li>
+      </ol>
+      <div class="ref">rdma_flow.sv L144–145 · rdma_doorbell_l0.sv:172-338</div>
+    </div>
+    <div class="card">
+      <h3><span style="color:var(--amber)">offs:把三张图串起来的线索</span></h3>
+      <ol>
+        <li>rdma_flow 写进 <code>req_1.offs</code> 的窗口槽号,就是图 2 里 <code>local_req_handler</code> 登记进重传表、随取数命令原样带回的那个 offs。</li>
+        <li>也是图 1 里 mux 拼重传缓冲地址、URAM 按 <code>addr[42:39]</code> 索槽的那个 offs——<strong>命令面的窗口槽号 = 数据面的重传缓冲槽号</strong>,16 槽恰好对应 16 段窗口。</li>
+        <li>注意:READ 窗口的消费端 <code>m_rdma_rd_req</code> 在 L0 只被计数并恒 ready 吸掉(本平台暂不支持作 READ 响应方),实际起作用的是 WRITE 窗口。</li>
+      </ol>
+      <div class="ref">roce_l0_top.sv:92-98 · rdma_retrans_uram.sv:58</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>一处已修正的记录:</strong>offs 在 248b txMeta 里的位置是 <code>rdma_sq_data[32+16+2 +: 6]</code> = bit[55:50](opcode 32b、qpn 16b、host、last 之后)——此前笔记里写的 [54:49] 有误,以 roce_stack.sv:99 为准。
+  </div>
+  </section>
+</div>
+
+

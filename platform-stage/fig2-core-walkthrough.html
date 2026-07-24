@@ -1,0 +1,685 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>图 2 解读 · RoCEv2 核内部数据流</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --surface: #ffffff; --panel: #fbfcfd; --panel2: #f1f4f7;
+    --ink: #1c2430; --muted: #5c6b7d; --line: #ccd4dd; --line-soft: #dde3ea;
+    --blue: #2563eb; --teal: #0d9488; --amber: #d97706;
+    --flow: #33415e; --ctrl: #8a97a8; --code-bg: #eef1f5;
+    --focus: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --surface: #1a2028; --panel: #1e2530; --panel2: #232b38;
+      --ink: #e4eaf2; --muted: #93a3b5; --line: #323c4a; --line-soft: #2a3340;
+      --blue: #6aa1f8; --teal: #34d3bc; --amber: #f0a63a;
+      --flow: #aab9d0; --ctrl: #6b7889; --code-bg: #232b38; --focus: #6aa1f8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161c; --surface: #1a2028; --panel: #1e2530; --panel2: #232b38;
+    --ink: #e4eaf2; --muted: #93a3b5; --line: #323c4a; --line-soft: #2a3340;
+    --blue: #6aa1f8; --teal: #34d3bc; --amber: #f0a63a;
+    --flow: #aab9d0; --ctrl: #6b7889; --code-bg: #232b38; --focus: #6aa1f8;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --surface: #ffffff; --panel: #fbfcfd; --panel2: #f1f4f7;
+    --ink: #1c2430; --muted: #5c6b7d; --line: #ccd4dd; --line-soft: #dde3ea;
+    --blue: #2563eb; --teal: #0d9488; --amber: #d97706;
+    --flow: #33415e; --ctrl: #8a97a8; --code-bg: #eef1f5; --focus: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.75; margin: 0; padding: 36px 22px 72px;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px;
+  }
+  h1 { font-size: 25px; line-height: 1.3; margin: 0 0 8px; font-weight: 700; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 64em; margin: 0 0 20px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .9em; background: var(--code-bg); border-radius: 4px; padding: 1px 5px;
+  }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .nav-btn {
+    appearance: none; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); border-radius: 8px; padding: 7px 16px; font-size: 14px;
+    cursor: pointer; font-family: inherit;
+  }
+  .nav-btn:hover { border-color: var(--flow); }
+  .nav-btn:disabled { opacity: .38; cursor: default; }
+  .nav-btn:focus-visible, .chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .progress {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    color: var(--muted); margin-left: 2px; font-variant-numeric: tabular-nums;
+  }
+  .kbd-hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .kbd-hint kbd {
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+    border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
+    padding: 0 5px; background: var(--surface);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip {
+    appearance: none; font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+    border-radius: 999px; padding: 4px 12px; font-size: 12.5px; line-height: 1.5;
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ctrl); flex: none; }
+  .chip[data-flow="1"] .dot { background: var(--blue); }
+  .chip[data-flow="2"] .dot { background: var(--teal); }
+  .chip[data-flow="3"] .dot { background: var(--amber); }
+  .chip.active { border-color: var(--flow); color: var(--ink); background: var(--panel2); font-weight: 600; }
+  .narration {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
+    padding: 18px 22px 14px; margin-bottom: 16px; min-height: 190px;
+  }
+  .narration .step-eyebrow {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+    letter-spacing: .09em; color: var(--muted); margin-bottom: 2px;
+  }
+  .narration .step-eyebrow .fl1 { color: var(--blue); font-weight: 700; }
+  .narration .step-eyebrow .fl2 { color: var(--teal); font-weight: 700; }
+  .narration .step-eyebrow .fl3 { color: var(--amber); font-weight: 700; }
+  .narration h3 { font-size: 17px; margin: 0 0 8px; }
+  .narration p { margin: 8px 0; max-width: 74em; }
+  .narration .ref {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+    color: var(--ctrl); margin-top: 10px;
+  }
+  .narration strong { color: var(--ink); }
+  .narration .b { font-weight: 700; }
+  .narration .c1 { color: var(--blue); } .narration .c2 { color: var(--teal); } .narration .c3 { color: var(--amber); }
+  .diagram {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
+    overflow-x: auto; margin-bottom: 28px;
+  }
+  .diagram svg { display: block; min-width: 1200px; width: 100%; height: auto; }
+  g[data-dim] { transition: opacity .35s ease; }
+  g[data-dim].faded { opacity: .12; }
+  @media (prefers-reduced-motion: reduce) { g[data-dim] { transition: none; } }
+  .blk { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  .blk-mux { fill: var(--panel2); stroke: var(--line); stroke-width: 1.6; }
+  .ibox { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; }
+  .chipbox { fill: var(--surface); stroke: var(--ctrl); stroke-width: 1; }
+  .t-title { font-size: 14px; font-weight: 700; fill: var(--ink); }
+  .t-sub   { font-size: 10.5px; fill: var(--muted); }
+  .t-mono  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .t-port  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; font-weight: 700; fill: var(--ink); }
+  .t-map   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 9.5px; fill: var(--muted); }
+  .t-note  { font-size: 9.5px; fill: var(--muted); }
+  .t-ref   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 8.5px; fill: var(--ctrl); }
+  .ln-flow  { stroke: var(--flow);  stroke-width: 2.4; fill: none; }
+  .ln-blue  { stroke: var(--blue);  stroke-width: 2.4; fill: none; }
+  .ln-teal  { stroke: var(--teal);  stroke-width: 2.4; fill: none; }
+  .ln-amber { stroke: var(--amber); stroke-width: 2.4; fill: none; }
+  .ln-ctrl  { stroke: var(--ctrl);  stroke-width: 1.7; fill: none; stroke-dasharray: 5 4; }
+  h2 { font-size: 18px; margin: 34px 0 12px; }
+  .tblwrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; background: var(--panel2); }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .footnote { color: var(--muted); font-size: 12.5px; margin-top: 26px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 数据流图集 · 图 2 分步导览</div>
+  <h1>RoCEv2 核内部 —— 上半收、下半发、中间五张表</h1>
+  <p class="lede">
+    fns HLS 核(<code>rocev2.cpp</code> / <code>ib_transport_protocol.cpp</code>,2830 行)的解剖图。
+    布局本身就是语义:<strong>上半带 RX 流水线(左→右)、中间带五张 per-QP 状态表、下半带 TX 流水线(右→左)、左缘组帧壳</strong>。
+    颜色:<span style="color:var(--blue);font-weight:700">蓝=载荷/包数据</span> ·
+    <span style="color:var(--teal);font-weight:700">青=meta/命令/事件</span> ·
+    <span style="color:var(--amber);font-weight:700">琥珀=可靠性</span> · 灰虚线=查表/控制。
+  </p>
+
+  <div class="controls">
+    <button class="nav-btn" id="btn-prev" type="button">‹ 上一步</button>
+    <button class="nav-btn" id="btn-next" type="button">下一步 ›</button>
+    <span class="progress" id="progress"></span>
+    <span class="kbd-hint">键盘 <kbd>←</kbd> <kbd>→</kbd> 也能翻页</span>
+  </div>
+  <div class="chips" id="chips" role="tablist" aria-label="讲解步骤"></div>
+
+  <div class="narration" id="narration" aria-live="polite"></div>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1460 1200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RoCEv2 核内部数据流分步导览图">
+    <defs>
+      <marker id="aBlue"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--blue)"/></marker>
+      <marker id="aTeal"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--teal)"/></marker>
+      <marker id="aAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--amber)"/></marker>
+      <marker id="aCtrl"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ctrl)"/></marker>
+    </defs>
+
+    <!-- ===== 外壳:组帧/解帧 + MAC 修补 ===== -->
+    <g id="G-shell" data-dim>
+      <rect class="chipbox" x="25" y="150" width="160" height="60" rx="6"/>
+      <text class="t-sub" x="105" y="172" text-anchor="middle" style="fill:var(--ink)">MAC RX 修补</text>
+      <text class="t-note" x="105" y="188" text-anchor="middle">FIFO + ack_gap_enforcer</text>
+      <text class="t-note" x="105" y="201" text-anchor="middle">(ACK 间 85T IPG)</text>
+      <rect class="chipbox" x="215" y="150" width="150" height="60" rx="6"/>
+      <text class="t-sub" x="290" y="172" text-anchor="middle" style="fill:var(--ink)">解帧</text>
+      <text class="t-note" x="290" y="188" text-anchor="middle">crc(直通)·IPv4·UDP</text>
+      <text class="t-ref" x="290" y="201" text-anchor="middle">rocev2.cpp:95-149</text>
+      <rect class="chipbox" x="215" y="1000" width="150" height="60" rx="6"/>
+      <text class="t-sub" x="290" y="1022" text-anchor="middle" style="fill:var(--ink)">组帧</text>
+      <text class="t-note" x="290" y="1038" text-anchor="middle">UDP·IPv4·crc(直通)</text>
+      <text class="t-ref" x="290" y="1051" text-anchor="middle">generate_udp / generate_ipv4</text>
+      <rect class="chipbox" x="25" y="1000" width="160" height="60" rx="6"/>
+      <text class="t-sub" x="105" y="1022" text-anchor="middle" style="fill:var(--ink)">MAC TX 修补</text>
+      <text class="t-note" x="105" y="1038" text-anchor="middle">read_request_trimmer</text>
+      <text class="t-note" x="105" y="1051" text-anchor="middle">→ icrc(真 iCRC 在此)</text>
+      <path class="ln-blue" d="M 185 180 H 211" marker-end="url(#aBlue)"/>
+      <path class="ln-blue" d="M 365 180 H 426" marker-end="url(#aBlue)"/>
+      <path class="ln-blue" d="M 215 1030 H 189" marker-end="url(#aBlue)"/>
+      <path class="ln-blue" d="M 410 1015 H 369" marker-end="url(#aBlue)"/>
+    </g>
+
+    <g id="G-frame" data-dim>
+      <rect class="blk-mux" x="400" y="100" width="850" height="1080" rx="10"/>
+      <text class="t-title t-mono" x="415" y="128" text-anchor="start">ib_transport_protocol(IB 传输层核心)</text>
+    </g>
+
+    <!-- ===== RX 带 ===== -->
+    <g id="G-ibh" data-dim>
+      <rect class="ibox" x="430" y="150" width="150" height="64" rx="7"/>
+      <text class="t-port" x="505" y="172" text-anchor="middle">rx_process_ibh</text>
+      <text class="t-sub" x="505" y="188" text-anchor="middle">解析 BTH</text>
+      <text class="t-note" x="505" y="202" text-anchor="middle">PSN·opcode·destQP</text>
+    </g>
+
+    <g id="G-rxdata" data-dim>
+      <path class="ln-blue" d="M 580 180 H 746" marker-end="url(#aBlue)"/>
+      <rect class="chipbox" x="606" y="164" width="60" height="32" rx="5"/>
+      <text class="t-map" x="636" y="184" text-anchor="middle">−BTH 12B</text>
+      <path class="ln-blue" d="M 900 180 H 926" marker-end="url(#aBlue)"/>
+      <path class="ln-blue" d="M 1070 180 H 1096" marker-end="url(#aBlue)"/>
+    </g>
+
+    <g id="G-exh" data-dim>
+      <rect class="ibox" x="750" y="150" width="150" height="64" rx="7"/>
+      <text class="t-port" x="825" y="172" text-anchor="middle">rx_process_exh</text>
+      <text class="t-sub" x="825" y="188" text-anchor="middle">解析 RETH/AETH</text>
+      <text class="t-note" x="825" y="202" text-anchor="middle">numPkg 计算</text>
+    </g>
+
+    <g id="G-drop" data-dim>
+      <rect class="ibox" x="930" y="150" width="140" height="64" rx="7"/>
+      <text class="t-port" x="1000" y="172" text-anchor="middle">drop_ooo_ibh</text>
+      <text class="t-sub" x="1000" y="188" text-anchor="middle">乱序整包丢弃</text>
+      <text class="t-ref" x="1000" y="202" text-anchor="middle">L788 / L2563</text>
+    </g>
+
+    <g id="G-merge" data-dim>
+      <rect class="ibox" x="1100" y="150" width="130" height="64" rx="7"/>
+      <text class="t-sub" x="1165" y="170" text-anchor="middle" style="fill:var(--ink)">剥 RETH/AETH</text>
+      <text class="t-port" x="1165" y="186" text-anchor="middle" style="font-size:10px">merge_rx_pkgs</text>
+      <text class="t-note" x="1165" y="201" text-anchor="middle">−16B / −4B 合流</text>
+    </g>
+
+    <g id="G-ibhfsm" data-dim>
+      <rect class="ibox" x="520" y="280" width="160" height="70" rx="7"/>
+      <text class="t-port" x="600" y="300" text-anchor="middle">rx_ibh_fsm</text>
+      <text class="t-sub" x="600" y="316" text-anchor="middle">PSN 序检查·重复窗</text>
+      <text class="t-note" x="600" y="330" text-anchor="middle">NAK 门控 retryCounter</text>
+      <text class="t-ref" x="600" y="344" text-anchor="middle">L256</text>
+    </g>
+
+    <g id="G-exhfsm" data-dim>
+      <rect class="ibox" x="750" y="280" width="170" height="90" rx="7"/>
+      <text class="t-port" x="835" y="300" text-anchor="middle">rx_exh_fsm</text>
+      <text class="t-sub" x="835" y="316" text-anchor="middle">按 opcode 分发执行</text>
+      <text class="t-note" x="835" y="331" text-anchor="middle">落地命令·读请求·事件</text>
+      <text class="t-note" x="835" y="345" text-anchor="middle">WRITE 游标 ↔ msn_table</text>
+      <text class="t-ref" x="835" y="361" text-anchor="middle">L484</text>
+    </g>
+
+    <g id="G-m-ibhmeta" data-dim>
+      <path class="ln-teal" d="M 505 214 V 315 H 516" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="498" y="256" text-anchor="end">ibhMeta+PSN</text>
+    </g>
+    <g id="G-m-exh" data-dim>
+      <path class="ln-teal" d="M 790 214 V 255 H 640 V 276" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="712" y="248" text-anchor="middle">exhMeta{isNak,numPkg}</text>
+      <path class="ln-teal" d="M 860 214 V 276" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="866" y="250" text-anchor="start">ExHeader</text>
+    </g>
+    <g id="G-m-release" data-dim>
+      <path class="ln-teal" d="M 680 315 H 746" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="713" y="308" text-anchor="middle">放行 meta</text>
+    </g>
+    <g id="G-ctl-drop" data-dim>
+      <path class="ln-ctrl" d="M 680 290 H 710 V 240 H 784 A 6 6 0 0 0 796 240 H 854 A 6 6 0 0 0 866 240 H 1000 V 218" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="935" y="233" text-anchor="middle">drop?</text>
+    </g>
+
+    <g id="G-readreq" data-dim>
+      <path class="ln-teal" d="M 920 358 H 1240 V 682 A 6 6 0 0 1 1240 694 V 785 H 1140 V 796" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="1246" y="432" text-anchor="end">readRequest{vaddr,len,psn}</text>
+    </g>
+
+    <!-- ===== 状态表带 ===== -->
+    <g id="G-t-state" data-dim>
+      <rect class="ibox" x="430" y="470" width="150" height="80" rx="7"/>
+      <text class="t-port" x="505" y="492" text-anchor="middle">state_table</text>
+      <text class="t-note" x="505" y="508" text-anchor="middle">resp_epsn / req_next_psn</text>
+      <text class="t-note" x="505" y="522" text-anchor="middle">重复窗·retryCounter(3b)</text>
+      <text class="t-ref" x="505" y="539" text-anchor="middle">state_table.hpp:122</text>
+    </g>
+    <g id="G-t-msn" data-dim>
+      <rect class="ibox" x="640" y="470" width="150" height="80" rx="7"/>
+      <text class="t-port" x="715" y="492" text-anchor="middle">msn_table</text>
+      <text class="t-note" x="715" y="508" text-anchor="middle">MSN·多包 vaddr 游标</text>
+      <text class="t-note" x="715" y="522" text-anchor="middle">r_key</text>
+      <text class="t-ref" x="715" y="539" text-anchor="middle">msn_table.hpp:92</text>
+    </g>
+    <g id="G-t-retrans" data-dim>
+      <rect class="ibox" x="820" y="455" width="160" height="120" rx="7"/>
+      <text class="t-port" x="900" y="477" text-anchor="middle">retransmitter</text>
+      <text class="t-note" x="900" y="494" text-anchor="middle">PSN→{laddr,raddr,len,offs}</text>
+      <text class="t-note" x="900" y="508" text-anchor="middle">per-QP 链表·2000 项池</text>
+      <text class="t-note" x="900" y="522" text-anchor="middle">ACK 释放·NAK 定点重放</text>
+      <text class="t-note" x="900" y="536" text-anchor="middle">超时全量重放</text>
+      <text class="t-note" x="900" y="550" text-anchor="middle">READ_RESP 部分更新</text>
+      <text class="t-ref" x="900" y="566" text-anchor="middle">retransmitter.hpp:570</text>
+    </g>
+    <g id="G-t-timer" data-dim>
+      <rect class="ibox" x="1010" y="470" width="110" height="80" rx="7"/>
+      <text class="t-port" x="1065" y="490" text-anchor="middle" style="font-size:10px">transport_timer</text>
+      <text class="t-note" x="1065" y="506" text-anchor="middle">1/5/12/64ms·×12</text>
+      <text class="t-note" x="1065" y="520" text-anchor="middle">武装:generate_exh</text>
+      <text class="t-note" x="1065" y="534" text-anchor="middle">清零:收有效响应</text>
+    </g>
+    <g id="G-t-conn" data-dim>
+      <rect class="ibox" x="1150" y="470" width="100" height="80" rx="7"/>
+      <text class="t-port" x="1200" y="492" text-anchor="middle" style="font-size:10.5px">conn_table</text>
+      <text class="t-note" x="1200" y="508" text-anchor="middle">remote qpn/IP</text>
+      <text class="t-note" x="1200" y="521" text-anchor="middle">udp_port</text>
+    </g>
+    <g id="G-timer-fire" data-dim>
+      <path class="ln-amber" d="M 1010 512 H 984" marker-end="url(#aAmber)"/>
+      <text class="t-note" x="997" y="505" text-anchor="middle">超时</text>
+    </g>
+
+    <!-- RX 侧查表与可靠性 -->
+    <g id="G-l-state" data-dim>
+      <path class="ln-ctrl" d="M 560 350 V 466" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="566" y="412" text-anchor="start">查/写 epsn·retry</text>
+    </g>
+    <g id="G-l-msn" data-dim>
+      <path class="ln-ctrl" d="M 770 370 V 466" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="764" y="400" text-anchor="end">MSN·vaddr 游标</text>
+    </g>
+    <g id="G-a-nak" data-dim>
+      <path class="ln-amber" d="M 870 370 V 451" marker-end="url(#aAmber)"/>
+      <text class="t-note" x="864" y="434" text-anchor="end" style="fill:var(--amber)">NAK 重放</text>
+    </g>
+    <g id="G-a-laddr" data-dim>
+      <path class="ln-amber" d="M 900 455 V 374" marker-end="url(#aAmber)"/>
+      <text class="t-note" x="906" y="416" text-anchor="start" style="fill:var(--amber)">laddr 前递</text>
+    </g>
+    <g id="G-a-ackrel" data-dim>
+      <path class="ln-amber" d="M 610 350 V 600 H 694 A 6 6 0 0 0 706 600 H 799 A 6 6 0 0 0 811 600 H 900 V 579" marker-end="url(#aAmber)"/>
+      <text class="t-note" x="616" y="592" text-anchor="start" style="fill:var(--amber)">ACK 释放表项(+清定时器)</text>
+    </g>
+    <g id="G-evt-cross" data-dim>
+      <path class="ln-teal" d="M 805 370 V 594 A 6 6 0 0 1 805 606 V 645 H 830 V 656" marker-end="url(#aTeal)"/>
+      <text class="t-map" transform="rotate(-90 796 520)" x="796" y="520" text-anchor="middle">ACK/NAK·完成事件</text>
+    </g>
+
+    <!-- ===== TX 带(自右向左) ===== -->
+    <g id="G-lrh" data-dim>
+      <rect class="ibox" x="1030" y="660" width="200" height="80" rx="7"/>
+      <text class="t-port" x="1130" y="682" text-anchor="middle">local_req_handler</text>
+      <text class="t-sub" x="1130" y="698" text-anchor="middle">SQ 命令入口</text>
+      <text class="t-note" x="1130" y="713" text-anchor="middle">重传事件优先于新 WQE</text>
+      <text class="t-ref" x="1130" y="729" text-anchor="middle">L1074</text>
+    </g>
+    <g id="G-mm" data-dim>
+      <rect class="ibox" x="820" y="660" width="170" height="80" rx="7"/>
+      <text class="t-port" x="905" y="682" text-anchor="middle">meta_merger</text>
+      <text class="t-sub" x="905" y="698" text-anchor="middle">事件仲裁</text>
+      <text class="t-note" x="905" y="713" text-anchor="middle">ACK &gt; 读响应 &gt; 本地/重传</text>
+      <text class="t-ref" x="905" y="729" text-anchor="middle">L1327</text>
+    </g>
+    <g id="G-gexh" data-dim>
+      <rect class="ibox" x="640" y="660" width="150" height="80" rx="7"/>
+      <text class="t-port" x="715" y="682" text-anchor="middle">generate_exh</text>
+      <text class="t-sub" x="715" y="698" text-anchor="middle">RETH/AETH 生成</text>
+      <text class="t-note" x="715" y="713" text-anchor="middle">武装定时器·算 udpLen</text>
+      <text class="t-ref" x="715" y="729" text-anchor="middle">L1499</text>
+    </g>
+    <g id="G-gibh" data-dim>
+      <rect class="ibox" x="450" y="660" width="150" height="80" rx="7"/>
+      <text class="t-port" x="525" y="682" text-anchor="middle">generate_ibh</text>
+      <text class="t-sub" x="525" y="698" text-anchor="middle">BTH·PSN 分配</text>
+      <text class="t-note" x="525" y="713" text-anchor="middle">req_next_psn += numPkg</text>
+      <text class="t-ref" x="525" y="729" text-anchor="middle">L1401</text>
+    </g>
+    <g id="G-hrr" data-dim>
+      <rect class="ibox" x="1030" y="800" width="200" height="80" rx="7"/>
+      <text class="t-port" x="1130" y="822" text-anchor="middle">handle_read_requests</text>
+      <text class="t-sub" x="1130" y="838" text-anchor="middle">远端 READ 按 PMTU 切分</text>
+      <text class="t-note" x="1130" y="853" text-anchor="middle">每段: 读命令+事件(psn++)</text>
+      <text class="t-ref" x="1130" y="869" text-anchor="middle">L922</text>
+    </g>
+    <g id="G-mcm" data-dim>
+      <rect class="ibox" x="820" y="800" width="170" height="80" rx="7"/>
+      <text class="t-port" x="905" y="822" text-anchor="middle">mem_cmd_merger</text>
+      <text class="t-sub" x="905" y="838" text-anchor="middle">命令合流(远端读优先)</text>
+      <text class="t-note" x="905" y="853" text-anchor="middle">1:1 发 pkgInfo 顺序契约</text>
+      <text class="t-ref" x="905" y="869" text-anchor="middle">L1149</text>
+    </g>
+    <g id="G-tpa" data-dim>
+      <rect class="ibox" x="640" y="800" width="150" height="80" rx="7"/>
+      <text class="t-port" x="715" y="822" text-anchor="middle">tx_pkg_arbiter</text>
+      <text class="t-sub" x="715" y="838" text-anchor="middle">载荷三路分流</text>
+      <text class="t-note" x="715" y="853" text-anchor="middle">AETH/RETH/RAW·PMTU 截断</text>
+      <text class="t-ref" x="715" y="869" text-anchor="middle">L1222</text>
+    </g>
+    <g id="G-ap" data-dim>
+      <rect class="ibox" x="450" y="800" width="150" height="80" rx="7"/>
+      <text class="t-port" x="525" y="822" text-anchor="middle">append_payload</text>
+      <text class="t-sub" x="525" y="838" text-anchor="middle">拼 EXH+载荷</text>
+      <text class="t-note" x="525" y="853" text-anchor="middle">左移 4B/16B 腾位</text>
+      <text class="t-ref" x="525" y="869" text-anchor="middle">L1757</text>
+    </g>
+    <g id="G-pih" data-dim>
+      <rect class="ibox" x="410" y="980" width="150" height="70" rx="7"/>
+      <text class="t-port" x="485" y="1002" text-anchor="middle" style="font-size:10.5px">prepend_ibh_header</text>
+      <text class="t-sub" x="485" y="1018" text-anchor="middle">填 BTH 发包</text>
+      <text class="t-note" x="485" y="1033" text-anchor="middle">整包已左移 12B</text>
+    </g>
+
+    <!-- TX 连线 -->
+    <g id="G-evt-lrh2mm" data-dim>
+      <path class="ln-teal" d="M 1030 690 H 994" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="1012" y="683" text-anchor="middle">事件</text>
+    </g>
+    <g id="G-cmd-lrh" data-dim>
+      <path class="ln-blue" d="M 1100 740 V 770 H 940 V 796" marker-end="url(#aBlue)"/>
+      <text class="t-map" x="1022" y="763" text-anchor="middle">本地取数命令</text>
+    </g>
+    <g id="G-a-reg1" data-dim>
+      <path class="ln-amber" d="M 1150 660 V 620 H 935 V 579" marker-end="url(#aAmber)"/>
+      <text class="t-map" x="1100" y="613" text-anchor="middle" style="fill:var(--amber)">登记{addr,len,offs}</text>
+    </g>
+    <g id="G-a-replay" data-dim>
+      <path class="ln-amber" d="M 955 575 V 612 A 10 10 0 0 1 955 632 V 640 H 1070 V 656" marker-end="url(#aAmber)"/>
+      <text class="t-map" x="1016" y="653" text-anchor="middle" style="fill:var(--amber)">重传重放(优先)</text>
+    </g>
+    <g id="G-a-reg2" data-dim>
+      <path class="ln-amber" d="M 530 660 V 648 H 694 A 6 6 0 0 0 706 648 H 845 V 606 A 6 6 0 0 0 845 594 V 579" marker-end="url(#aAmber)"/>
+      <text class="t-map" x="560" y="641" text-anchor="start" style="fill:var(--amber)">登记{psn,opcode}</text>
+    </g>
+    <g id="G-mm2gexh" data-dim>
+      <path class="ln-teal" d="M 820 690 H 794" marker-end="url(#aTeal)"/>
+    </g>
+    <g id="G-ibhmeta-path" data-dim>
+      <path class="ln-teal" d="M 860 740 V 760 H 736 A 6 6 0 0 0 724 760 H 560 V 746" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="820" y="772" text-anchor="middle">ibhMeta</text>
+    </g>
+    <g id="G-gexh2ap" data-dim>
+      <path class="ln-teal" d="M 730 740 V 775 H 570 V 796" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="742" y="768" text-anchor="start">EXH 头+packetInfo</text>
+    </g>
+    <g id="G-pkginfo" data-dim>
+      <path class="ln-ctrl" d="M 820 820 H 794" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="807" y="813" text-anchor="middle">pkgInfo</text>
+    </g>
+    <g id="G-rdresp-evt" data-dim>
+      <path class="ln-teal" d="M 1030 830 H 965 V 776 A 6 6 0 0 0 965 764 V 746" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="1000" y="823" text-anchor="middle">读响应事件</text>
+    </g>
+    <g id="G-hrr2mcm" data-dim>
+      <path class="ln-blue" d="M 1030 850 H 994" marker-end="url(#aBlue)"/>
+    </g>
+    <g id="G-tpa2ap" data-dim>
+      <path class="ln-blue" d="M 640 840 H 604" marker-end="url(#aBlue)"/>
+    </g>
+    <g id="G-ap2pih" data-dim>
+      <path class="ln-blue" d="M 525 880 V 976" marker-end="url(#aBlue)"/>
+    </g>
+    <g id="G-bth" data-dim>
+      <path class="ln-teal" d="M 450 700 H 420 V 976" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="426" y="870" text-anchor="start">BTH</text>
+    </g>
+    <g id="G-l-psn" data-dim>
+      <path class="ln-ctrl" d="M 505 660 V 554" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="511" y="610" text-anchor="start">取/写 PSN</text>
+    </g>
+    <g id="G-l-msn2" data-dim>
+      <path class="ln-ctrl" d="M 700 660 V 554" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="706" y="610" text-anchor="start">查 msn/r_key</text>
+    </g>
+    <g id="G-l-conn" data-dim>
+      <path class="ln-ctrl" d="M 930 656 V 630 H 1180 V 554" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="1055" y="624" text-anchor="middle">查 remote_qpn/IP/port</text>
+    </g>
+
+    <!-- ===== 外部口(右缘) ===== -->
+    <g id="G-x-wrdata" data-dim>
+      <path class="ln-blue" d="M 1230 180 H 1262" marker-end="url(#aBlue)"/>
+      <text class="t-port" x="1272" y="174">m_axis_mem_write_data</text>
+      <text class="t-note" x="1272" y="192">→ m_axis_rdma_wr(直连用户)</text>
+    </g>
+    <g id="G-x-wrcmd" data-dim>
+      <path class="ln-teal" d="M 920 295 H 1262" marker-end="url(#aTeal)"/>
+      <text class="t-port" x="1272" y="289">m_axis_mem_write_cmd</text>
+      <text class="t-note" x="1272" y="307">→ m_rdma_wr_req(不经 mux)</text>
+    </g>
+    <g id="G-x-ackmeta" data-dim>
+      <path class="ln-teal" d="M 920 330 H 1262" marker-end="url(#aTeal)"/>
+      <text class="t-port" x="1272" y="324">m_axis_rx_ack_meta</text>
+      <text class="t-note" x="1272" y="342">→ rdma_flow → CQ(图 3)</text>
+    </g>
+    <g id="G-x-sq" data-dim>
+      <path class="ln-blue" d="M 1262 690 H 1234" marker-end="url(#aBlue)"/>
+      <text class="t-port" x="1272" y="684">s_axis_sq_meta</text>
+      <text class="t-note" x="1272" y="702">← rdma_flow(txMeta·含 offs)</text>
+    </g>
+    <g id="G-x-rdcmd" data-dim>
+      <path class="ln-blue" d="M 905 880 V 910 H 1262" marker-end="url(#aBlue)"/>
+      <text class="t-port" x="1272" y="904">m_axis_mem_read_cmd</text>
+      <text class="t-note" x="1272" y="922">→ mux s_req_net(图 1)</text>
+    </g>
+    <g id="G-x-rddata" data-dim>
+      <path class="ln-blue" d="M 1262 940 H 810 V 860 H 794" marker-end="url(#aBlue)"/>
+      <text class="t-port" x="1272" y="936">s_axis_mem_read_data</text>
+      <text class="t-note" x="1272" y="958">← mux m_axis_net 汇合载荷</text>
+    </g>
+  </svg>
+  </div>
+
+  <h2>外部口速查(六个口,各自去向)</h2>
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th>方向</th><th>HLS 核端口</th><th>接到哪</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>出</td><td><code>m_axis_mem_write_cmd</code></td><td><code>m_rdma_wr_req</code> 直连用户</td><td>远端 WRITE 的放置描述符,<strong>不经图 1 mux</strong></td></tr>
+        <tr><td>出</td><td><code>m_axis_mem_write_data</code></td><td><code>m_axis_rdma_wr</code> 直连用户</td><td>放置数据(placement 观察口)</td></tr>
+        <tr><td>出</td><td><code>m_axis_rx_ack_meta</code></td><td>rdma_flow → CQ(图 3)</td><td>ACK/CQE 事件,只有 last=1 进 CQ</td></tr>
+        <tr><td>入</td><td><code>s_axis_sq_meta</code></td><td>← rdma_flow(图 3)</td><td>248b txMeta,含被覆写的 offs</td></tr>
+        <tr><td>出</td><td><code>m_axis_mem_read_cmd</code></td><td>→ 图 1 mux 的 <code>s_req_net</code></td><td>三种场景共用的取数命令口</td></tr>
+        <tr><td>入</td><td><code>s_axis_mem_read_data</code></td><td>← 图 1 mux 的 <code>m_axis_net</code></td><td>三路汇合后的发包 payload</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footnote">
+    源:《RoCE 数据流图集》图 2(third_party/fpga-network-stack/hls,rocev2.cpp / ib_transport_protocol.cpp 2830 行;原图连线经 190 条断言对源码核对)·
+    交叉证据:Stage B B5(RX ICRC 检查被编译禁用)/ rx_neg 三幕(重复 PSN·NAK 0x60)/ write12k MIDDLE 游标 / B9 定时器重传(平台 d_retrans_b9 实测 ~626µs@250MHz)·
+    HLS STREAM depth 深潜文档"csim 报告里的 1999" = retransmitter 2000 项池的 free-list。图 1 / 图 3 见原图集与图 1 导览。
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var ALL = ["G-shell","G-frame","G-ibh","G-rxdata","G-exh","G-drop","G-merge","G-ibhfsm","G-exhfsm",
+             "G-m-ibhmeta","G-m-exh","G-m-release","G-ctl-drop","G-readreq",
+             "G-t-state","G-t-msn","G-t-retrans","G-t-timer","G-t-conn","G-timer-fire",
+             "G-l-state","G-l-msn","G-a-nak","G-a-laddr","G-a-ackrel","G-evt-cross",
+             "G-lrh","G-mm","G-gexh","G-gibh","G-hrr","G-mcm","G-tpa","G-ap","G-pih",
+             "G-evt-lrh2mm","G-cmd-lrh","G-a-reg1","G-a-replay","G-a-reg2",
+             "G-mm2gexh","G-ibhmeta-path","G-gexh2ap","G-pkginfo","G-rdresp-evt","G-hrr2mcm",
+             "G-tpa2ap","G-ap2pih","G-bth","G-l-psn","G-l-msn2","G-l-conn",
+             "G-x-wrdata","G-x-wrcmd","G-x-ackmeta","G-x-sq","G-x-rdcmd","G-x-rddata"];
+
+  var STEPS = [
+    {
+      chip: "全景", flow: 0, eyebrow: "起点 · 布局即语义",
+      title: "上半收、下半发、中间五张表",
+      body: "<p>这张图是 fns HLS 核(2830 行)的解剖:<strong>上半带是 RX 流水线,从左往右走</strong>;<strong>中间一排是五张 per-QP 状态表</strong>(整个核的\"记忆\");<strong>下半带是 TX 流水线,注意方向是从右往左</strong>;最左边一列是组帧/解帧外壳和 roce_stack 打的两个修补。</p><p>读图口诀:<span class='b c1'>蓝线=载荷/包数据</span>,<span class='b c2'>青线=meta/命令/事件</span>,<span class='b c3'>琥珀线=可靠性(重传表/定时器)</span>,灰虚线=查表。右缘六个端口就是它与图 1(mux)、图 3(rdma_flow)和用户的全部接口。</p>",
+      ref: "rocev2.cpp / ib_transport_protocol.cpp · 原图连线经 190 条断言对源码核对",
+      focus: []
+    },
+    {
+      chip: "外壳", flow: 0, eyebrow: "第 1 步 · 组帧壳与两个修补",
+      title: "crc 块是假的,真 iCRC 在外面",
+      body: "<p>HLS 核外层是 crc→IPv4→UDP 三层组/解帧壳,但 <strong>crc 块因 <code>DISABLE_CRC_*</code> 实为直通</strong>——这就是 Stage B 发现 <strong>B5</strong>(坏帧照收、crc_drop 恒 0)的编译期根源。真的 iCRC 由 roce_stack 的 Verilog <code>icrc</code> 模块在 TX 出口补算;RX 侧 <code>extract_icrc</code> 只负责把帧尾 4B 剥掉,不校验。</p><p>两个 MAC 修补:RX 进核前有 FIFO + <code>ack_gap_enforcer</code>(连续 ACK 强制 85 拍间隔,防止核被 ACK 风暴噎住);TX 出口有 <code>read_request_trimmer</code>(裁剪 READ REQUEST 以兼容 Mellanox 网卡)→ <code>icrc</code>。</p><p><strong>层级勘误(2026-07-23 源码核实)</strong>:组帧壳(crc/ipv4/udp)与 <code>ib_transport_protocol</code> 是 <code>rocev2()</code> 里<strong>平级的四兄弟</strong>(rocev2.cpp:95/121/133/149),组帧本体在 IB 层之外;但组帧用的 meta(对端 IP/port + udpLen)由 <strong>IB 层内部</strong>的 <code>tx_ipUdpMetaMerger</code>(ib_transport_protocol.cpp:2060,例化 :2710)汇合 conn_table 查表结果与 generate_exh 的 udpLen 后经 <code>m_axis_tx_meta</code> 递出——原图集把这个函数名标在组帧 chip 上属于\"住址标错\",本页已改署 <code>generate_udp / generate_ipv4</code>。</p>",
+      ref: "rocev2.cpp:95-149 · crc.hpp(DISABLE_CRC_CHECK)· ib_transport_protocol.cpp:2060/2710 · roce_stack.sv icrc 实例",
+      focus: ["G-shell","G-frame"]
+    },
+    {
+      chip: "RX 拆分", flow: 2, eyebrow: "第 2 步 · RX 第一站",
+      title: "rx_process_ibh:一进门就拆成 meta 与载荷两路",
+      body: "<p>理解上半带的钥匙一句话:<strong>meta 与载荷分离行进</strong>。每个包进 <code>rx_process_ibh</code> 后被拆开——<span class='b c2'>meta(PSN·opcode·destQP)</span>向下送进 <code>rx_ibh_fsm</code> 等判决;<span class='b c1'>载荷</span>剥掉 12B BTH 后沿上沿继续向右传送。</p><p>为什么要拆?因为判决(要不要这个包)和搬运(把字节送到哪)节奏完全不同:判决要查表、可能要等;载荷是 512b 大流量,不能停等。分离行进让两者各走各的,靠后面的\"放行/丢弃\"信号再会合。</p>",
+      ref: "ib_transport_protocol.cpp(rx_process_ibh)",
+      focus: ["G-frame","G-shell","G-ibh","G-rxdata","G-m-ibhmeta","G-ibhfsm"]
+    },
+    {
+      chip: "解扩展头", flow: 2, eyebrow: "第 3 步 · RX 第二站",
+      title: "rx_process_exh:解析 RETH/AETH,算出 numPkg",
+      body: "<p>载荷路过 <code>rx_process_exh</code> 时,扩展头被解析出来:WRITE 首包的 <strong>RETH</strong>(vaddr/rkey/DMALen)、ACK/NAK 的 <strong>AETH</strong>(syndrome/MSN)。它还负责算 <code>numPkg</code>——这条消息应该对应几个包。</p><p>产物分两路:<code>exhMeta{isNak,numPkg}</code> 回送给守门员 <code>rx_ibh_fsm</code>(它判决时需要知道\"这是不是 NAK\");<code>ExHeader</code> 本体送给执行者 <code>rx_exh_fsm</code>(它执行时需要 vaddr/syndrome 这些字段)。</p>",
+      ref: "ib_transport_protocol.cpp(rx_process_exh)",
+      focus: ["G-frame","G-exh","G-rxdata","G-m-exh","G-ibhfsm","G-exhfsm"]
+    },
+    {
+      chip: "守门员", flow: 2, eyebrow: "第 4 步 · rx_ibh_fsm",
+      title: "守门员:epsn==psn 才放行,rx_neg 三幕全在它肚子里",
+      body: "<p><code>rx_ibh_fsm</code> 拿 meta 里的 PSN 与 <code>state_table</code> 的 <code>resp_epsn</code> 比对:<strong>相等才按序放行</strong>(放行 meta →执行者)。不等则分档:落在<strong>重复窗</strong>内(旧包重来)——READ 重执行、WRITE 丢载荷但<strong>补发 ACK</strong>、其余静默丢;完全无效的 PSN——回 NAK,且由 retryCounter 门控<strong>同一个错只 NAK 一次</strong>。</p><p>判丢弃时,它经虚线 \"drop?\" 指挥 <code>drop_ooo_ibh</code> 把还在传送带上的载荷<strong>整包丢弃</strong>——meta 路判决、数据路执行。Stage B rx_neg 的三幕剧(重复 PSN→不重放数据重发 ACK;PSN+2→NAK syndrome 0x60 带期望 PSN)就是这段逻辑的实测:判决在这里,NAK 帧本身则由 TX 带发出。</p>",
+      ref: "ib_transport_protocol.cpp L256(rx_ibh_fsm)· drop_ooo_ibh L788/L2563 · STAGE_B_REPORT §5.4",
+      focus: ["G-frame","G-ibhfsm","G-m-ibhmeta","G-m-exh","G-ctl-drop","G-drop","G-l-state","G-t-state","G-m-release"]
+    },
+    {
+      chip: "执行者", flow: 2, eyebrow: "第 5 步 · rx_exh_fsm",
+      title: "执行者:按 opcode 干活,WRITE 游标是 write12k 的功臣",
+      body: "<p>放行的 meta 到 <code>rx_exh_fsm</code>,按 opcode 分发执行。对 <strong>WRITE</strong>:首包(ONLY/FIRST)从 RETH 取 vaddr;<strong>MIDDLE/LAST 没有 RETH</strong>,写到哪来自 <code>msn_table</code> 里维护的 vaddr 游标(每包写完游标前移)——write12k 三帧 FIRST/MIDDLE/LAST 能连续 bit-exact 落地,靠的就是它。落地命令+数据从右缘直连用户(<strong>不经图 1 的 mux</strong>)。</p><p>对 <strong>READ 请求</strong>:打包成 <code>readRequest{vaddr,len,psn}</code> 沿右侧长青线送进 TX 带的 <code>handle_read_requests</code>。对 <strong>ACK/NAK</strong>:生成完成/重传事件,沿中缝青线穿到 TX 带。一个隐蔽点:<strong>READ 响应的落地地址不来自包头</strong>,而是 retransmitter 表项前递的 laddr(琥珀线 \"laddr 前递\")——发 READ 时登记的本地地址,收响应时取回来用。</p>",
+      ref: "ib_transport_protocol.cpp L484(rx_exh_fsm)· STAGE_C write12k",
+      focus: ["G-frame","G-exhfsm","G-m-release","G-l-msn","G-t-msn","G-x-wrcmd","G-x-wrdata","G-readreq","G-hrr","G-a-laddr","G-t-retrans","G-evt-cross","G-x-ackmeta"]
+    },
+    {
+      chip: "载荷终点", flow: 1, eyebrow: "第 6 步 · merge_rx_pkgs",
+      title: "载荷的终点:剥头、合流、直连放置",
+      body: "<p>载荷传送带的最后一站 <code>merge_rx_pkgs</code>:按包型剥掉 16B RETH 或 4B AETH,把干净的 payload 合成一条流,从 <code>m_axis_mem_write_data</code>(= <code>m_axis_rdma_wr</code>)送出——<strong>直连用户内存,不经图 1 的 mux</strong>。</p><p>Stage B/C 里 TB 检查 placement(放置 vaddr/len/数据逐字节比对)的观察口,就是这条直连路加上一条放置命令(<code>m_rdma_wr_req</code>)。还记得图 1 末尾那句\"RX WRITE 落地不经本模块\"吗——它的另一半就在这里。</p>",
+      ref: "ib_transport_protocol.cpp(merge_rx_pkgs)· 图 1 导览第 9 步",
+      focus: ["G-frame","G-merge","G-rxdata","G-drop","G-x-wrdata","G-x-wrcmd"]
+    },
+    {
+      chip: "五张表", flow: 0, eyebrow: "第 7 步 · 状态表带",
+      title: "五张 per-QP 表:整个核的记忆",
+      body: "<p><code>state_table</code>:双向 PSN 账本——收方期望 <code>resp_epsn</code>、发方下一个 <code>req_next_psn</code>,外加重复窗和 retryCounter(3b)。<code>msn_table</code>:MSN、多包 WRITE 的 vaddr 游标、r_key。<code>conn_table</code>:对端 qpn/IP/udp_port(发包时反查)。</p><p><code>retransmitter</code>:可靠性的心脏——PSN→{laddr,raddr,len,offs} 的 per-QP 链表,背后是<strong>全局 2000 项池</strong>;HLS 深潜文档里\"csim 报告的 1999\"就是它的 free-list FIFO(2000−1)。<code>transport_timer</code>:重传闹钟,1/5/12/64ms 指数退避、上限 12 次;由 <code>generate_exh</code> 发包时武装、收到有效响应清零——B9 里平台实测 ~626µs@250MHz 触发的就是它(Stage B 只看了 240µs,当然什么都没看到)。</p>",
+      ref: "state_table.hpp:122 · msn_table.hpp:92 · retransmitter.hpp:570 · transport_timer.hpp:90",
+      focus: ["G-frame","G-t-state","G-t-msn","G-t-retrans","G-t-timer","G-t-conn","G-timer-fire"]
+    },
+    {
+      chip: "TX 命令面", flow: 1, eyebrow: "第 8 步 · 下半带其一(右→左)",
+      title: "命令面:两路取数命令合流,1:1 pkgInfo 契约",
+      body: "<p>TX 有两条并行的汇聚路径,先看<strong>命令面</strong>(下排)。取数命令有两个来源:<code>local_req_handler</code>(SQ 入口,收图 3 rdma_flow 送来的 txMeta;<strong>重传事件优先于新 WQE</strong>)发出本地取数命令;<code>handle_read_requests</code> 把远端 READ 按 PMTU 切段,每段一条读命令+一个事件(psn++)。</p><p>两路在 <code>mem_cmd_merger</code> 合流(<strong>远端读优先</strong>),从右缘 <code>m_axis_mem_read_cmd</code> 出去——接的正是图 1 mux 的 <code>s_req_net</code>。关键契约:每发一条命令就 <strong>1:1 写一条 pkgInfo</strong> 给 <code>tx_pkg_arbiter</code>,返回的载荷全靠顺序对号入座——图 1 里\"用户必须按命令序推流\"的源头就在这一拍。</p>",
+      ref: "L1074(local_req_handler)· L922(handle_read_requests)· L1149(mem_cmd_merger)",
+      focus: ["G-frame","G-x-sq","G-lrh","G-hrr","G-readreq","G-mcm","G-cmd-lrh","G-hrr2mcm","G-x-rdcmd","G-pkginfo","G-tpa"]
+    },
+    {
+      chip: "TX 头部面", flow: 1, eyebrow: "第 9 步 · 下半带其二(右→左)",
+      title: "头部面:仲裁 → 生成扩展头 → 拼载荷",
+      body: "<p>再看<strong>头部面</strong>(上排)。所有\"要发一个包\"的事件——RX 带穿过来的 <span class='b c2'>ACK/NAK</span>、<code>handle_read_requests</code> 的读响应事件、<code>local_req_handler</code> 的本地/重传事件——在 <code>meta_merger</code> 做固定优先级仲裁:<strong>ACK &gt; 读响应 &gt; 本地/重传</strong>(响应永远不被自己的新请求饿死)。</p><p>胜出的事件进 <code>generate_exh</code>:生成 RETH/AETH、算 udpLen,并在此刻<strong>武装重传定时器</strong>;需要查 <code>msn_table</code>(r_key)和 <code>conn_table</code>(对端三元组)。与此同时,载荷从右缘 <code>s_axis_mem_read_data</code>(= 图 1 的 <code>m_axis_net</code>)回来,经 <code>tx_pkg_arbiter</code> 按 pkgInfo 三路分流(AETH/RETH/RAW,PMTU 截断),在 <code>append_payload</code> 与扩展头拼接(左移 4B/16B 腾位)。</p>",
+      ref: "L1327(meta_merger)· L1499(generate_exh)· L1222(tx_pkg_arbiter)· L1757(append_payload)",
+      focus: ["G-frame","G-x-rddata","G-tpa","G-ap","G-tpa2ap","G-mm","G-evt-lrh2mm","G-rdresp-evt","G-evt-cross","G-mm2gexh","G-gexh","G-gexh2ap","G-l-msn2","G-t-msn","G-l-conn","G-t-conn"]
+    },
+    {
+      chip: "PSN 发放", flow: 1, eyebrow: "第 10 步 · generate_ibh",
+      title: "全核唯一的 PSN 发放点",
+      body: "<p><code>generate_ibh</code> 是 PSN 的唯一出纳:对新请求,从 <code>state_table</code> 取 <code>req_next_psn</code> 填进 BTH,然后 <code>+= numPkg</code> 写回——<strong>READ REQ 一次预留 ⌈len/PMTU⌉ 个 PSN</strong>(响应要占号);读响应/ACK/重传<strong>自带 PSN,跳过查表</strong>(重传必须用原号,这正是重复 PSN 语义成立的前提)。destQP 则经 conn_table 的反馈环填入——源码自注 \"hack\"。</p><p>随后 BTH 交给 <code>prepend_ibh_header</code>:整包在 append_payload 已左移 12B 腾好位,这里把 BTH 填进去,发往组帧壳(UDP·IPv4)→ trimmer → icrc 上线。write8k 两帧 PSN 连号、write12k 三帧连号,都是这个出纳的工作记录。</p>",
+      ref: "L1401(generate_ibh)· prepend_ibh_header · STAGE_B §5.3",
+      focus: ["G-frame","G-gibh","G-ibhmeta-path","G-l-psn","G-t-state","G-bth","G-pih","G-ap2pih","G-ap","G-shell"]
+    },
+    {
+      chip: "可靠性", flow: 3, eyebrow: "第 11 步 · 琥珀线总复习",
+      title: "可靠性闭环:登记 → 触发 → 重放 → 释放",
+      body: "<p>把所有琥珀线连起来看。<strong>登记</strong>:每个可重传包的表项由两半拼成——<code>local_req_handler</code> 登记 {addr,len,offs},<code>generate_ibh</code> 登记 {psn,opcode},按序配对存入 per-QP 链表。<strong>触发</strong>有两种:定时器超时(1/5/12/64ms 退避,上限 12 次)→ 从链表头<strong>全量重放</strong>;RX 收到 NAK → <strong>定点重放</strong>。重放事件回注 <code>local_req_handler</code> 且优先于新 SQ,PSN 用原值。</p><p><strong>释放</strong>:ACK 到达即释放表项+清定时器;READ_RESP 的 FIRST/MIDDLE 只对表头做增量更新(addr+=PMTU、len−=PMTU、psn+1)。整套逻辑由 <code>RETRANS_EN</code> 编译开关控制——不定义就整体不编译(本分支是开的,Stage A 勘误确认过)。B9 的完整链路:丢 ACK → 定时器 ~626µs 触发 → 重放命令带原 offs → 图 1 mux 读 URAM → 原帧原 PSN 上线。</p>",
+      ref: "retransmitter.hpp:570 · transport_timer.hpp:90 · d_retrans_b9(平台仿真)",
+      focus: ["G-frame","G-t-retrans","G-t-timer","G-timer-fire","G-a-reg1","G-a-reg2","G-a-replay","G-a-ackrel","G-a-nak","G-a-laddr","G-lrh","G-gibh","G-gexh"]
+    },
+    {
+      chip: "化石边界", flow: 0, eyebrow: "第 12 步 · 停用件与注释陷阱",
+      title: "两块化石,一条过时注释",
+      body: "<p>读源码时会遇到的坑:<code>read_req_table</code> 和 <code>multi_queue</code> 的实例化<strong>整体被注释掉了</strong>(cpp:2742–2761)——READ 响应的落地地址改由 retransmitter 的 <code>retrans2rx_init</code> 前递(第 5 步那条琥珀线)。反过来,<code>drop_ooo_ibh</code> 定义处的注释写着 \"Currently not used!!\"——<strong>这条注释已过时</strong>,它实际就在载荷主通路上(第 4 步亲眼所见)。教训:这份代码里,注释的可信度低于连线。</p><p>右缘六个外部口的去向见下方速查表:三个直连用户、一对接图 1 的 mux、一对接图 3 的 rdma_flow——把这张图和图 1、图 3 拼起来,就是 roce_stack 的完整世界。</p>",
+      ref: "ib_transport_protocol.cpp:2742–2761 · drop_ooo_ibh L788 注释",
+      focus: ["G-frame","G-drop","G-t-retrans","G-a-laddr","G-x-wrdata","G-x-wrcmd","G-x-ackmeta","G-x-sq","G-x-rdcmd","G-x-rddata"]
+    }
+  ];
+
+  var chipsEl = document.getElementById("chips");
+  var narr = document.getElementById("narration");
+  var prog = document.getElementById("progress");
+  var btnPrev = document.getElementById("btn-prev");
+  var btnNext = document.getElementById("btn-next");
+  var cur = 0;
+
+  STEPS.forEach(function (s, i) {
+    var b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.setAttribute("data-flow", String(s.flow));
+    b.setAttribute("role", "tab");
+    b.innerHTML = "<span class='dot'></span>" + i + " · " + s.chip;
+    b.addEventListener("click", function () { show(i); });
+    chipsEl.appendChild(b);
+  });
+
+  function show(i) {
+    cur = Math.max(0, Math.min(STEPS.length - 1, i));
+    var s = STEPS[cur];
+    var flowTag = s.flow === 1 ? "<span class='fl1'>载荷/TX</span> · " :
+                  s.flow === 2 ? "<span class='fl2'>RX/meta</span> · " :
+                  s.flow === 3 ? "<span class='fl3'>可靠性</span> · " : "";
+    narr.innerHTML =
+      "<div class='step-eyebrow'>" + flowTag + s.eyebrow + "</div>" +
+      "<h3>" + s.title + "</h3>" + s.body +
+      "<div class='ref'>源码坐标 · " + s.ref + "</div>";
+    var focusSet = {};
+    s.focus.forEach(function (id) { focusSet[id] = true; });
+    var dimming = s.focus.length > 0;
+    ALL.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle("faded", dimming && !focusSet[id]);
+    });
+    var chips = chipsEl.children;
+    for (var k = 0; k < chips.length; k++) chips[k].classList.toggle("active", k === cur);
+    prog.textContent = "第 " + cur + " / " + (STEPS.length - 1) + " 步";
+    btnPrev.disabled = cur === 0;
+    btnNext.disabled = cur === STEPS.length - 1;
+  }
+
+  btnPrev.addEventListener("click", function () { show(cur - 1); });
+  btnNext.addEventListener("click", function () { show(cur + 1); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { show(cur - 1); }
+    else if (e.key === "ArrowRight") { show(cur + 1); }
+  });
+
+  show(0);
+})();
+</script>

@@ -1,0 +1,472 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>图 3 解读 · rdma_flow 发送窗口与 offs 的一生</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --surface: #ffffff; --panel: #fbfcfd; --panel2: #f1f4f7;
+    --ink: #1c2430; --muted: #5c6b7d; --line: #ccd4dd; --line-soft: #dde3ea;
+    --blue: #2563eb; --teal: #0d9488; --amber: #d97706;
+    --flow: #33415e; --ctrl: #8a97a8; --code-bg: #eef1f5;
+    --focus: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --surface: #1a2028; --panel: #1e2530; --panel2: #232b38;
+      --ink: #e4eaf2; --muted: #93a3b5; --line: #323c4a; --line-soft: #2a3340;
+      --blue: #6aa1f8; --teal: #34d3bc; --amber: #f0a63a;
+      --flow: #aab9d0; --ctrl: #6b7889; --code-bg: #232b38; --focus: #6aa1f8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161c; --surface: #1a2028; --panel: #1e2530; --panel2: #232b38;
+    --ink: #e4eaf2; --muted: #93a3b5; --line: #323c4a; --line-soft: #2a3340;
+    --blue: #6aa1f8; --teal: #34d3bc; --amber: #f0a63a;
+    --flow: #aab9d0; --ctrl: #6b7889; --code-bg: #232b38; --focus: #6aa1f8;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --surface: #ffffff; --panel: #fbfcfd; --panel2: #f1f4f7;
+    --ink: #1c2430; --muted: #5c6b7d; --line: #ccd4dd; --line-soft: #dde3ea;
+    --blue: #2563eb; --teal: #0d9488; --amber: #d97706;
+    --flow: #33415e; --ctrl: #8a97a8; --code-bg: #eef1f5; --focus: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.75; margin: 0; padding: 36px 22px 72px;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px;
+  }
+  h1 { font-size: 25px; line-height: 1.3; margin: 0 0 8px; font-weight: 700; text-wrap: balance; }
+  h1 code { font-size: 23px; }
+  .lede { color: var(--muted); max-width: 64em; margin: 0 0 20px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .9em; background: var(--code-bg); border-radius: 4px; padding: 1px 5px;
+  }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .nav-btn {
+    appearance: none; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); border-radius: 8px; padding: 7px 16px; font-size: 14px;
+    cursor: pointer; font-family: inherit;
+  }
+  .nav-btn:hover { border-color: var(--flow); }
+  .nav-btn:disabled { opacity: .38; cursor: default; }
+  .nav-btn:focus-visible, .chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .progress {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    color: var(--muted); margin-left: 2px; font-variant-numeric: tabular-nums;
+  }
+  .kbd-hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .kbd-hint kbd {
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+    border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
+    padding: 0 5px; background: var(--surface);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip {
+    appearance: none; font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+    border-radius: 999px; padding: 4px 12px; font-size: 12.5px; line-height: 1.5;
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ctrl); flex: none; }
+  .chip[data-flow="1"] .dot { background: var(--blue); }
+  .chip[data-flow="2"] .dot { background: var(--teal); }
+  .chip[data-flow="3"] .dot { background: var(--amber); }
+  .chip.active { border-color: var(--flow); color: var(--ink); background: var(--panel2); font-weight: 600; }
+  .narration {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
+    padding: 18px 22px 14px; margin-bottom: 16px; min-height: 185px;
+  }
+  .narration .step-eyebrow {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+    letter-spacing: .09em; color: var(--muted); margin-bottom: 2px;
+  }
+  .narration .step-eyebrow .fl1 { color: var(--blue); font-weight: 700; }
+  .narration .step-eyebrow .fl2 { color: var(--teal); font-weight: 700; }
+  .narration .step-eyebrow .fl3 { color: var(--amber); font-weight: 700; }
+  .narration h3 { font-size: 17px; margin: 0 0 8px; }
+  .narration p { margin: 8px 0; max-width: 74em; }
+  .narration .ref {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+    color: var(--ctrl); margin-top: 10px;
+  }
+  .narration strong { color: var(--ink); }
+  .narration .b { font-weight: 700; }
+  .narration .c1 { color: var(--blue); } .narration .c2 { color: var(--teal); } .narration .c3 { color: var(--amber); }
+  .diagram {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
+    overflow-x: auto; margin-bottom: 28px;
+  }
+  .diagram svg { display: block; min-width: 1120px; width: 100%; height: auto; }
+  g[data-dim] { transition: opacity .35s ease; }
+  g[data-dim].faded { opacity: .12; }
+  @media (prefers-reduced-motion: reduce) { g[data-dim] { transition: none; } }
+  .blk { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  .blk-mux { fill: var(--panel2); stroke: var(--line); stroke-width: 1.6; }
+  .ibox { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; }
+  .chipbox { fill: var(--surface); stroke: var(--ctrl); stroke-width: 1; }
+  .t-title { font-size: 14px; font-weight: 700; fill: var(--ink); }
+  .t-sub   { font-size: 10.5px; fill: var(--muted); }
+  .t-mono  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .t-port  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; font-weight: 700; fill: var(--ink); }
+  .t-map   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 9.5px; fill: var(--muted); }
+  .t-note  { font-size: 9.5px; fill: var(--muted); }
+  .t-ref   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 8.5px; fill: var(--ctrl); }
+  .ln-blue  { stroke: var(--blue);  stroke-width: 2.4; fill: none; }
+  .ln-teal  { stroke: var(--teal);  stroke-width: 2.4; fill: none; }
+  .ln-amber { stroke: var(--amber); stroke-width: 2.4; fill: none; }
+  .ln-ctrl  { stroke: var(--ctrl);  stroke-width: 1.7; fill: none; stroke-dasharray: 5 4; }
+  h2 { font-size: 18px; margin: 34px 0 12px; }
+  .tblwrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; background: var(--panel2); }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .footnote { color: var(--muted); font-size: 12.5px; margin-top: 26px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 数据流图集 · 图 3 分步导览</div>
+  <h1><code>rdma_flow</code> —— 16 段滑动窗，与 offs 的一生</h1>
+  <p class="lede">
+    坐在 SQ 命令面上的滑动窗:上游是 doorbell(Stage C+)或 TB(Stage B)推来的 <code>dreq_t</code>,
+    下游是 HLS 核的 <code>s_axis_sq_meta</code>。它决定"放行还是反压",放行时把窗口槽号写进
+    <code>req_1.offs</code>——这个 4 位小号码一路贯穿图 1、图 2、图 3,把三张图缝成一个系统。
+    颜色:<span style="color:var(--blue);font-weight:700">蓝=SQ 请求方向</span> ·
+    <span style="color:var(--teal);font-weight:700">青=ACK/CQ 方向</span> ·
+    <span style="color:var(--amber);font-weight:700">琥珀=offs 旅程</span> · 灰虚线=指针表读写。
+  </p>
+
+  <div class="controls">
+    <button class="nav-btn" id="btn-prev" type="button">‹ 上一步</button>
+    <button class="nav-btn" id="btn-next" type="button">下一步 ›</button>
+    <span class="progress" id="progress"></span>
+    <span class="kbd-hint">键盘 <kbd>←</kbd> <kbd>→</kbd> 也能翻页</span>
+  </div>
+  <div class="chips" id="chips" role="tablist" aria-label="讲解步骤"></div>
+
+  <div class="narration" id="narration" aria-live="polite"></div>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1360 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="rdma_flow 发送窗口流控分步导览图">
+    <defs>
+      <marker id="aBlue"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--blue)"/></marker>
+      <marker id="aTeal"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--teal)"/></marker>
+      <marker id="aAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--amber)"/></marker>
+      <marker id="aCtrl"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ctrl)"/></marker>
+    </defs>
+
+    <!-- 上游 -->
+    <g id="G-up" data-dim>
+      <rect class="blk" x="40" y="140" width="240" height="280" rx="9"/>
+      <text class="t-title" x="160" y="168" text-anchor="middle">SQ 生产者(上游)</text>
+      <text class="t-sub t-mono" x="160" y="192" text-anchor="middle">Stage C: rdma_doorbell_l0</text>
+      <text class="t-note" x="160" y="210" text-anchor="middle">SQ ring 深 16 · BUDGET=8 in-flight</text>
+      <text class="t-note" x="160" y="225" text-anchor="middle">PMTU=4096 预切 FIRST/MID/LAST</text>
+      <text class="t-note" x="160" y="240" text-anchor="middle">每段一个 dreq(offs='0)</text>
+      <text class="t-sub t-mono" x="160" y="270" text-anchor="middle">Stage B: TB push_cmd()</text>
+      <text class="t-note" x="160" y="288" text-anchor="middle">write8k 手工预切 0x06+0x08</text>
+      <text class="t-note" x="160" y="392" text-anchor="middle">收 CQE → sq_compl++</text>
+      <text class="t-ref" x="160" y="408" text-anchor="middle">rdma_doorbell_l0.sv:315-338 / :495</text>
+    </g>
+
+    <!-- rdma_flow 容器 -->
+    <g id="G-frame" data-dim>
+      <rect class="blk-mux" x="360" y="100" width="540" height="560" rx="10"/>
+      <text class="t-title t-mono" x="380" y="128" text-anchor="start">rdma_flow(发送窗口流控)</text>
+    </g>
+
+    <g id="G-fsm" data-dim>
+      <rect class="ibox" x="390" y="150" width="170" height="110" rx="7"/>
+      <text class="t-sub" x="475" y="172" text-anchor="middle" style="fill:var(--ink)">5 态 FSM</text>
+      <text class="t-note" x="475" y="190" text-anchor="middle">IDLE 仲裁:ACK 优先</text>
+      <text class="t-note" x="475" y="205" text-anchor="middle">REQ_LUP: !issued||head≠tail</text>
+      <text class="t-note" x="475" y="220" text-anchor="middle">→ 放行并 head+1</text>
+      <text class="t-note" x="475" y="235" text-anchor="middle">ACK_LUP: tail+1 退休一槽</text>
+      <text class="t-ref" x="475" y="252" text-anchor="middle">L46 / L94 / L141</text>
+    </g>
+
+    <g id="G-ptbl" data-dim>
+      <rect class="ibox" x="390" y="320" width="170" height="120" rx="7"/>
+      <text class="t-port" x="475" y="342" text-anchor="middle">inst_pntr_table</text>
+      <text class="t-note" x="475" y="359" text-anchor="middle">ram_sp_nc·16b/项</text>
+      <text class="t-note" x="475" y="374" text-anchor="middle">地址 {is_rd, vfid, pid}</text>
+      <text class="t-note" x="475" y="389" text-anchor="middle">{issued, head[3:0], tail[3:0]}</text>
+      <text class="t-note" x="475" y="404" text-anchor="middle">读/写窗口各一套</text>
+      <text class="t-ref" x="475" y="424" text-anchor="middle">L64-74 · L112-115</text>
+    </g>
+
+    <g id="G-l-ram" data-dim>
+      <path class="ln-ctrl" d="M 475 260 V 316" marker-start="url(#aCtrl)" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="483" y="292" text-anchor="start">1 拍 RAM(LUP_WAIT)</text>
+    </g>
+
+    <g id="G-sqq" data-dim>
+      <rect class="chipbox" x="640" y="170" width="220" height="48" rx="6"/>
+      <text class="t-port" x="750" y="190" text-anchor="middle" style="font-size:10.5px">inst_sq(queue_meta ×16)</text>
+      <text class="t-note" x="750" y="207" text-anchor="middle">req_1.offs ← head 覆写</text>
+    </g>
+
+    <g id="G-cqq" data-dim>
+      <rect class="chipbox" x="640" y="400" width="220" height="48" rx="6"/>
+      <text class="t-port" x="750" y="420" text-anchor="middle" style="font-size:10.5px">inst_cq(queue_meta ×16)</text>
+      <text class="t-note" x="750" y="437" text-anchor="middle">仅 last-ACK 入队 → 每 WR 一个 CQE</text>
+    </g>
+
+    <!-- SQ 方向 -->
+    <g id="G-sq-in" data-dim>
+      <path class="ln-blue" d="M 280 190 H 386" marker-end="url(#aBlue)"/>
+      <text class="t-map" x="330" y="183" text-anchor="middle">s_rdma_sq</text>
+      <text class="t-note" x="330" y="206" text-anchor="middle">dreq_t</text>
+    </g>
+    <g id="G-sq-grant" data-dim>
+      <path class="ln-blue" d="M 560 194 H 636" marker-end="url(#aBlue)"/>
+      <text class="t-map" x="598" y="187" text-anchor="middle">放行的 dreq</text>
+    </g>
+    <g id="G-sq-fwd" data-dim>
+      <path class="ln-blue" d="M 860 194 H 976" marker-end="url(#aBlue)"/>
+      <text class="t-map" x="916" y="187" text-anchor="middle">m_req</text>
+      <path class="ln-blue" d="M 1160 190 H 1196" marker-end="url(#aBlue)"/>
+    </g>
+
+    <!-- ACK 方向 -->
+    <g id="G-ack-path" data-dim>
+      <path class="ln-teal" d="M 1200 420 H 1164" marker-end="url(#aTeal)"/>
+      <path class="ln-teal" d="M 980 420 H 910 V 230 H 564" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="930" y="413" text-anchor="middle">s_ack</text>
+    </g>
+    <g id="G-ack-cq" data-dim>
+      <path class="ln-teal" d="M 560 250 H 600 V 370 H 750 V 396" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="668" y="363" text-anchor="middle">last-ACK(完成)</text>
+    </g>
+    <g id="G-cqe-out" data-dim>
+      <path class="ln-teal" d="M 640 424 H 320 V 384 H 284" marker-end="url(#aTeal)"/>
+      <text class="t-map" x="460" y="417" text-anchor="middle">m_rdma_ack(CQE)</text>
+    </g>
+
+    <!-- 重打包 / HLS / 解包 -->
+    <g id="G-repack" data-dim>
+      <rect class="chipbox" x="980" y="150" width="180" height="80" rx="6"/>
+      <text class="t-sub" x="1070" y="172" text-anchor="middle" style="fill:var(--ink)">248b txMeta 重打包</text>
+      <text class="t-note" x="1070" y="190" text-anchor="middle">offs @ bit[55:50]</text>
+      <text class="t-note" x="1070" y="205" text-anchor="middle">raddr 先于 laddr(FIX)</text>
+      <text class="t-ref" x="1070" y="220" text-anchor="middle">roce_stack.sv:89-109</text>
+    </g>
+
+    <g id="G-hls" data-dim>
+      <rect class="blk" x="1200" y="100" width="120" height="460" rx="9"/>
+      <text class="t-title t-mono" x="1260" y="130" text-anchor="middle" style="font-size:13px">rocev2_ip</text>
+      <text class="t-note" x="1260" y="148" text-anchor="middle">(HLS 核,图 2)</text>
+      <text class="t-note" x="1260" y="180" text-anchor="middle">s_axis_sq_meta ↓</text>
+      <text class="t-note" x="1260" y="196" text-anchor="middle">local_req_handler</text>
+      <text class="t-note" x="1260" y="212" text-anchor="middle">消费·登记 offs</text>
+      <text class="t-note" x="1260" y="300" text-anchor="middle">offs 原样带回</text>
+      <text class="t-note" x="1260" y="316" text-anchor="middle">mem_*_cmd</text>
+      <text class="t-note" x="1260" y="430" text-anchor="middle">m_axis_rx_ack_meta ↑</text>
+    </g>
+
+    <g id="G-unpack" data-dim>
+      <rect class="chipbox" x="980" y="380" width="180" height="80" rx="6"/>
+      <text class="t-sub" x="1070" y="402" text-anchor="middle" style="fill:var(--ink)">ACK meta 解包</text>
+      <text class="t-note" x="1070" y="420" text-anchor="middle">→ dack_t{ack_t, last}</text>
+      <text class="t-ref" x="1070" y="436" text-anchor="middle">roce_stack.sv:115-126</text>
+    </g>
+
+    <!-- offs 旅程横条 -->
+    <g id="G-o-title" data-dim>
+      <text class="t-sub" x="60" y="608" text-anchor="start" style="fill:var(--ink); font-weight:700">offs 的一生 —— 窗口槽号 = 重传缓冲槽号(贯穿图 1 / 图 2 / 图 3)</text>
+    </g>
+    <g id="G-o1" data-dim>
+      <rect class="chipbox" x="60" y="640" width="200" height="70" rx="6"/>
+      <text class="t-sub" x="160" y="662" text-anchor="middle" style="fill:var(--ink)">rdma_flow 放行</text>
+      <text class="t-map" x="160" y="680" text-anchor="middle">req_1.offs = head</text>
+      <text class="t-ref" x="160" y="696" text-anchor="middle">rdma_flow.sv:130</text>
+    </g>
+    <g id="G-o2" data-dim>
+      <path class="ln-amber" d="M 260 675 H 306" marker-end="url(#aAmber)"/>
+      <rect class="chipbox" x="310" y="640" width="200" height="70" rx="6"/>
+      <text class="t-sub" x="410" y="662" text-anchor="middle" style="fill:var(--ink)">txMeta 打包</text>
+      <text class="t-map" x="410" y="680" text-anchor="middle">offs @ bit[55:50]</text>
+      <text class="t-ref" x="410" y="696" text-anchor="middle">roce_stack.sv:99</text>
+    </g>
+    <g id="G-o3" data-dim>
+      <path class="ln-amber" d="M 510 675 H 556" marker-end="url(#aAmber)"/>
+      <rect class="chipbox" x="560" y="640" width="200" height="70" rx="6"/>
+      <text class="t-sub" x="660" y="662" text-anchor="middle" style="fill:var(--ink)">HLS 原样带回</text>
+      <text class="t-map" x="660" y="680" text-anchor="middle">mem_*_cmd.offs</text>
+      <text class="t-ref" x="660" y="696" text-anchor="middle">roce_stack.sv:224/242</text>
+    </g>
+    <g id="G-o4" data-dim>
+      <path class="ln-amber" d="M 760 675 H 806" marker-end="url(#aAmber)"/>
+      <rect class="chipbox" x="810" y="640" width="200" height="70" rx="6"/>
+      <text class="t-sub" x="910" y="662" text-anchor="middle" style="fill:var(--ink)">mux 组地址</text>
+      <text class="t-map" x="910" y="680" text-anchor="middle">(offs≪12)≪27</text>
+      <text class="t-ref" x="910" y="696" text-anchor="middle">rdma_mux_retrans.sv:128-141</text>
+    </g>
+    <g id="G-o5" data-dim>
+      <path class="ln-amber" d="M 1010 675 H 1056" marker-end="url(#aAmber)"/>
+      <rect class="chipbox" x="1060" y="640" width="240" height="70" rx="6"/>
+      <text class="t-sub" x="1180" y="662" text-anchor="middle" style="fill:var(--ink)">rdma_retrans_uram 槽</text>
+      <text class="t-map" x="1180" y="680" text-anchor="middle">slot = addr[42:39] · 16×4KiB</text>
+      <text class="t-ref" x="1180" y="696" text-anchor="middle">rdma_retrans_uram.sv:58</text>
+    </g>
+    <g id="G-o-note" data-dim>
+      <text class="t-note" x="60" y="742" text-anchor="start">重传时:retransmitter 表项带原 offs → 重放的取数命令命中同一槽(HLS 内部旁路,不再经过 rdma_flow;ib_transport_protocol.cpp:1112/1140)</text>
+    </g>
+  </svg>
+  </div>
+
+  <h2>接口速查(rdma_flow 的四个口)</h2>
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th>口</th><th>类型</th><th>方向</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>s_rdma_sq</code></td><td><code>dreq_t</code>(两个 req_t)</td><td>上游 → flow</td><td>每段一条;满窗时 ready=0 反压上游</td></tr>
+        <tr><td><code>m_req</code></td><td>放行的 dreq → 248b txMeta</td><td>flow → HLS 核</td><td>offs 已被覆写为窗口槽号;B2 FIX 打包序在重打包段</td></tr>
+        <tr><td><code>s_ack</code></td><td><code>dack_t{ack_t, last}</code></td><td>HLS 核 → flow</td><td>逐段 ACK,每个都 tail+1 退窗(隐含按序假设)</td></tr>
+        <tr><td><code>m_rdma_ack</code></td><td><code>ack_t</code>(32b)</td><td>flow → 上游</td><td>仅 last=1 入 CQ → 每 WR 一个 CQE;CQ 写有损须常排空(B8)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footnote">
+    源:《RoCE 数据流图集》图 3(rtl/coyote/rdma_flow.sv 205 行 + roce_stack.sv 接线)·
+    勘误在档:offs 在 248b txMeta 里的位置 = <code>rdma_sq_data[32+16+2 +: 6]</code> = bit[55:50](此前笔记的 [54:49] 有误,以 roce_stack.sv:99 为准)·
+    交叉证据:Stage B B6(指针表 X 死锁)/ B2(打包序 FIX)/ B8(ack_t 32b last 门控)· Stage C d_multiwr(SQ 环 8-WR)· retransEntry.offs(4b) 与 16 槽 URAM 咬合。
+    图 1 / 图 2 导览见同系列。
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var ALL = ["G-up","G-frame","G-fsm","G-ptbl","G-l-ram","G-sqq","G-cqq",
+             "G-sq-in","G-sq-grant","G-sq-fwd","G-ack-path","G-ack-cq","G-cqe-out",
+             "G-repack","G-hls","G-unpack",
+             "G-o-title","G-o1","G-o2","G-o3","G-o4","G-o5","G-o-note"];
+
+  var STEPS = [
+    {
+      chip: "全景", flow: 0, eyebrow: "起点 · 它坐在哪",
+      title: "SQ 命令面上的守门滑动窗",
+      body: "<p>左边是 <strong>SQ 生产者</strong>(Stage B 的 TB / Stage C 起的 doorbell);右边是 HLS 核(图 2);中间就是本图主角 <code>rdma_flow</code>——一个只有 205 行 SV 的滑动窗。它回答一个问题:<strong>这条 WQE 段现在能不能发?</strong>能,放行并发一个槽号;不能,反压。</p><p>下半那条琥珀横带是本图的灵魂:<strong>offs 的一生</strong>——放行时发出的窗口槽号,穿过 txMeta、HLS 核、mux,最后落在重传 URAM 的槽位上,把三张图缝成一个系统。读图口诀:<span class='b c1'>蓝=SQ 请求</span>、<span class='b c2'>青=ACK/CQ 回程</span>、<span class='b c3'>琥珀=offs 旅程</span>、灰虚线=查指针表。</p>",
+      ref: "rtl/coyote/rdma_flow.sv(205 行)+ roce_stack.sv 接线",
+      focus: []
+    },
+    {
+      chip: "上游", flow: 1, eyebrow: "第 1 步 · SQ 生产者的职责清单",
+      title: "切分在上游,预算也在上游",
+      body: "<p>rdma_flow 收到的 <code>dreq_t</code> 必须已经是<strong>切好的段</strong>——Stage B 发现 B4 说过:roce_stack 不切大 WR,>PMTU 的切分是 SQ 生产者的职责。Stage C 的 doorbell 内置切分器(PMTU=4096 预切 FIRST/MIDDLE/LAST,每段一条 dreq);Stage B 的 TB 则手工推两段(write8k = 0x06+0x08)。</p><p>注意上游发出的 dreq 里 <code>offs</code> 字段填的是 0——<strong>填什么都没用</strong>,第 3 步会看到它被覆写。上游还有自己的一层节流:doorbell 的 SQ ring 深 16、<code>SQ_BUDGET=8</code> 在途上限,收到 CQE 才 <code>sq_compl++</code> 释放预算——和 rdma_flow 的 16 段窗<strong>叠加</strong>成两级流控。</p>",
+      ref: "rdma_doorbell_l0.sv:315-338 / :495 · STAGE_B B4",
+      focus: ["G-up","G-frame","G-sq-in"]
+    },
+    {
+      chip: "窗口判决", flow: 1, eyebrow: "第 2 步 · FSM + 指针表",
+      title: "判决:!issued || head≠tail,一拍 RAM 等待",
+      body: "<p>请求进门,5 态 FSM 在 IDLE 仲裁(<strong>ACK 优先于新请求</strong>——满窗时一定能先被 ACK 解锁,结构上无死锁),然后去查 <code>inst_pntr_table</code>:16 项小 RAM,地址由 <code>{is_rd, vfid, pid}</code> 拼成——最高位区分读/写,<strong>读窗口和写窗口各一套账</strong>。每项 16b:<code>{issued, head[3:0], tail[3:0]}</code>。查表要等 1 拍 RAM(LUP_WAIT 态),单事务全程 3-4 拍。</p><p>判决式:<code>issued &amp;&amp; head==tail</code> = 满窗(16 段在途)→ <code>ready</code> 拉低反压;<code>head==tail &amp;&amp; !issued</code> = 空窗。<strong>这张指针表就是 Stage B 发现 B6 的案发地</strong>:xsim 里 BRAM 读出 X → 判决式永假 → SQ 永不放行——比特流上电清零、csim 静态数组天然零,唯独 RTL 仿真裸奔,SIM_ZERO_INIT 由此而来。</p>",
+      ref: "rdma_flow.sv L46/L94/L141(FSM)· L64-74/L112-115(指针表)· STAGE_B B6",
+      focus: ["G-frame","G-fsm","G-ptbl","G-l-ram","G-sq-in"]
+    },
+    {
+      chip: "放行覆写", flow: 3, eyebrow: "第 3 步 · offs 诞生",
+      title: "放行 = head+1,并把槽号盖进 req_1.offs",
+      body: "<p>判决通过后两个动作同时发生:<code>head+1</code>(占掉一个窗口槽),以及——<strong><code>req_1.offs = head</code>(rdma_flow.sv:130)</strong>。上游填的 offs 在这里被无条件覆写:窗口槽号从此成为这条段的身份证。放行的 dreq 经 <code>inst_sq</code> 队列(深 16 的 queue_meta)缓冲后继续向右。</p><p>这就是琥珀横带第一站。值得记住的对齐关系:<code>OFFS_BITS=6</code> 但窗口只用低 4 位——4 位 = 16 槽,恰好等于窗口深度 <code>RDMA_N_WR_OUTSTANDING=16</code>(lynx_pkg.sv:218),也恰好等于重传 URAM 的 16 个槽。<strong>三个 16 不是巧合,是同一个数</strong>:窗口不退休,槽就不会被覆写。</p>",
+      ref: "rdma_flow.sv:130(覆写)· lynx_pkg.sv:218",
+      focus: ["G-frame","G-fsm","G-sqq","G-sq-grant","G-o-title","G-o1"]
+    },
+    {
+      chip: "重打包", flow: 1, eyebrow: "第 4 步 · 进核",
+      title: "248b txMeta:两个 Stage B 战果的浓缩地",
+      body: "<p>放行的 dreq 在 roce_stack.sv:89-109 被重打包成 HLS 核吃的 248b txMeta。这一小段浓缩了两条来之不易的知识:<strong>B2 修复</strong>——fns 的 txMeta 结构体声明序是 raddr 在 laddr <em>之前</em>(构造函数参数序相反),上游 Coyote 打包按参数序把两者装反、RETH VA 全零,我们的副本按声明序修正(STAGE-B FIX);<strong>一处勘误</strong>——offs 落在 <code>rdma_sq_data[32+16+2 +: 6]</code> = bit[55:50],此前笔记写 [54:49] 是错的。</p><p>进核后由 <code>local_req_handler</code>(图 2 第 8 步)消费:登记重传表项前半 {addr,len,offs}、发取数命令——<strong>offs 被原样写进 retransEntry(4 位字段)并随 <code>mem_*_cmd</code> 原样带回</strong>(roce_stack.sv:224/242),这是琥珀带第二、三站。</p>",
+      ref: "roce_stack.sv:89-109(重打包)/ :99(offs 位置)/ :224/242(带回)· retransmitter.hpp:94(offs 4b)",
+      focus: ["G-frame","G-sqq","G-sq-fwd","G-repack","G-hls","G-o2","G-o3"]
+    },
+    {
+      chip: "ACK 退窗", flow: 2, eyebrow: "第 5 步 · 回程其一",
+      title: "每个段 ACK 都 tail+1:逐段退窗,隐含按序假设",
+      body: "<p>HLS 核的 <code>m_axis_rx_ack_meta</code> 出来后在 roce_stack.sv:115-126 解包成 <code>dack_t{ack_t, last}</code>,送进 FSM 的 ACK_LUP 态:<strong>tail+1,退休一个窗口槽</strong>。注意是<strong>逐段</strong>退——Stage C 板上验证过的"逐包 ACK"(8K→2 个 ACK、12K→3 个)在这里逐个消费,每个都推一格 tail。</p><p>这里埋着一条<strong>隐含假设:ACK 按序到达</strong>。tail 只会 +1 前进,没有乱序容忍——环回和单交换机场景天然满足;将来接 CX-5 若遇到 coalesced ACK(合并确认),这套逐段记账如何反应是互操作检查单上的一项(Stage C 已记录)。</p>",
+      ref: "roce_stack.sv:115-126(解包)· rdma_flow ACK_LUP · STAGE_C 逐包 ACK wire-proven",
+      focus: ["G-frame","G-hls","G-unpack","G-ack-path","G-fsm","G-ptbl"]
+    },
+    {
+      chip: "CQ 语义", flow: 2, eyebrow: "第 6 步 · 回程其二",
+      title: "只有 last=1 进 CQ:每 WR 恰好一个 CQE",
+      body: "<p>退窗是每段都做,但<strong>入 CQ 只挑 last=1 的 ACK</strong>——多段 WR 的中间段 ACK 只还窗口债、不惊动软件,最后一段的 ACK 才进 <code>inst_cq</code> 变成 CQE 从 <code>m_rdma_ack</code> 冒头。所以 write8k 两个 ACK 只出一个 CQE,d_multiwr 的 4 个 WR 恰好 4 个 CQE。</p><p>两条 Stage B/C 的实务知识挂在这:<strong>B8</strong>——CQE 载荷是 32b 裸 <code>ack_t</code>(不是 33b dack_t,TB 曾因此全字段错 1 位);<strong>CQ 写有损</strong>——rdma_flow 的 CQ 队列深 16 且写入无保护,消费方必须常排空 <code>m_rdma_ack</code>(doorbell 收到就 <code>sq_compl++</code> 并递增完成计数,正是在履行这个义务)。</p>",
+      ref: "rdma_flow L144-145(last 门控)· STAGE_B B8 · doorbell sq_compl(:495)",
+      focus: ["G-frame","G-fsm","G-ack-cq","G-cqq","G-cqe-out","G-up"]
+    },
+    {
+      chip: "offs 五站", flow: 3, eyebrow: "第 7 步 · 琥珀横带",
+      title: "offs 的一生:命令面窗口槽号 = 数据面缓冲槽号",
+      body: "<p>把五站连起来走一遍:① <code>rdma_flow</code> 放行时 <code>req_1.offs = head</code>(:130)→ ② txMeta bit[55:50](roce_stack.sv:99)→ ③ HLS 核 local_req_handler 登记进 retransEntry(4b 字段)、随 <code>mem_*_cmd.offs</code> 原样带回(:224/242)→ ④ 图 1 的 mux 拼重传缓冲地址 <code>(offs≪12)≪27</code>(低 39 位恒零)→ ⑤ URAM 按 <code>addr[42:39]</code> 选槽,16×4KiB。</p><p>一句话:<strong>命令面的窗口槽号,就是数据面的重传缓冲槽号</strong>。流控与存底共用同一套编号,窗口的生命周期天然等于缓冲槽的生命周期——段不被 ACK,槽号不退休,存底就不会被新数据覆写。这是整个平台里最优雅的一处设计咬合。</p>",
+      ref: "五站坐标见图内 · retransmitter.hpp:94(offs 存进重传表项)",
+      focus: ["G-o-title","G-o1","G-o2","G-o3","G-o4","G-o5","G-o-note","G-hls"]
+    },
+    {
+      chip: "旁路边界", flow: 0, eyebrow: "第 8 步 · 两个容易想错的角落",
+      title: "重传不过窗;READ 窗口在 L0 被吸掉",
+      body: "<p><strong>其一:重传不再经过 rdma_flow。</strong>超时/NAK 触发的重放事件在 HLS 核<strong>内部</strong>回注 local_req_handler(cpp:1112/1140 一带),用 retransmitter 表项里存的<strong>原 offs</strong> 直接发命令——不占新窗口槽、不推 head、天然命中当初存底的同一个 URAM 槽。窗口账本对重传完全无感,这正是"重放帧 ≡ 原帧"(B9)在流控层的前提。</p><p><strong>其二:READ 窗口是个空转的半边。</strong>指针表给读/写各备了一套账,但本平台不做 READ 响应方——L0 把 <code>m_rdma_rd_req</code> 恒 ready 吸掉、只计数(roce_l0_top.sv:92-98)。实际起作用的只有 WRITE 窗口。将来若做 READ,这半套账本现成。</p>",
+      ref: "ib_transport_protocol.cpp:1112/1140(重放回注)· roce_l0_top.sv:92-98(READ 吸收)",
+      focus: ["G-o-note","G-hls","G-fsm","G-ptbl","G-frame"]
+    }
+  ];
+
+  var chipsEl = document.getElementById("chips");
+  var narr = document.getElementById("narration");
+  var prog = document.getElementById("progress");
+  var btnPrev = document.getElementById("btn-prev");
+  var btnNext = document.getElementById("btn-next");
+  var cur = 0;
+
+  STEPS.forEach(function (s, i) {
+    var b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.setAttribute("data-flow", String(s.flow));
+    b.setAttribute("role", "tab");
+    b.innerHTML = "<span class='dot'></span>" + i + " · " + s.chip;
+    b.addEventListener("click", function () { show(i); });
+    chipsEl.appendChild(b);
+  });
+
+  function show(i) {
+    cur = Math.max(0, Math.min(STEPS.length - 1, i));
+    var s = STEPS[cur];
+    var flowTag = s.flow === 1 ? "<span class='fl1'>SQ 请求</span> · " :
+                  s.flow === 2 ? "<span class='fl2'>ACK/CQ</span> · " :
+                  s.flow === 3 ? "<span class='fl3'>offs</span> · " : "";
+    narr.innerHTML =
+      "<div class='step-eyebrow'>" + flowTag + s.eyebrow + "</div>" +
+      "<h3>" + s.title + "</h3>" + s.body +
+      "<div class='ref'>源码坐标 · " + s.ref + "</div>";
+    var focusSet = {};
+    s.focus.forEach(function (id) { focusSet[id] = true; });
+    var dimming = s.focus.length > 0;
+    ALL.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle("faded", dimming && !focusSet[id]);
+    });
+    var chips = chipsEl.children;
+    for (var k = 0; k < chips.length; k++) chips[k].classList.toggle("active", k === cur);
+    prog.textContent = "第 " + cur + " / " + (STEPS.length - 1) + " 步";
+    btnPrev.disabled = cur === 0;
+    btnNext.disabled = cur === STEPS.length - 1;
+  }
+
+  btnPrev.addEventListener("click", function () { show(cur - 1); });
+  btnNext.addEventListener("click", function () { show(cur + 1); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { show(cur - 1); }
+    else if (e.key === "ArrowRight") { show(cur + 1); }
+  });
+
+  show(0);
+})();
+</script>

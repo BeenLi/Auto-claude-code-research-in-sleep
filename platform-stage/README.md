@@ -36,6 +36,18 @@ WR-ZipGuard · VCU118 RoCE 平台阶段的全部文档(报告/设计/决策)。�
 平台可用期 ①(链路状态寄存器)②(多段写板测 tcl)不单独成报告,结论入 LEARNING_GUIDE 仪表盘
 决策摘要(07-18 板上全绿行)。
 
+## 数据流图集(RoCEv2 核与外围电路深潜解读)
+
+图集 = 三张 SVG 数据流总图(总入口);三篇「图 N 解读」逐图走读。2026-07-23/24 生成,
+2026-07-24 自会话 scratchpad 收入本目录为源文件正本。
+
+| 本地文件 | Artifact 标题 | 链接 |
+|---|---|---|
+| [roce-dataflow-atlas.html](roce-dataflow-atlas.html) | 《RoCE 数据流图集 — mux · RoCEv2 核 · rdma_flow》(总入口) | [db528950](https://claude.ai/code/artifact/db528950-9efc-4483-b4fb-297b18c40f8a) |
+| [fig1-mux-walkthrough.html](fig1-mux-walkthrough.html) | 《图 1 解读 · rdma_mux_retrans 重传复用器》 | [f0281e6f](https://claude.ai/code/artifact/f0281e6f-085e-4718-b355-dc32942c745b) |
+| [fig2-core-walkthrough.html](fig2-core-walkthrough.html) | 《图 2 解读 · RoCEv2 核内部数据流》 | [d3eab836](https://claude.ai/code/artifact/d3eab836-2f2e-43c4-87c4-a0df103ba2c0) |
+| [fig3-flow-walkthrough.html](fig3-flow-walkthrough.html) | 《图 3 解读 · rdma_flow 发送窗口与 offs 的一生》 | [1a3b78e6](https://claude.ai/code/artifact/1a3b78e6-5110-43c0-a58b-a6dcca9f8d34) |
+
 ## 设计文档(Markdown,不发布 Artifact)
 
 | 本地文件 | 内容 | 对应工作项 |

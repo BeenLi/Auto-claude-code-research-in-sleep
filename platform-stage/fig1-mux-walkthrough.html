@@ -1,0 +1,505 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>图 1 解读 · rdma_mux_retrans 重传复用器</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --surface: #ffffff; --panel: #fbfcfd; --panel2: #f1f4f7;
+    --ink: #1c2430; --muted: #5c6b7d; --line: #ccd4dd; --line-soft: #dde3ea;
+    --blue: #2563eb; --teal: #0d9488; --amber: #d97706;
+    --flow: #33415e; --ctrl: #8a97a8; --code-bg: #eef1f5;
+    --focus: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --surface: #1a2028; --panel: #1e2530; --panel2: #232b38;
+      --ink: #e4eaf2; --muted: #93a3b5; --line: #323c4a; --line-soft: #2a3340;
+      --blue: #6aa1f8; --teal: #34d3bc; --amber: #f0a63a;
+      --flow: #aab9d0; --ctrl: #6b7889; --code-bg: #232b38;
+      --focus: #6aa1f8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161c; --surface: #1a2028; --panel: #1e2530; --panel2: #232b38;
+    --ink: #e4eaf2; --muted: #93a3b5; --line: #323c4a; --line-soft: #2a3340;
+    --blue: #6aa1f8; --teal: #34d3bc; --amber: #f0a63a;
+    --flow: #aab9d0; --ctrl: #6b7889; --code-bg: #232b38; --focus: #6aa1f8;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --surface: #ffffff; --panel: #fbfcfd; --panel2: #f1f4f7;
+    --ink: #1c2430; --muted: #5c6b7d; --line: #ccd4dd; --line-soft: #dde3ea;
+    --blue: #2563eb; --teal: #0d9488; --amber: #d97706;
+    --flow: #33415e; --ctrl: #8a97a8; --code-bg: #eef1f5; --focus: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.75; margin: 0; padding: 36px 22px 72px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px;
+  }
+  h1 { font-size: 25px; line-height: 1.3; margin: 0 0 8px; font-weight: 700; text-wrap: balance; }
+  h1 code { font-size: 23px; }
+  .lede { color: var(--muted); max-width: 64em; margin: 0 0 20px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .9em; background: var(--code-bg); border-radius: 4px; padding: 1px 5px;
+  }
+  /* ---- step controls ---- */
+  .controls {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .nav-btn {
+    appearance: none; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); border-radius: 8px; padding: 7px 16px; font-size: 14px;
+    cursor: pointer; font-family: inherit;
+  }
+  .nav-btn:hover { border-color: var(--flow); }
+  .nav-btn:disabled { opacity: .38; cursor: default; }
+  .nav-btn:focus-visible, .chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .progress {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    color: var(--muted); margin-left: 2px; font-variant-numeric: tabular-nums;
+  }
+  .kbd-hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .kbd-hint kbd {
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+    border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
+    padding: 0 5px; background: var(--surface);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip {
+    appearance: none; font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+    border-radius: 999px; padding: 4px 12px; font-size: 12.5px; line-height: 1.5;
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ctrl); flex: none; }
+  .chip[data-flow="1"] .dot { background: var(--blue); }
+  .chip[data-flow="2"] .dot { background: var(--teal); }
+  .chip[data-flow="3"] .dot { background: var(--amber); }
+  .chip.active { border-color: var(--flow); color: var(--ink); background: var(--panel2); font-weight: 600; }
+  /* ---- narration ---- */
+  .narration {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
+    padding: 18px 22px 14px; margin-bottom: 16px; min-height: 168px;
+  }
+  .narration .step-eyebrow {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+    letter-spacing: .09em; color: var(--muted); margin-bottom: 2px;
+  }
+  .narration .step-eyebrow .fl1 { color: var(--blue); font-weight: 700; }
+  .narration .step-eyebrow .fl2 { color: var(--teal); font-weight: 700; }
+  .narration .step-eyebrow .fl3 { color: var(--amber); font-weight: 700; }
+  .narration h3 { font-size: 17px; margin: 0 0 8px; }
+  .narration p { margin: 8px 0; max-width: 72em; }
+  .narration .ref {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+    color: var(--ctrl); margin-top: 10px;
+  }
+  .narration strong { color: var(--ink); }
+  .narration .b { font-weight: 700; }
+  .narration .c1 { color: var(--blue); } .narration .c2 { color: var(--teal); } .narration .c3 { color: var(--amber); }
+  /* ---- diagram ---- */
+  .diagram {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
+    overflow-x: auto; margin-bottom: 28px;
+  }
+  .diagram svg { display: block; min-width: 1060px; width: 100%; height: auto; }
+  g[data-dim] { transition: opacity .35s ease; }
+  g[data-dim].faded { opacity: .12; }
+  @media (prefers-reduced-motion: reduce) {
+    g[data-dim] { transition: none; }
+  }
+  /* svg classes (与《数据流图集》同源) */
+  .blk { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  .blk-mux { fill: var(--panel2); stroke: var(--line); stroke-width: 1.6; }
+  .ibox { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; }
+  .chipbox { fill: var(--surface); stroke: var(--ctrl); stroke-width: 1; }
+  .t-title { font-size: 14px; font-weight: 700; fill: var(--ink); }
+  .t-sub   { font-size: 10.5px; fill: var(--muted); }
+  .t-mono  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .t-port  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; font-weight: 700; fill: var(--ink); }
+  .t-map   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 9.5px; fill: var(--muted); }
+  .t-note  { font-size: 9.5px; fill: var(--muted); }
+  .t-ref   { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 8.5px; fill: var(--ctrl); }
+  .t-judge { font-size: 10.5px; }
+  .ln-flow  { stroke: var(--flow);  stroke-width: 2.4; fill: none; }
+  .ln-blue  { stroke: var(--blue);  stroke-width: 2.4; fill: none; }
+  .ln-teal  { stroke: var(--teal);  stroke-width: 2.4; fill: none; }
+  .ln-amber { stroke: var(--amber); stroke-width: 2.4; fill: none; }
+  .ln-ctrl  { stroke: var(--ctrl);  stroke-width: 1.7; fill: none; stroke-dasharray: 5 4; }
+  .badge-blue  { fill: var(--blue); }
+  .badge-teal  { fill: var(--teal); }
+  .badge-amber { fill: var(--amber); }
+  .badge-txt { fill: #fff; font-size: 10px; font-weight: 700; }
+  /* ---- reference table ---- */
+  h2 { font-size: 18px; margin: 34px 0 12px; }
+  .tblwrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 780px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; background: var(--panel2); }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .dot-td { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .d1 { background: var(--blue); } .d2 { background: var(--teal); } .d3 { background: var(--amber); } .d0 { background: var(--flow); }
+  .footnote { color: var(--muted); font-size: 12.5px; margin-top: 26px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">WR-ZipGuard · Platform Stage · 数据流图集 · 图 1 分步导览</div>
+  <h1><code>rdma_mux_retrans</code> —— 一个命令口，三种人生</h1>
+  <p class="lede">
+    HLS RoCEv2 核只有<strong>一个</strong>取数命令口和<strong>一个</strong>发包数据入口，而发送方向有三种取数场景。
+    这个复用器就是把"一口"分成"三路"、再把三路数据汇回"一口"的调度员。
+    点下方步骤（或用方向键）逐步点亮图中的通路——被讲到的部分高亮，其余压暗。
+  </p>
+
+  <div class="controls">
+    <button class="nav-btn" id="btn-prev" type="button">‹ 上一步</button>
+    <button class="nav-btn" id="btn-next" type="button">下一步 ›</button>
+    <span class="progress" id="progress"></span>
+    <span class="kbd-hint">键盘 <kbd>←</kbd> <kbd>→</kbd> 也能翻页</span>
+  </div>
+  <div class="chips" id="chips" role="tablist" aria-label="讲解步骤"></div>
+
+  <div class="narration" id="narration" aria-live="polite"></div>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1280 880" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="rdma_mux_retrans 数据流分步导览图">
+    <defs>
+      <marker id="aFlow"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--flow)"/></marker>
+      <marker id="aBlue"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--blue)"/></marker>
+      <marker id="aTeal"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--teal)"/></marker>
+      <marker id="aAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--amber)"/></marker>
+      <marker id="aCtrl"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ctrl)"/></marker>
+    </defs>
+
+    <!-- ===== 角色块 ===== -->
+    <g id="G-hls" data-dim>
+      <rect class="blk" x="40" y="160" width="160" height="540" rx="9"/>
+      <text class="t-title" x="120" y="192" text-anchor="middle">HLS RoCEv2 核</text>
+      <text class="t-sub t-mono" x="120" y="210" text-anchor="middle">rocev2_top</text>
+      <text class="t-note" x="120" y="640" text-anchor="middle">发出取数命令,</text>
+      <text class="t-note" x="120" y="654" text-anchor="middle">收汇合数据并打包发送</text>
+      <text class="t-ref" x="120" y="676" text-anchor="middle">(roce_stack.sv 内部 · 见图 2)</text>
+    </g>
+
+    <g id="G-muxframe" data-dim>
+      <rect class="blk-mux" x="280" y="110" width="520" height="680" rx="10"/>
+      <text class="t-title t-mono" x="540" y="138" text-anchor="middle">rdma_mux_retrans</text>
+    </g>
+
+    <g id="G-user" data-dim>
+      <rect class="blk" x="980" y="150" width="270" height="320" rx="9"/>
+      <text class="t-title" x="1115" y="240" text-anchor="middle">用户逻辑(vFPGA)</text>
+      <text class="t-sub t-mono" x="1115" y="259" text-anchor="middle">Stage B: TB · Stage C+: doorbell</text>
+    </g>
+    <g id="G-rxnote" data-dim>
+      <text class="t-note" x="1115" y="440" text-anchor="middle">RX WRITE 落地(m_rdma_wr_req +</text>
+      <text class="t-note" x="1115" y="454" text-anchor="middle">m_axis_rdma_wr)不经本模块,直连</text>
+    </g>
+
+    <g id="G-buf" data-dim>
+      <rect class="blk" x="980" y="520" width="270" height="320" rx="9"/>
+      <text class="t-title" x="1115" y="560" text-anchor="middle">重传缓冲区</text>
+      <text class="t-sub t-mono" x="1115" y="579" text-anchor="middle">rdma_retrans_uram</text>
+      <text class="t-note" x="1115" y="596" text-anchor="middle">16 slot × 4 KiB URAM,按 offs 索引</text>
+      <text class="t-note" x="1115" y="775" text-anchor="middle">仅存 WRITE payload;READ 响应不存底</text>
+      <text class="t-note" x="1115" y="790" text-anchor="middle">*_sts 状态口无人消费 → tie-off</text>
+      <text class="t-ref" x="1115" y="812" text-anchor="middle">TB 行为模型: tb_stage_b.sv L209+</text>
+    </g>
+
+    <!-- ===== 命令 Mux 与三条判决 ===== -->
+    <g id="G-cmdmux" data-dim>
+      <rect class="ibox" x="320" y="150" width="180" height="180" rx="7"/>
+      <text class="t-title" x="410" y="180" text-anchor="middle" style="font-size:13px">命令 Mux(三选一)</text>
+      <text class="t-ref" x="410" y="316" text-anchor="middle">L94–144 · WRITE 分支 req_user.valid=0</text>
+    </g>
+    <g id="G-j2" data-dim>
+      <text class="t-judge" x="410" y="215" text-anchor="middle" style="fill:var(--teal)">actv=1 &amp; rd → 用户取数 ②</text>
+    </g>
+    <g id="G-j1" data-dim>
+      <text class="t-judge" x="410" y="248" text-anchor="middle" style="fill:var(--blue)">actv=1 &amp; !rd → 只发存底命令 ①</text>
+    </g>
+    <g id="G-j3" data-dim>
+      <text class="t-judge" x="410" y="278" text-anchor="middle" style="fill:var(--amber)">actv=0 → 回放命令 ③</text>
+    </g>
+
+    <g id="G-seqq" data-dim>
+      <rect class="chipbox" x="580" y="346" width="120" height="48" rx="6"/>
+      <text class="t-sub" x="640" y="366" text-anchor="middle" style="fill:var(--ink)">seq 队列</text>
+      <text class="t-map" x="640" y="382" text-anchor="middle">{rd,actv,len} L147</text>
+    </g>
+
+    <g id="G-datamux" data-dim>
+      <path class="ibox" d="M 660 440 L 660 600 L 580 560 L 580 480 Z"/>
+      <text class="t-sub" x="618" y="514" text-anchor="middle" style="fill:var(--ink)">数据</text>
+      <text class="t-sub" x="618" y="530" text-anchor="middle" style="fill:var(--ink)">Mux</text>
+      <text class="t-ref" x="620" y="618" text-anchor="middle">L313–361</text>
+    </g>
+
+    <g id="G-fifonet" data-dim>
+      <rect class="ibox" x="360" y="496" width="140" height="48" rx="6"/>
+      <text class="t-map" x="430" y="516" text-anchor="middle" style="fill:var(--ink)">axis_data_fifo_512</text>
+      <text class="t-note" x="430" y="532" text-anchor="middle">net 方向</text>
+    </g>
+    <g id="G-fifoddr" data-dim>
+      <rect class="ibox" x="665" y="600" width="120" height="48" rx="6"/>
+      <text class="t-map" x="725" y="620" text-anchor="middle" style="fill:var(--ink)">axis_data_fifo_512</text>
+      <text class="t-note" x="725" y="636" text-anchor="middle">存底镜像方向</text>
+    </g>
+
+    <!-- ===== 左侧共享两口 ===== -->
+    <g id="G-sreq" data-dim>
+      <path class="ln-flow" d="M 200 240 H 316" marker-end="url(#aFlow)"/>
+      <text class="t-port" x="258" y="228" text-anchor="middle">s_req_net</text>
+      <text class="t-map" x="258" y="258" text-anchor="middle">取数命令 metaIntf&lt;req_t&gt;</text>
+      <text class="t-note" x="258" y="271" text-anchor="middle">由 rd_cmd 拼装 :209</text>
+    </g>
+    <g id="G-mnet" data-dim>
+      <path class="ln-flow" d="M 360 520 H 206" marker-end="url(#aFlow)"/>
+      <path class="ln-flow" d="M 580 520 H 500"/>
+      <text class="t-port" x="280" y="508" text-anchor="middle">m_axis_net</text>
+      <text class="t-map" x="280" y="538" text-anchor="middle">AXI4S 512b → 打包发送</text>
+    </g>
+
+    <!-- ===== 控制虚线 ===== -->
+    <g id="G-ctrl" data-dim>
+      <path class="ln-ctrl" d="M 500 230 H 640 V 342" marker-end="url(#aCtrl)"/>
+      <path class="ln-ctrl" d="M 640 394 V 446" marker-end="url(#aCtrl)"/>
+      <text class="t-note" x="662" y="420" text-anchor="start">选路 + 拍数</text>
+    </g>
+
+    <!-- ===== 流② READ 响应(青) ===== -->
+    <g id="G-f2req" data-dim>
+      <path class="ln-teal" d="M 500 190 H 974" marker-end="url(#aTeal)"/>
+      <rect class="chipbox" x="640" y="176" width="70" height="28" rx="5"/>
+      <text class="t-map" x="675" y="194" text-anchor="middle">queue</text>
+      <text class="t-port" x="806" y="164">m_req_user</text>
+      <text class="t-map" x="806" y="147">= m_rdma_rd_req</text>
+      <text class="t-note" x="806" y="133">READ 响应取数描述符(仅此场景)</text>
+      <circle class="badge-teal" cx="780" cy="190" r="8.5"/><text class="badge-txt" x="780" y="193.5" text-anchor="middle">2</text>
+    </g>
+    <g id="G-f2data" data-dim>
+      <path class="ln-teal" d="M 980 430 H 750 V 510 H 666" marker-end="url(#aTeal)"/>
+      <text class="t-port" x="806" y="424">s_axis_user_rsp</text>
+      <text class="t-map" x="806" y="446">= s_axis_rdma_rd_rsp</text>
+      <text class="t-note" x="806" y="459">READ 响应 payload · 用户回填</text>
+      <text class="t-note" x="1115" y="322" text-anchor="middle" style="fill:var(--teal)">READ 响应:收描述符 → 回填数据</text>
+      <text class="t-note" x="1115" y="337" text-anchor="middle" style="fill:var(--teal)">serve_payload() L157</text>
+      <circle class="badge-teal" cx="780" cy="430" r="8.5"/><text class="badge-txt" x="780" y="433.5" text-anchor="middle">2</text>
+    </g>
+
+    <!-- ===== 流① WRITE(蓝) ===== -->
+    <g id="G-f1push" data-dim>
+      <path class="ln-blue" d="M 980 380 H 725 V 470"/>
+      <path class="ln-blue" d="M 725 470 H 666" marker-end="url(#aBlue)"/>
+      <text class="t-port" x="806" y="368">s_axis_user_req</text>
+      <text class="t-map" x="806" y="396">= s_axis_rdma_rd_req</text>
+      <text class="t-note" x="806" y="409">WRITE payload · 用户自发推</text>
+      <text class="t-note" x="1115" y="285" text-anchor="middle" style="fill:var(--blue)">WRITE:SQ 提交后自发推 payload</text>
+      <text class="t-note" x="1115" y="300" text-anchor="middle" style="fill:var(--blue)">push_payload() L181</text>
+      <circle class="badge-blue" cx="780" cy="380" r="8.5"/><text class="badge-txt" x="780" y="383.5" text-anchor="middle">1</text>
+    </g>
+    <g id="G-f1tee" data-dim>
+      <path class="ln-blue" d="M 725 470 V 502 A 8 8 0 0 1 725 518 V 542 A 8 8 0 0 1 725 558 V 596" marker-end="url(#aBlue)"/>
+      <circle cx="725" cy="470" r="4.5" fill="var(--blue)"/>
+      <text class="t-note" x="738" y="590" text-anchor="start" style="fill:var(--blue)">一式两份 L359</text>
+      <path class="ln-blue" d="M 785 624 H 974" marker-end="url(#aBlue)"/>
+      <text class="t-port" x="806" y="618">m_axis_ddr</text>
+      <text class="t-map" x="806" y="640">= m_axis_rdma_mem_wr</text>
+      <text class="t-note" x="806" y="653">payload 存底镜像</text>
+      <circle class="badge-blue" cx="945" cy="624" r="8.5"/><text class="badge-txt" x="945" y="627.5" text-anchor="middle">1</text>
+    </g>
+    <g id="G-f1cmd" data-dim>
+      <path class="ln-blue" d="M 500 310 H 525 V 512 A 8 8 0 0 1 525 528 V 734 H 974" marker-end="url(#aBlue)"/>
+      <rect class="chipbox" x="620" y="720" width="70" height="28" rx="5"/>
+      <text class="t-map" x="655" y="738" text-anchor="middle">queue</text>
+      <text class="t-port" x="806" y="714">m_req_ddr_wr</text>
+      <text class="t-map" x="806" y="762">= m_rdma_mem_wr_cmd · 存底命令</text>
+      <circle class="badge-blue" cx="780" cy="734" r="8.5"/><text class="badge-txt" x="780" y="737.5" text-anchor="middle">1</text>
+    </g>
+
+    <!-- ===== 流③ 重传(琥珀) ===== -->
+    <g id="G-f3data" data-dim>
+      <path class="ln-amber" d="M 980 550 H 666" marker-end="url(#aAmber)"/>
+      <text class="t-port" x="806" y="544">s_axis_ddr</text>
+      <text class="t-map" x="806" y="566">= s_axis_rdma_mem_rd</text>
+      <text class="t-note" x="806" y="579">重传回放数据</text>
+      <circle class="badge-amber" cx="780" cy="550" r="8.5"/><text class="badge-txt" x="780" y="553.5" text-anchor="middle">3</text>
+    </g>
+    <g id="G-f3cmd" data-dim>
+      <path class="ln-amber" d="M 500 290 H 555 V 512 A 8 8 0 0 1 555 528 V 680 H 974" marker-end="url(#aAmber)"/>
+      <rect class="chipbox" x="620" y="666" width="70" height="28" rx="5"/>
+      <text class="t-map" x="655" y="684" text-anchor="middle">queue</text>
+      <text class="t-port" x="806" y="660">m_req_ddr_rd</text>
+      <text class="t-map" x="806" y="694">= m_rdma_mem_rd_cmd · 回放命令</text>
+      <circle class="badge-amber" cx="780" cy="680" r="8.5"/><text class="badge-txt" x="780" y="683.5" text-anchor="middle">3</text>
+    </g>
+  </svg>
+  </div>
+
+  <h2>端口速查(三层命名对照)</h2>
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr><th>流</th><th>mux 端口</th><th>roce_stack 连线</th><th>方向</th><th>承载内容</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="dot-td d0"></span>共用</td><td><code>s_req_net</code></td><td>内部 <code>rdma_rd_req</code></td><td><code>核 → mux</code></td><td>取数命令 req_t,三种场景共用一口</td></tr>
+        <tr><td><span class="dot-td d0"></span>共用</td><td><code>m_axis_net</code></td><td>HLS 核 TX 数据入口</td><td><code>mux → 核</code></td><td>三路汇合后的发包 payload</td></tr>
+        <tr><td><span class="dot-td d2"></span>②</td><td><code>m_req_user</code></td><td><code>m_rdma_rd_req</code></td><td><code>mux → 用户</code></td><td>READ 响应取数描述符(仅此场景触发)</td></tr>
+        <tr><td><span class="dot-td d1"></span>①</td><td><code>s_axis_user_req</code></td><td><code>s_axis_rdma_rd_req</code></td><td><code>用户 → mux</code></td><td>WRITE payload,用户自发推(名字是模板遗留)</td></tr>
+        <tr><td><span class="dot-td d2"></span>②</td><td><code>s_axis_user_rsp</code></td><td><code>s_axis_rdma_rd_rsp</code></td><td><code>用户 → mux</code></td><td>READ 响应 payload,按描述符回填</td></tr>
+        <tr><td><span class="dot-td d1"></span>①</td><td><code>m_req_ddr_wr</code></td><td><code>m_rdma_mem_wr_cmd</code></td><td><code>mux → 缓冲</code></td><td>存底命令 {addr,len},每个 WRITE 段一条</td></tr>
+        <tr><td><span class="dot-td d1"></span>①</td><td><code>m_axis_ddr</code></td><td><code>m_axis_rdma_mem_wr</code></td><td><code>mux → 缓冲</code></td><td>payload 存底镜像(tee 的另一份)</td></tr>
+        <tr><td><span class="dot-td d3"></span>③</td><td><code>m_req_ddr_rd</code></td><td><code>m_rdma_mem_rd_cmd</code></td><td><code>mux → 缓冲</code></td><td>回放命令,仅超时/NAK 时触发</td></tr>
+        <tr><td><span class="dot-td d3"></span>③</td><td><code>s_axis_ddr</code></td><td><code>s_axis_rdma_mem_rd</code></td><td><code>缓冲 → mux</code></td><td>回放数据,重发时替代用户供数</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footnote">
+    源:《RoCE 数据流图集》图 1(rtl/coyote/rdma_mux_retrans.sv)· 交叉证据:Stage B 发现 B3(payload 主动推流)/ B9 仿真闭案(重传帧 ≡ 原帧,check_b9_retrans.py)· 缓冲真身 = 平台可用期 item③ 的 rdma_retrans_uram(16×4KiB)。
+    图 2(HLS 核内部)与图 3(rdma_flow / offs 的一生)见原图集。
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var ALL = ["G-hls","G-muxframe","G-user","G-rxnote","G-buf","G-cmdmux","G-j1","G-j2","G-j3",
+             "G-seqq","G-datamux","G-fifonet","G-fifoddr","G-sreq","G-mnet","G-ctrl",
+             "G-f2req","G-f2data","G-f1push","G-f1tee","G-f1cmd","G-f3data","G-f3cmd"];
+
+  var STEPS = [
+    {
+      chip: "全景", flow: 0, eyebrow: "起点 · 认识舞台",
+      title: "四个角色,三种颜色",
+      body: "<p>左边是 <strong>HLS RoCEv2 核</strong>(协议大脑,图 2 的主角);中间是本图主角 <code>rdma_mux_retrans</code>;右上是<strong>用户逻辑</strong>(Stage B 里是 testbench,Stage C 起是 doorbell + staging);右下是<strong>重传缓冲区</strong>(板上真身 <code>rdma_retrans_uram</code>,16 槽 × 4 KiB)。</p><p>三种颜色就是三条流:<span class='b c1'>蓝① WRITE 发送</span>、<span class='b c2'>青② READ 响应</span>、<span class='b c3'>琥珀③ 重传</span>;灰虚线是控制。先记住一句话:<strong>这个模块存在,是因为 HLS 核只有\"一张嘴\",而世界上有三种取数场景。</strong></p>",
+      ref: "rtl/coyote/rdma_mux_retrans.sv(全文 ~370 行)",
+      focus: []
+    },
+    {
+      chip: "一口三景", flow: 0, eyebrow: "第 1 步 · 问题的起点",
+      title: "一个命令口 + 一个数据口,如何伺候三种场景",
+      body: "<p>HLS 核发送任何 payload 前都会在 <code>s_req_net</code> 发一条取数命令(<code>req_t</code>),而它接收数据的入口也只有一个:<code>m_axis_net</code>。可是数据从哪来?三种场景答案完全不同——WRITE 时用户推来、READ 响应时用户按描述符回填、重传时缓冲区回放。</p><p>于是 mux 的职责一分为二:左上的<strong>命令 Mux</strong> 负责\"分\"(判断场景、路由命令),下方的<strong>数据 Mux</strong> 负责\"合\"(三路进、一路出,经 net FIFO 送回核打包)。</p>",
+      ref: "rdma_mux_retrans.sv L94–144(命令)/ L313–361(数据)",
+      focus: ["G-hls","G-muxframe","G-sreq","G-mnet","G-cmdmux","G-datamux","G-fifonet"]
+    },
+    {
+      chip: "判决", flow: 0, eyebrow: "第 2 步 · 命令 Mux 的三选一",
+      title: "两个位,判定三种人生",
+      body: "<p>每条取数命令带两个关键位:<code>actv</code>(active,=1 表示这是正常发送路径的\"活跃取数\")和 <code>rd</code>(read)。判决表:<span class='b c2'>actv=1 &amp; rd → 场景②,把命令递给用户</span>;<span class='b c1'>actv=1 &amp; !rd → 场景①,命令不出门,只派生存底命令</span>;<span class='b c3'>actv=0 → 场景③,向缓冲区发回放命令</span>。</p><p>判决的同时,<code>{rd, actv, len}</code> 被压进 <strong>seq 队列</strong>——这是数据 Mux 稍后\"对号入座\"的唯一依据(虚线:选路 + 拍数)。命令什么顺序进,数据就必须什么顺序来。</p>",
+      ref: "rdma_mux_retrans.sv L94–144 · seq 队列 L147",
+      focus: ["G-muxframe","G-sreq","G-cmdmux","G-j1","G-j2","G-j3","G-seqq","G-ctrl"]
+    },
+    {
+      chip: "① 吞命令", flow: 1, eyebrow: "第 3 步 · 流① WRITE(其一)",
+      title: "命令被故意吞掉 —— B3 的电路学解释",
+      body: "<p>WRITE 分支里 <code>req_user.valid=0</code>——取数命令到此为止,<strong>用户永远收不到\"请求\"</strong>。这不是疏漏:命令被拦下后干了两件正事——(a) 生成 <code>m_req_ddr_wr</code> 存底命令 <code>{addr,len}</code> 发给重传缓冲(每个 WRITE 段一条);(b) len 进 seq 队列,给数据 Mux 定好\"接下来这么多拍属于这一段\"。</p><p>这就是 Stage B 发现 <strong>B3</strong> 的出处:不是栈忘了发请求,而是 mux 故意拦下了——所以用户侧必须\"自发推流\"。Coyote 源码里那句自我吐槽 <em>\"Shouldn't it be automatically delivered to the stack?\"</em> 说的正是这里。</p>",
+      ref: "rdma_mux_retrans.sv L106–114",
+      focus: ["G-muxframe","G-sreq","G-cmdmux","G-j1","G-f1cmd","G-seqq","G-ctrl","G-buf"]
+    },
+    {
+      chip: "① 自发推", flow: 1, eyebrow: "第 4 步 · 流① WRITE(其二)",
+      title: "用户不等请求,提交 SQ 后立刻推 payload",
+      body: "<p>既然请求永远不来,用户就必须在提交 SQ 之后<strong>主动</strong>把 payload 推进 <code>s_axis_user_req</code>(Stage B 是 TB 的 <code>push_payload()</code>;Stage C 起由 doorbell 的推流机在 WQE 提交后同步从 staging 读出并推送)。</p><p>注意这个端口的名字:<code>s_axis_rdma_rd_req</code>——名字里带 \"rd_req\",扛的却是 WRITE 发送数据。这是 Coyote 通用模板的命名遗留(模板里它配合 <code>m_req_user</code> 回数),retrans 变体把 WRITE 的\"请求半边\"内部化了,\"数据半边\"沿用了旧名。第 8 步会讲它附带的契约风险。</p>",
+      ref: "rdma_mux_retrans.sv L326–331 · tb_stage_b.sv push_payload() L181",
+      focus: ["G-muxframe","G-user","G-f1push","G-datamux"]
+    },
+    {
+      chip: "① tee", flow: 1, eyebrow: "第 5 步 · 流① WRITE(其三)",
+      title: "tee 一式两份:一份上线,一份存底",
+      body: "<p>数据 Mux 按 seq 队列里的 len 计数切段,在 <strong>tee 点</strong>(蓝色圆点)把每一拍一分为二:一份经 net FIFO → <code>m_axis_net</code> 回 HLS 核打包上线;另一份经 ddr FIFO → <code>m_axis_ddr</code> 写进重传缓冲对应槽。</p><p>关键细节:两路的 <code>tready</code> 取 AND、<strong>锁步前进</strong>——任何一侧堵住,两侧一起停。这保证\"线上发出的\"和\"缓冲里存的\"永远逐拍一致,也是后来 B9 闭案时\"重传帧 ≡ 原帧\"能成立的物质基础。</p>",
+      ref: "rdma_mux_retrans.sv L359–361(tee)· L313–361(计数切段)",
+      focus: ["G-muxframe","G-datamux","G-seqq","G-ctrl","G-f1push","G-f1tee","G-fifonet","G-fifoddr","G-mnet","G-buf","G-hls"]
+    },
+    {
+      chip: "② 读响应", flow: 2, eyebrow: "第 6 步 · 流②",
+      title: "READ 响应:唯一走完整握手的流",
+      body: "<p>远端要读你的内存时,要读的 vaddr/len 用户<strong>事先不知道</strong>——所以这是唯一保留完整\"请求 → 回数\"握手的场景:命令 Mux(actv=1 &amp; rd)把描述符经 <code>m_req_user</code>(= <code>m_rdma_rd_req</code>)真正递给用户,用户取数后回填 <code>s_axis_user_rsp</code> → net FIFO → 发包。</p><p>两个要点:① Stage B 的观察\"<code>m_rdma_rd_req</code> 只在 READ 响应时跳\"出处就在这;② READ 响应<strong>不存底</strong>——按 IBTA 语义,READ 丢包由请求方重发 READ 请求兜底,响应方无需备份。</p>",
+      ref: "rdma_mux_retrans.sv L97–105 / L317–324 · TB serve_payload() L157",
+      focus: ["G-muxframe","G-sreq","G-cmdmux","G-j2","G-f2req","G-user","G-f2data","G-datamux","G-fifonet","G-mnet","G-hls"]
+    },
+    {
+      chip: "③ 重传", flow: 3, eyebrow: "第 7 步 · 流③",
+      title: "重传:缓冲回放,用户全程无感",
+      body: "<p>requester 的 <code>transport_timer</code> 超时(1/5/12/64 ms 退避,见图 2)或收到 NAK 时,HLS 核发出 <code>actv=0</code> 的命令。命令 Mux 用 <code>{vfid, pid, offs}</code> 拼出回放地址((offs≪12)≪27——低 39 位恒零,URAM 侧按 <code>addr[42:39]</code> 选槽),发 <code>m_req_ddr_rd</code>;缓冲把当初 tee 存底的 payload 从 <code>s_axis_ddr</code> 推回,直接汇入发包。</p><p><strong>全程不打扰用户</strong>——它甚至不知道发生过重传。B9 仿真闭案(丢第 N 个 ACK → ~626 µs 定时器触发 → 回放)时,<code>check_b9_retrans.py</code> 证明线上重传帧与原帧逐字节相同,验证的就是这条琥珀路。</p>",
+      ref: "rdma_mux_retrans.sv L116–124 / L128–141 / L334–341 · rdma_retrans_uram.sv:58",
+      focus: ["G-muxframe","G-sreq","G-cmdmux","G-j3","G-f3cmd","G-buf","G-f3data","G-datamux","G-fifonet","G-mnet","G-hls"]
+    },
+    {
+      chip: "契约", flow: 1, eyebrow: "第 8 步 · 红线",
+      title: "配对没有校验:顺序 + 长度就是全部契约",
+      body: "<p>WRITE 路的数据与命令怎么配对?<strong>没有任何地址/vaddr 校验</strong>,全靠两条纪律:<strong>顺序</strong>——用户必须严格按 SQ 提交顺序推流;<strong>长度</strong>——每段推流字节数必须恰好等于命令的 len。谁破坏它,硬件不会报错:payload 会安静地错位串台,存底镜像也跟着一起错,板上表现为无波形可看的静默数据损坏。</p><p>这正是 Stage C 把\"doorbell 提交 WQE 后由控制器同步从 staging 读出并推流\"定为设计输入的原因——用状态机把这两条纪律机器化,而不是指望软件自觉。</p>",
+      ref: "契约出处:seq 队列按序编程(L147)+ 计数切段(L313–361),无 vaddr 兜底",
+      focus: ["G-muxframe","G-cmdmux","G-seqq","G-f1push","G-datamux","G-user"]
+    },
+    {
+      chip: "边界", flow: 0, eyebrow: "第 9 步 · 图外之路",
+      title: "两件不在图里的事",
+      body: "<p>(a) <strong>远端 WRITE 写进本端的落地路不经过这个 mux</strong>:<code>m_rdma_wr_req</code>(放置描述符)+ <code>m_axis_rdma_wr</code>(放置数据)由 HLS 核直连用户——本图只覆盖发送方向的三条流。Stage B/C 检查 placement 的观察口就是那条直连路。</p><p>(b) 缓冲区的 <code>*_sts</code> 状态口无人消费,被 tie-off。另外记住:缓冲真身在平台可用期 item③ 已从 Stage D 的 tie-off wedge 换成真 URAM(16 槽恰好对应 rdma_flow 的 16 段发送窗口)——槽号 offs 怎么贯穿命令面与数据面,是图 3 \"offs 的一生\"的故事。</p>",
+      ref: "roce_stack.sv 直连接线 · rdma_retrans_uram.sv(item③)· 图 3 offs 旅程",
+      focus: ["G-hls","G-user","G-rxnote","G-buf"]
+    }
+  ];
+
+  var chipsEl = document.getElementById("chips");
+  var narr = document.getElementById("narration");
+  var prog = document.getElementById("progress");
+  var btnPrev = document.getElementById("btn-prev");
+  var btnNext = document.getElementById("btn-next");
+  var cur = 0;
+
+  STEPS.forEach(function (s, i) {
+    var b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.setAttribute("data-flow", String(s.flow));
+    b.setAttribute("role", "tab");
+    b.innerHTML = "<span class='dot'></span>" + i + " · " + s.chip;
+    b.addEventListener("click", function () { show(i); });
+    chipsEl.appendChild(b);
+  });
+
+  function show(i) {
+    cur = Math.max(0, Math.min(STEPS.length - 1, i));
+    var s = STEPS[cur];
+    var flowTag = s.flow === 1 ? "<span class='fl1'>流① WRITE</span> · " :
+                  s.flow === 2 ? "<span class='fl2'>流② READ 响应</span> · " :
+                  s.flow === 3 ? "<span class='fl3'>流③ 重传</span> · " : "";
+    narr.innerHTML =
+      "<div class='step-eyebrow'>" + flowTag + s.eyebrow + "</div>" +
+      "<h3>" + s.title + "</h3>" + s.body +
+      "<div class='ref'>源码坐标 · " + s.ref + "</div>";
+    var focusSet = {};
+    s.focus.forEach(function (id) { focusSet[id] = true; });
+    var dimming = s.focus.length > 0;
+    ALL.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle("faded", dimming && !focusSet[id]);
+    });
+    var chips = chipsEl.children;
+    for (var k = 0; k < chips.length; k++) chips[k].classList.toggle("active", k === cur);
+    prog.textContent = "第 " + cur + " / " + (STEPS.length - 1) + " 步";
+    btnPrev.disabled = cur === 0;
+    btnNext.disabled = cur === STEPS.length - 1;
+  }
+
+  btnPrev.addEventListener("click", function () { show(cur - 1); });
+  btnNext.addEventListener("click", function () { show(cur + 1); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { show(cur - 1); }
+    else if (e.key === "ArrowRight") { show(cur + 1); }
+  });
+
+  show(0);
+})();
+</script>
