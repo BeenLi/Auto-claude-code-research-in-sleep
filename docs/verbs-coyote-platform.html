@@ -369,7 +369,7 @@ TX:  roce_stack.m_axis_tx ──→ mac_ip_encode ──→ (ethernet_frame_padd
 RX:  CMAC ──→ ip_handler ──m_axis_ROCE──→ roce_l0_top.s_axis_rx
                 └── 一比一替换 rx_udp4791_filter(乞丐版退役)
 </pre>
-<figcaption>CX-5 站插装草图:一进一出,接口零适配(<span class="filepath">mac_ip_encode.hpp:41-47</span> / <span class="filepath">ip_handler.hpp:40-48</span>)。padding_512 顺带把 48B ACK runt 帧补到 64B 合规(802.3 最小帧)。</figcaption>
+<figcaption>CX-5 站插装草图:一进一出,接口零适配(<span class="filepath">mac_ip_encode.hpp:41-47</span> / <span class="filepath">ip_handler.hpp:40-48</span>)。padding_512 顺带把 48B ACK runt 帧补到 64B。<span style="opacity:.75">(勘误 2026-07-29:此处原写"64B 合规(802.3 最小帧)",把两个 64 混为一谈。802.3 的 64 B 最小帧<strong>含 4 B FCS</strong>,故 MAC 之前的标准最小值恰是 <strong>60 B</strong> —— 这正是当前 <code>cmac_pad</code> 补到 60 B 的原因,与本站并不冲突。<code>padding_512</code> 的 64 B 是"把 512 位首拍填满"的副产物,合法但不是 802.3 最小值。)</span></figcaption>
 </figure>
 
 <div class="note"><strong>勘误(2026-07-23 实测)</strong>:此前"本仓库只快照了 fns 的 rdma/ 子集、届时需重新 clone"的说法<em>作废</em> —— <span class="filepath">third_party/fpga-network-stack/hls/</span> 下 mac_ip_encode / ip_handler / arp_server_subnet / icmp_server / ethernet_frame_padding_512 五件套源码全部在仓(ls 实测确认),无需任何外部拉取。</div>

@@ -77,6 +77,40 @@
   .toc { font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 18px; margin: 20px 0; }
   .toc a { border-bottom: none; }
   .toc span { color: var(--muted); margin: 0 6px; }
+
+  /* —— §3 端到端数据流图的配套件 —— */
+  .figbox svg { display: block; min-width: 700px; }
+  .fig-legend { display: flex; flex-wrap: wrap; gap: 5px 16px; font-size: 12px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .fig-legend i { font-style: normal; white-space: nowrap; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; border: 1px solid var(--line); }
+  .sw-ctl { background: var(--accent-soft); border-color: var(--accent); }
+  .sw-dat { background: var(--surface-2); border-color: var(--link); border-width: 1.5px; }
+  .sw-gap { background: var(--warn-soft); border-color: var(--warn); border-style: dashed; }
+  .sw-off { background: var(--fail-soft); border-color: var(--fail); }
+  .sw-hw  { background: var(--surface); border-style: dashed; }
+
+  .caliber { font-size: 12.5px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0; padding: 9px 14px; margin: 22px 0 0; }
+  .bytebox { border: 1px solid var(--line); border-radius: 0 0 8px 8px; background: var(--surface); padding: 12px 14px 10px; }
+  .brow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; margin-bottom: 9px; }
+  .brow:last-of-type { margin-bottom: 0; }
+  .rlab { flex: 0 0 120px; font-size: 12px; color: var(--muted); align-self: center; padding-right: 4px; }
+  .brow .c { flex: 1 1 60px; min-width: 54px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); padding: 5px 7px; font-size: 11.5px; text-align: center; line-height: 1.35; }
+  .brow .c b { display: block; font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--muted); }
+  .brow .c.pay { flex: 5 1 130px; border-color: var(--link); }
+  .brow .c.pay b { color: var(--link); }
+  .brow .c.sum { flex: 0 0 auto; background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; align-self: center; padding: 6px 11px; }
+  .brow .c.pad { flex: 0 0 auto; background: repeating-linear-gradient(45deg, transparent, transparent 4px, color-mix(in srgb, var(--muted) 22%, transparent) 4px, color-mix(in srgb, var(--muted) 22%, transparent) 6px), var(--surface); color: var(--muted); border-style: dashed; }
+  .notch { flex: 0 0 auto; align-self: center; font-size: 11px; color: var(--warn); background: repeating-linear-gradient(45deg, transparent, transparent 4px, color-mix(in srgb, var(--warn) 26%, transparent) 4px, color-mix(in srgb, var(--warn) 26%, transparent) 6px), var(--warn-soft); border: 1px dashed var(--warn); border-radius: 4px; padding: 5px 6px; line-height: 1.3; text-align: center; }
+  .bytenote { font-size: 12px; color: var(--muted); margin: 10px 0 0; padding-top: 9px; border-top: 1px dashed var(--line); }
+  .bytenote b { color: var(--ink); font-weight: 600; }
+
+  .steps { margin: 8px 0 0; }
+  .steps h4 { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; color: var(--accent-ink); margin: 22px 0 4px; font-weight: 700; }
+  .steps ol { list-style: none; padding: 0; margin: 0; }
+  .steps li { display: grid; grid-template-columns: 24px 1fr; gap: 11px; margin: 9px 0; font-size: 14px; align-items: start; }
+  .steps .n { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; margin-top: 2px; border-radius: 50%; background: var(--accent); color: var(--bg); font-family: var(--mono); font-size: 11.5px; font-weight: 700; }
+  .steps li.off .n { background: var(--fail); }
+  .steps li em { font-style: normal; color: var(--muted); font-size: 13px; }
 </style>
 
 <main>
@@ -115,12 +149,360 @@
 <p>xsim 对两类东西宽容而综合器严格:SV 语法混进 <code>.v</code> 文件(照吃)、RAM 访问模式(照仿)。因此"仿真全绿"不等于"可综合",每一次综合失败都是一条免费的静态审查——本阶段五次尝试各抓到一颗真雷(§4),全部回灌成代码修复 + 回归门。</p>
 
 <h2 id="s3"><span class="no">§3</span>装置(Setup)</h2>
-<div class="figbox"><pre>
-run_hw_axi / TB task ─AXI-Lite(24b/32b)→ jtag_axi ─→ stage_d_core:
-  roce_l0_top.m_axis_tx (250M) → axis_async_fifo FRAME_FIFO → CMAC QSFP1 (tx_clk ~322.27M)
-      ═ DAC(TB: async FIFO + cmac_pad 模型)═ CMAC QSFP2 (rx_clk, CDR 恢复)
-      → axis_async_fifo DROP_WHEN_FULL+DROP_BAD_FRAME → rx_udp4791_filter → roce_l0_top.s_axis_rx
-</pre><div class="figcap">图:Stage D 数据路径。行为仿真止于 stage_d_core 的 CMAC 侧 AXIS 端口(tap 点即 golden 捕获点);CMAC/GT/jtag_axi 硬核由 Stage E 板上验证。</div></div>
+<div class="figbox">
+<svg viewBox="0 0 880 846" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stage D 端到端数据流框图:从 Mac 敲寄存器到数据经 QSFP 环回落地" font-family="-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', 'Segoe UI', sans-serif" font-size="10">
+  <defs>
+    <marker id="d-aC" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--accent)"/></marker>
+    <marker id="d-aD" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--link)"/></marker>
+    <marker id="d-aM" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
+    <pattern id="d-hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <rect width="7" height="7" fill="var(--warn-soft)"/><line x1="0" y1="0" x2="0" y2="7" stroke="var(--warn)" stroke-width="1.6" opacity="0.42"/>
+    </pattern>
+  </defs>
+
+  <text x="0" y="17" font-size="13.5" font-weight="700" fill="var(--ink)">图 1 · 一次 RDMA WRITE 的全程:从 Mac 敲一下寄存器,到数据落进"对端"内存</text>
+
+  <!-- ===== 带名条 ===== -->
+  <g fill="var(--muted)">
+    <rect x="0" y="124" width="92" height="144" rx="6" fill="var(--surface-2)"/>
+    <rect x="0" y="286" width="92" height="340" rx="6" fill="var(--surface-2)"/>
+    <rect x="0" y="644" width="92" height="80"  rx="6" fill="var(--surface-2)"/>
+    <rect x="0" y="742" width="92" height="92"  rx="6" fill="var(--surface-2)"/>
+    <text x="46" y="58"  text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent-ink)">一</text>
+    <text x="46" y="74"  text-anchor="middle" font-size="10.5">主机侧</text>
+    <text x="46" y="176" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent-ink)">二</text>
+    <text x="46" y="192" text-anchor="middle" font-size="10.5">前端</text>
+    <text x="46" y="206" text-anchor="middle" font-size="10.5">切段·喂料</text>
+    <text x="46" y="428" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent-ink)">三</text>
+    <text x="46" y="444" text-anchor="middle" font-size="10.5">协议引擎</text>
+    <text x="46" y="458" text-anchor="middle" font-size="10.5">装信封</text>
+    <text x="46" y="472" text-anchor="middle" font-size="10.5">拆信封</text>
+    <text x="46" y="676" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent-ink)">四</text>
+    <text x="46" y="692" text-anchor="middle" font-size="10.5">上线</text>
+    <text x="46" y="706" text-anchor="middle" font-size="10.5">换时钟</text>
+    <text x="46" y="782" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent-ink)">五</text>
+    <text x="46" y="798" text-anchor="middle" font-size="10.5">物理出口</text>
+    <text x="46" y="812" text-anchor="middle" font-size="9.5">Stage E 上板</text>
+  </g>
+
+  <!-- ===== 带一 · 主机侧 ===== -->
+  <rect x="112" y="36" width="196" height="62" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="5 4"/>
+  <text x="210" y="57" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--ink)">Mac 主机</text>
+  <text x="210" y="74" text-anchor="middle" fill="var(--muted)">一根 USB 调试线(JTAG)</text>
+  <text x="210" y="89" text-anchor="middle" font-size="9.5" fill="var(--muted)">无 PCIe · 无驱动 · 无 BAR</text>
+  <line x1="308" y1="67" x2="344" y2="67" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#d-aM)"/>
+  <rect x="350" y="40" width="184" height="54" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="5 4"/>
+  <text x="442" y="59" text-anchor="middle" font-size="12" font-weight="700" font-family="ui-monospace,Menlo,monospace" fill="var(--ink)">jtag_axi</text>
+  <text x="442" y="75" text-anchor="middle" fill="var(--muted)">AXI-Lite:24 位地址 / 32 位数据</text>
+  <text x="442" y="89" text-anchor="middle" font-size="9.5" fill="var(--muted)">addr[23]=1 → 暂存内存窗口</text>
+  <text x="556" y="58" font-size="10" fill="var(--muted)">同一套 AXI-Lite 序列:</text>
+  <text x="556" y="73" font-size="10" fill="var(--muted)">仿真里 TB 写,板上 JTAG 写,同一份 RTL</text>
+
+  <path d="M420 94 V112 H212 V146" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#d-aC)"/>
+  <text x="300" y="108" text-anchor="middle" fill="var(--accent-ink)">写配置 · 下工单 · 敲门铃</text>
+  <path d="M470 94 V104 H682 V146" fill="none" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+  <text x="600" y="100" text-anchor="middle" fill="var(--link)">写载荷 → 进暂存内存</text>
+
+  <!-- ===== 带二 · roce_l0_top ===== -->
+  <rect x="100" y="124" width="772" height="144" rx="10" fill="none" stroke="var(--accent)" stroke-dasharray="6 4" opacity="0.75"/>
+  <text x="866" y="142" text-anchor="end" font-size="10.5" font-family="ui-monospace,Menlo,monospace" fill="var(--accent-ink)">roce_l0_top ｜ 前端垫片</text>
+
+  <rect x="112" y="150" width="200" height="96" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="122" y="169" font-size="12.5" font-weight="700" fill="var(--accent-ink)">寄存器堆</text>
+  <text x="302" y="169" text-anchor="end" font-size="8.4" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">rdma_doorbell_l0</text>
+  <g font-family="ui-monospace,Menlo,monospace" font-size="9.4" fill="var(--muted)">
+    <text x="122" y="188">0x00 ID ／ 0x04 STATUS.busy</text>
+    <text x="122" y="204">0x10–0x4C 连接与 QP 配置</text>
+    <text x="122" y="220" fill="var(--accent-ink)">0x50–0x70 工单 WQE ＋ 门铃</text>
+    <text x="122" y="236">0x80–0xAC 11 个计数器(唯一的眼睛)</text>
+  </g>
+  <circle cx="112" cy="150" r="9" fill="var(--accent)"/><text x="112" y="154" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">2</text>
+  <circle cx="298" cy="216" r="9" fill="var(--accent)"/><text x="298" y="220" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">3</text>
+
+  <rect x="330" y="150" width="160" height="68" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="410" y="170" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-ink)">切分 FSM</text>
+  <text x="410" y="187" text-anchor="middle" fill="var(--muted)">一个包最多 4096 字节</text>
+  <rect x="336" y="194" width="148" height="18" rx="4" fill="url(#d-hatch)" stroke="var(--warn)" stroke-dasharray="4 3" stroke-width="0.9"/>
+  <text x="410" y="207" text-anchor="middle" font-size="8.8" fill="var(--warn)">［没有队列环·硬件自取工单］</text>
+  <circle cx="330" cy="150" r="9" fill="var(--accent)"/><text x="330" y="154" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">4</text>
+
+  <rect x="592" y="150" width="180" height="96" rx="8" fill="var(--surface-2)" stroke="var(--link)" stroke-width="1.6"/>
+  <text x="682" y="171" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--ink)">暂存内存 staging</text>
+  <text x="682" y="190" text-anchor="middle" fill="var(--muted)">片上 SRAM 256 KiB</text>
+  <text x="682" y="209" text-anchor="middle" font-size="9.4" fill="var(--muted)">A 口:主机写入 0x800000+</text>
+  <text x="682" y="227" text-anchor="middle" font-size="9.4" fill="var(--muted)">B 口:引擎读出 ／ 落地写入</text>
+  <text x="682" y="241" text-anchor="middle" font-size="8.4" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">rdma_uram_staging</text>
+  <circle cx="592" cy="150" r="9" fill="var(--accent)"/><text x="592" y="154" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">1</text>
+
+  <line x1="410" y1="218" x2="410" y2="282" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#d-aC)"/>
+  <text x="418" y="256" fill="var(--accent-ink)">每段一条命令</text>
+  <text x="418" y="269" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="var(--accent-ink)">s_rdma_sq</text>
+  <line x1="682" y1="246" x2="682" y2="308" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+  <text x="672" y="262" text-anchor="end" fill="var(--link)">载荷推流:前端主动喂</text>
+  <text x="672" y="275" text-anchor="end" fill="var(--link)">引擎不会自己来取</text>
+  <circle cx="682" cy="262" r="9" fill="var(--accent)"/><text x="682" y="266" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">5</text>
+
+  <!-- ===== 带三 · roce_stack ===== -->
+  <rect x="100" y="286" width="772" height="340" rx="10" fill="none" stroke="var(--muted)" opacity="0.55"/>
+  <text x="112" y="304" font-size="10.5" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">roce_stack ｜ 协议引擎</text>
+  <text x="112" y="319" font-size="9.2" fill="var(--muted)">橙框 = fns HLS 核;框外 = Coyote SV</text>
+
+  <!-- 行 A:SV 前置 -->
+  <rect x="330" y="312" width="160" height="56" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="410" y="332" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--accent-ink)">限流放行</text>
+  <text x="484" y="332" text-anchor="end" font-size="8.4" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">rdma_flow</text>
+  <text x="410" y="348" text-anchor="middle" font-size="9.4" fill="var(--muted)">16 段槽的发送窗口</text>
+  <text x="410" y="361" text-anchor="middle" font-size="9.4" fill="var(--muted)">本版一次只在飞一个工单</text>
+  <circle cx="330" cy="312" r="9" fill="var(--accent)"/><text x="330" y="316" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">6</text>
+
+  <rect x="592" y="312" width="180" height="56" rx="8" fill="var(--surface-2)" stroke="var(--link)" stroke-width="1.6"/>
+  <text x="682" y="331" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">一式两份</text>
+  <text x="766" y="331" text-anchor="end" font-size="8.4" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">mux_retrans</text>
+  <text x="682" y="347" text-anchor="middle" font-size="9.4" fill="var(--muted)">一份去发包,一份去存底</text>
+  <text x="682" y="360" text-anchor="middle" font-size="9.4" fill="var(--muted)">两边都准备好才走</text>
+  <circle cx="592" cy="312" r="9" fill="var(--fail)"/><text x="592" y="316" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">7</text>
+
+  <line x1="772" y1="334" x2="798" y2="334" stroke="var(--fail)" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="785" y="330" text-anchor="middle" font-size="15" font-weight="700" fill="var(--fail)">✕</text>
+  <rect x="800" y="316" width="66" height="40" rx="6" fill="var(--fail-soft)" stroke="var(--fail)" stroke-dasharray="4 3"/>
+  <text x="833" y="333" text-anchor="middle" font-size="9.4" fill="var(--fail)">重传缓冲</text>
+  <text x="833" y="346" text-anchor="middle" font-size="9.4" fill="var(--fail)">本版接死</text>
+  <text x="833" y="371" text-anchor="middle" font-size="8.8" fill="var(--muted)">写进虚空(D8)</text>
+
+  <!-- 行 B:TX 流水线 -->
+  <rect x="112" y="400" width="488" height="88" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+  <text x="120" y="414" font-size="9.2" fill="var(--accent-ink)">rocev2 · 发送</text>
+  <circle cx="112" cy="400" r="9" fill="var(--accent)"/><text x="112" y="404" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">8</text>
+
+  <rect x="124" y="418" width="104" height="60" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="176" y="440" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--accent-ink)">派工台</text>
+  <text x="176" y="456" text-anchor="middle" font-size="9" fill="var(--muted)">ACK ＞ 读响应</text>
+  <text x="176" y="469" text-anchor="middle" font-size="9" fill="var(--muted)">＞ 本地／重传</text>
+
+  <rect x="244" y="414" width="172" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="330" y="433" text-anchor="middle" font-size="9.2" fill="var(--accent-ink)">头部面:造 RETH → 分配包序号 PSN</text>
+  <rect x="244" y="452" width="172" height="30" rx="6" fill="var(--surface-2)" stroke="var(--link)" stroke-width="1.4"/>
+  <text x="330" y="471" text-anchor="middle" font-size="9.2" fill="var(--ink)">载荷面:按 PMTU 取载荷、拼上头</text>
+
+  <rect x="432" y="418" width="152" height="60" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="508" y="438" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--accent-ink)">合成整帧</text>
+  <text x="508" y="454" text-anchor="middle" font-size="9" fill="var(--muted)">贴运单 BTH ＋ 装</text>
+  <text x="508" y="467" text-anchor="middle" font-size="9" fill="var(--muted)">UDP／IP 信封(4791)</text>
+
+  <line x1="228" y1="429" x2="244" y2="429" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#d-aC)"/>
+  <line x1="416" y1="429" x2="432" y2="429" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#d-aC)"/>
+  <line x1="416" y1="467" x2="432" y2="467" stroke="var(--link)" stroke-width="2" marker-end="url(#d-aD)"/>
+  <path d="M330 444 V452" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#d-aC)"/>
+
+  <rect x="624" y="418" width="140" height="60" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="694" y="438" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">封口出栈</text>
+  <text x="758" y="438" text-anchor="end" font-size="8.4" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">icrc</text>
+  <text x="694" y="454" text-anchor="middle" font-size="9" fill="var(--muted)">帧尾追加 4 字节校验和</text>
+  <text x="694" y="467" text-anchor="middle" font-size="9" fill="var(--muted)">(ICRC,≠ 以太网 FCS)</text>
+  <circle cx="624" cy="418" r="9" fill="var(--accent)"/><text x="624" y="422" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--bg)">9</text>
+  <line x1="584" y1="448" x2="624" y2="448" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#d-aC)"/>
+
+  <path d="M410 368 V386 H176 V396" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#d-aC)"/>
+  <path d="M660 368 V392 H236 V467 H240" fill="none" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+  <text x="440" y="386" font-size="9.2" fill="var(--link)">载荷按命令序对号入座</text>
+
+  <!-- 行 C:状态表 -->
+  <rect x="296" y="500" width="272" height="34" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+  <text x="432" y="514" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">每条连接的记事本</text>
+  <text x="432" y="527" text-anchor="middle" font-size="8.2" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">state · msn · conn · retransmitter · timer</text>
+  <line x1="430" y1="488" x2="430" y2="498" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="430" y1="534" x2="430" y2="544" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <!-- ACK 中缝 -->
+  <path d="M270 546 V492 H176 V482" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#d-aC)"/>
+  <text x="278" y="497" font-size="9.2" fill="var(--accent-ink)">ACK 事件 → 派工台(优先级最高)</text>
+
+  <!-- 行 D:RX 流水线 -->
+  <rect x="112" y="546" width="124" height="68" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="174" y="570" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">进栈整形</text>
+  <text x="174" y="586" text-anchor="middle" font-size="8.6" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">rx FIFO ＋</text>
+  <text x="174" y="598" text-anchor="middle" font-size="8.6" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">ack_gap_enforcer</text>
+
+  <rect x="244" y="546" width="424" height="68" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+  <text x="252" y="559" font-size="9.2" fill="var(--accent-ink)">rocev2 · 接收</text>
+  <rect x="252" y="566" width="128" height="42" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="316" y="583" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-ink)">进门与解封</text>
+  <text x="316" y="598" text-anchor="middle" font-size="8.4" fill="var(--muted)">拆 IP／UDP;帧尾 4B 只剥不校验</text>
+  <rect x="396" y="566" width="124" height="42" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="458" y="583" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-ink)">查运单 · 守门</text>
+  <text x="458" y="598" text-anchor="middle" font-size="8.4" fill="var(--muted)">按包序号查乱序／重复</text>
+  <rect x="536" y="566" width="124" height="42" rx="6" fill="var(--surface-2)" stroke="var(--link)" stroke-width="1.6"/>
+  <text x="598" y="583" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">落地写入</text>
+  <text x="598" y="598" text-anchor="middle" font-size="8.4" fill="var(--muted)">直接写进暂存内存</text>
+  <circle cx="536" cy="566" r="9" fill="var(--accent)"/><text x="536" y="570" text-anchor="middle" font-size="10" font-weight="700" fill="var(--bg)">12</text>
+  <line x1="236" y1="587" x2="252" y2="587" stroke="var(--link)" stroke-width="2" marker-end="url(#d-aD)"/>
+  <line x1="380" y1="587" x2="396" y2="587" stroke="var(--link)" stroke-width="2" marker-end="url(#d-aD)"/>
+  <line x1="520" y1="587" x2="536" y2="587" stroke="var(--link)" stroke-width="2" marker-end="url(#d-aD)"/>
+  <text x="252" y="622" font-size="9.2" fill="var(--warn)">［ 无 ICRC 检查站 ］本分支 RX 不校验(B5)</text>
+
+  <path d="M256 552 L206 530" fill="none" stroke="var(--accent)" stroke-width="1.4" marker-end="url(#d-aC)"/>
+  <text x="196" y="524" text-anchor="end" font-size="9.2" fill="var(--accent-ink)">完成通知 CQ</text>
+  <text x="196" y="536" text-anchor="end" font-size="9.2" fill="var(--accent-ink)">→ 带二计数器</text>
+
+  <!-- placement 回流 -->
+  <path d="M660 580 H686 Q694 570 702 580 H784 V256 H750 V250" fill="none" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+  <text x="778" y="532" text-anchor="end" font-size="9.2" fill="var(--link)">落地数据回暂存内存</text>
+
+  <!-- TX 出栈 -->
+  <path d="M694 478 V632 H775 V664" fill="none" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+
+  <!-- ===== 带四 · stage_d_core ===== -->
+  <rect x="100" y="644" width="772" height="80" rx="10" fill="none" stroke="var(--muted)" stroke-dasharray="6 4" opacity="0.7"/>
+  <text x="112" y="662" font-size="10.5" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">stage_d_core ｜ 载体胶水</text>
+
+  <rect x="112" y="668" width="164" height="48" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="194" y="685" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">接收换挡缓冲:满了就丢</text>
+  <text x="194" y="699" text-anchor="middle" font-size="8.6" fill="var(--muted)">因为收方 MAC 不能被喊停</text>
+  <text x="194" y="711" text-anchor="middle" font-size="7.8" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">DROP_WHEN_FULL ＋ DROP_BAD_FRAME</text>
+
+  <rect x="292" y="668" width="196" height="48" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="390" y="685" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-ink)">门牌号过滤</text>
+  <text x="482" y="685" text-anchor="end" font-size="7.6" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">udp4791_filter</text>
+  <text x="390" y="699" text-anchor="middle" font-size="8.4" fill="var(--muted)">首拍一次判完三条:IP 版本 · protocol</text>
+  <text x="390" y="711" text-anchor="middle" font-size="8.4" fill="var(--muted)">· 目的端口 4791,三条全中才放行</text>
+  <circle cx="292" cy="668" r="9" fill="var(--accent)"/><text x="292" y="672" text-anchor="middle" font-size="10" font-weight="700" fill="var(--bg)">11</text>
+
+  <rect x="504" y="676" width="170" height="32" rx="16" fill="var(--pass-soft)" stroke="var(--pass)"/>
+  <text x="589" y="690" text-anchor="middle" font-size="10" font-weight="700" fill="var(--pass)">✔ golden 捕获点</text>
+  <text x="589" y="702" text-anchor="middle" font-size="8.6" fill="var(--muted)">行为仿真止于此</text>
+
+  <rect x="690" y="668" width="170" height="48" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+  <text x="775" y="685" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">发送换挡缓冲</text>
+  <text x="775" y="699" text-anchor="middle" font-size="8.6" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">250 MHz → 322.27 MHz</text>
+  <text x="775" y="711" text-anchor="middle" font-size="7.8" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">axis_async_fifo</text>
+  <circle cx="690" cy="668" r="9" fill="var(--accent)"/><text x="690" y="672" text-anchor="middle" font-size="10" font-weight="700" fill="var(--bg)">10</text>
+
+  <path d="M390 668 V632 H174 V618" fill="none" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+
+  <!-- ===== 带五 · 物理出口 ===== -->
+  <text x="330" y="741" font-size="9.2" fill="var(--warn)">⚑ LED5/6(两条 CMAC 链路对齐)常绿才准敲 doorbell</text>
+  <rect x="112" y="750" width="190" height="56" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="5 4"/>
+  <text x="207" y="769" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">CMAC ＋ GTY(QSFP2 接收)</text>
+  <text x="207" y="784" text-anchor="middle" font-size="8.4" font-family="ui-monospace,Menlo,monospace" fill="var(--muted)">cmac_gty_wrapper(原件整体搬运)</text>
+  <text x="207" y="797" text-anchor="middle" font-size="8.4" fill="var(--muted)">GT bring-up 状态机上电自主完成</text>
+
+  <rect x="318" y="750" width="336" height="56" rx="8" fill="var(--surface-2)" stroke="var(--link)" stroke-width="1.6"/>
+  <text x="486" y="770" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--link)">QSFP1 ═ DAC 铜缆 ═ QSFP2</text>
+  <text x="486" y="786" text-anchor="middle" font-size="9" fill="var(--muted)">同一块板的两个口,自己发给自己</text>
+  <text x="486" y="799" text-anchor="middle" font-size="9" fill="var(--muted)">只有一条 TX、一条 RX:ACK 与 WRITE 同向</text>
+
+  <rect x="670" y="750" width="190" height="56" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="5 4"/>
+  <text x="765" y="769" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">CMAC ＋ GTY(QSFP1 发送)</text>
+  <text x="765" y="784" text-anchor="middle" font-size="8.4" fill="var(--muted)">cmac_pad:短帧补零到 60 B</text>
+  <text x="765" y="797" text-anchor="middle" font-size="8.2" fill="var(--muted)">本平台只有 48 B 的 ACK 会真被补</text>
+
+  <line x1="775" y1="716" x2="775" y2="746" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+  <line x1="670" y1="778" x2="658" y2="778" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+  <line x1="318" y1="778" x2="306" y2="778" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+  <line x1="194" y1="750" x2="194" y2="720" stroke="var(--link)" stroke-width="2.4" marker-end="url(#d-aD)"/>
+
+  <rect x="112" y="814" width="748" height="22" rx="5" fill="url(#d-hatch)" stroke="var(--warn)" stroke-dasharray="6 4"/>
+  <text x="486" y="829" text-anchor="middle" font-size="9.4" fill="var(--warn)">⚠ 这里没有以太网二层头:帧直接从 IPv4 的 0x45 起 —— 点对点直连、两端同栈,MAC 地址查表／ARP／路由三项功能全部空转(D2)</text>
+</svg>
+<div class="fig-legend">
+  <i><span class="sw sw-ctl"></span>控制／命令(工单·寄存器·包头)</i>
+  <i><span class="sw sw-dat"></span>载荷数据(要搬的字节,线更粗)</i>
+  <i><span class="sw sw-gap"></span>［ 本平台没有的部分 ］</i>
+  <i><span class="sw sw-off"></span>本版禁用(重传)</i>
+  <i><span class="sw sw-hw"></span>厂商硬核／仿真不覆盖(Stage E 上板才验)</i>
+  <i>①…⑫ 与下方「一个包的一生」逐步对应</i>
+</div>
+<div class="figcap">图 1 · 本图画的是 <strong>Stage D 认证态 bitstream(ID <code>0x0C1A0001</code>)</strong>:L0 直发、无 SQ 环、无 WQE DMA fetch、无 codec、重传六口 tie-off。协议核内部结构据《RoCE 数据流图集》与 fig1–3 walkthrough;IP/UDP 组帧壳与 IB 层在 HLS 核内平级,图中并入「合成整帧」。本图不画前导/SFD/FCS/帧间隔——它们落在 CMAC 硬核内部、AXIS 端口之外,本仓无任何配置记载,本报告不作断言。</div>
+</div>
+
+<h3>线上到底长什么样:一帧的字节账</h3>
+<div class="caliber"><strong>计量口径</strong>:以下长度在 <code>stage_d_core</code> 的 CMAC 侧 AXIS 端口测得(= 图 1 的 golden 捕获点),<strong>只算到这个端口为止</strong>——CMAC 硬核内部、AXIS 端口之外的一切(前导/SFD/FCS/帧间隔等)本仓无记载,不计入也不作断言。示意图,非等比例。</div>
+<div class="bytebox">
+  <div class="brow">
+    <span class="rlab">WRITE 首段/单帧</span>
+    <span class="notch">▽ L2 插装点<br>0 字节</span>
+    <span class="c">IPv4<b>20</b></span>
+    <span class="c">UDP<b>8</b></span>
+    <span class="c">BTH<b>12</b></span>
+    <span class="c">RETH<b>16</b></span>
+    <span class="c pay">payload<b>4096</b></span>
+    <span class="c">ICRC<b>4</b></span>
+    <span class="c sum">4156 B</span>
+  </div>
+  <div class="brow">
+    <span class="rlab">WRITE 中段/末段</span>
+    <span class="notch">▽ 0</span>
+    <span class="c">IPv4<b>20</b></span>
+    <span class="c">UDP<b>8</b></span>
+    <span class="c">BTH<b>12</b></span>
+    <span class="c pay">payload<b>4096</b></span>
+    <span class="c">ICRC<b>4</b></span>
+    <span class="c sum">4140 B</span>
+  </div>
+  <div class="brow">
+    <span class="rlab">c_write64 单帧</span>
+    <span class="notch">▽ 0</span>
+    <span class="c">IPv4<b>20</b></span>
+    <span class="c">UDP<b>8</b></span>
+    <span class="c">BTH<b>12</b></span>
+    <span class="c">RETH<b>16</b></span>
+    <span class="c pay">payload<b>64</b></span>
+    <span class="c">ICRC<b>4</b></span>
+    <span class="c sum">124 B</span>
+  </div>
+  <div class="brow">
+    <span class="rlab">响应方 ACK</span>
+    <span class="notch">▽ 0</span>
+    <span class="c">IPv4<b>20</b></span>
+    <span class="c">UDP<b>8</b></span>
+    <span class="c">BTH<b>12</b></span>
+    <span class="c">AETH<b>4</b></span>
+    <span class="c">ICRC<b>4</b></span>
+    <span class="c sum">48 B</span>
+    <span class="c pad">cmac_pad 补空气<b>→ 60 B</b></span>
+  </div>
+  <p class="bytenote">
+    <b>▽ L2 插装点 = 零字节。</b>商品 RNIC 在这里有 14 B 以太网头(目的 MAC / 源 MAC / EtherType);本平台一个二层字节都没有,帧的第一个字节就是 IPv4 的 <code>0x45</code>(D2)。未来 CX-5 互通时由 fns <code>mac_ip_encode</code> 在此插入这 14 B。<br>
+    <b>算式出处。</b><code>4156=20+8+12+16+4096+4</code> 与 <code>4140=20+8+12+4096+4</code> 是 Stage B §5.3 原文;<code>124</code>(Stage B 实测 <code>rtl=124</code>)与 <code>48</code> 是实测总长,其拆分式按同型算式<em>推得</em>。<br>
+    <b>RETH.DMALen = 每命令段长 4096,不是 IBTA 语义的总消息长</b>——已知偏离,CX-5 互操作观察项(B4)。ACK 的 48→60 由 <code>cmac_gty_wrapper</code> 内的 <code>cmac_pad</code> 补(D3);未来 CX-5 站换用 fns <code>ethernet_frame_padding_512</code> 时补至 64 B,两者是两条不同路径下的两种配置,不是同一条路径上的矛盾。
+  </p>
+</div>
+
+<h3>一个包的一生</h3>
+<div class="steps">
+  <h4>一 · 主机侧:三次写,一次敲</h4>
+  <ol>
+    <li><span class="n">1</span><span><strong>送料</strong> —— Mac 通过一根 USB 调试线(JTAG),把要发的数据字节写进板上的<strong>暂存内存</strong>(片上 SRAM 256 KiB,窗口地址 <code>0x800000</code> 起,32 位一拍 + 字节使能)。全程无 PCIe、无驱动、不碰主机内存。</span></li>
+    <li><span class="n">2</span><span><strong>报到</strong> —— 写连接配置寄存器:这条专线本端是谁、对端是谁、对方内存的钥匙是什么;写 SUBMIT 拍一张快照,推进硬件的连接表与 QP 表。</span></li>
+    <li><span class="n">3</span><span><strong>下工单 ＋ 敲门铃</strong> —— 把这一单的五件事填进寄存器(走哪条连接 / 数据在本地哪 / 写到对方哪 / 多长 / 是不是末段),最后写一下 <code>0x70</code> 这个<strong>门铃</strong>。硬件从这一拍起自己干活。<em>(忙时敲门会被静默忽略,软件先轮询 <code>STATUS.busy</code>;工单里的 opcode 字段只是登记项,实际段类型由下一步的切分 FSM 决定。)</em></span></li>
+  </ol>
+  <h4>二 · 前端:拆成段,主动喂数据</h4>
+  <ol>
+    <li><span class="n">4</span><span><strong>切段</strong> —— 一个包最多装 4096 字节,超了就切成 首段/中段/末段,每段变成一条内部命令推给协议引擎。<em>(本版没有"排队列 ＋ 硬件自己去主机内存取工单"那一套:工单就是寄存器,门铃一响直接开工。)</em></span></li>
+    <li><span class="n">5</span><span><strong>喂料</strong> —— 命令和数据是两条独立的路。<strong>先推该段命令,命令被接受后</strong>,才从暂存内存按本地地址把这一段的数据整段推给引擎,然后才轮到下一段。<strong>引擎不会自己来取</strong>——它其实也发了取数命令,但被前面那个分流器拦下了,数据一律由前端主动喂。</span></li>
+    <li><span class="n">6</span><span><strong>限流放行</strong> —— 发送窗口给每段发一个槽号,最多允许 16 段同时在飞,满了就等对方确认回来再放下一段。<em>(本版一次只在飞一个工单,这个窗口远用不满。)</em></span></li>
+  </ol>
+  <h4>三 · 协议引擎:装信封</h4>
+  <ol>
+    <li class="off"><span class="n">7</span><span><strong>复制存底(本版已禁用)</strong> —— 正常设计里每一拍数据都复制一份进重传缓冲,万一丢包好重发。Stage D 把这一路接死成常量:存底的那一份写进虚空(端口恒 ready,不拖慢发送),既不存底、也不会重发。</span></li>
+    <li><span class="n">8</span><span><strong>逐层加头</strong> —— 像寄快递,<strong>两条路并行走</strong>。<strong>头部面</strong>:先写<strong>收件地址</strong>(只有<strong>首段</strong>有,告诉对方写到哪个地址、多长),再给整个包分配<strong>包序号</strong>(收方靠它判断丢没丢、乱没乱)。<strong>载荷面</strong>:同时把这一段载荷按 4096 字节取齐,拼上刚造好的那层头。两条路在最后一站<strong>合流</strong>,贴上<strong>运单号</strong>,再装进 UDP 信封(门牌号固定 4791)、最后装进 IP 信封。</span></li>
+    <li><span class="n">9</span><span><strong>封口出栈</strong> —— 帧尾追加 4 字节校验和(RDMA 自带的那一层 ICRC,和以太网的 FCS 不是一回事),整帧从引擎出口发出:一拍 64 字节,250 MHz。</span></li>
+  </ol>
+  <h4>四 · 上线:换时钟,上铜缆</h4>
+  <ol>
+    <li><span class="n">10</span><span><strong>上线</strong> —— 帧过一个异步缓冲,从 250 MHz 跨到发送时钟域(~322.27 MHz)。随后进 <code>cmac_gty_wrapper</code>:<strong>每帧都经过补零模块,但只有不足 60 字节的帧会被真补——本平台只有 48 字节的 ACK 落进这一档,124 B 与 4156 B 的帧原样通过。</strong>再交给 CMAC 硬核与 GTY 串行化,从 QSFP1 出去,经一根 DAC 铜缆绕回<strong>同一块板</strong>的 QSFP2。</span></li>
+  </ol>
+  <h4>五 · 接收:拆信封、落地、销单</h4>
+  <ol>
+    <li><span class="n">11</span><span><strong>进门与安检</strong> —— 收方的 MAC 不能被喊停,所以先过一个"满了就丢"的缓冲跨回 250 MHz;再由过滤器在<strong>第一拍一次判完三个条件</strong>——IP 版本、protocol、目的端口 4791,<strong>三条全中才放行</strong>。引擎逐层拆掉 IP／UDP 信封、拆头,按包序号检查有没有乱序或重复,序号对的才放行。<em>(本版不校验那 4 字节 ICRC——校验分支在代码里被关掉了,B5。)</em></span></li>
+    <li><span class="n">12</span><span><strong>落地与销单</strong> —— 引擎先发一条<strong>放置描述符</strong>(写到哪、多长),数据随后落进暂存内存——这就是 RDMA 的"绕开 CPU 直接落地"。同时响应方<strong>逐包</strong>生成 48 字节确认帧(8K 消息回 2 个、12K 回 3 个),以最高优先级插队发出。<strong>注意确认帧不走"回程"</strong>:本设计只有一条发送线和一条接收线,确认帧与数据同向,一样从 QSFP1 出、QSFP2 进——请求方和响应方本来就是同一片 FPGA 上的同一个协议栈实例,铜缆只是把它自己的帧递回给自己。中间段的确认只用来释放窗口槽,<strong>只有末段确认才产生一条完成通知</strong>;主机读一下计数器 / <code>LAST_ACK</code> 寄存器,就看见"这单干完了"。</span></li>
+  </ol>
+</div>
+<div class="callout warn"><span class="tag">岔路(仅本版)</span>因为第 ⑦ 步被禁用,链路上真丢一帧,发送方会永远等不到确认:重传计数器非零、发送永久停摆,唯一出路是复位(D8)。<strong>所以 Stage D 的全部结论都建立在"链路零丢帧"之上。</strong>引擎内的重传定时器仍在跑,但重放数据无处可读;请求方定时重传(B9)在本 bitstream 上不可观测。</div>
+
+<div class="callout"><span class="tag">那以太网 / MAC 层呢?</span><strong>标准 RoCE v2 要,本平台没有。</strong>我们的帧第一个字节就是 IP 头的 <code>0x45</code>,线上一个二层字节都没有——负责造那 14 字节以太网头(目的 MAC / 源 MAC / EtherType)的那一站被整体省掉了。<br><strong>为什么这样也能通</strong>:铜缆把本板的两个口点对点直连,两端是同一片 FPGA 上的同一个协议栈,没有交换机要转发、没有第二台机器要认 MAC、也没人会发 ARP 查询,这 14 字节的三项功能全部空转。<br><strong>但 MAC 层并非不存在</strong>:CMAC 硬核仍在,它把我们交给它的字节原封不动发上线(前导/SFD/FCS 等硬核内部行为本仓无配置记载,本报告不作断言)。<strong>实证</strong>:两端 CMAC 对这种无二层头的帧照收照发——Stage E 板上 <code>tx_frm = rx_frm = 2</code>,落地数据逐字节 bit-exact。<br><strong>代价记在账上</strong>:真要跟 ConnectX-5 互通,必须在 CMAC 前后插回 fns 的 <code>mac_ip_encode</code> / <code>ip_handler</code>,届时每帧多 14 字节,抓包口径与整条校验链都要重定——所以 07-23 的决策是<strong>到 CX-5 互操作站再插装,Stage D 保持认证态不动</strong>。</div>
+
+<h3>件与门规</h3>
 <div class="tablebox"><table>
 <tr><th>件</th><th>内容</th></tr>
 <tr><td class="mono">stage_d_shell/rtl/fpga_stage_d.sv</td><td>板级顶层:时钟/复位再扎根 + 2×cmac_gty_wrapper + jtag_axi + core(469 行)</td></tr>

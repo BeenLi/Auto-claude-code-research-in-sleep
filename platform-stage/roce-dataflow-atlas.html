@@ -687,7 +687,7 @@
       <h3><span style="color:var(--blue)">TX:命令与头部两条汇聚路径</span></h3>
       <ol>
         <li>命令面:本地 SQ(<code>local_req_handler</code>)与远端读(<code>handle_read_requests</code>)两路取数命令在 <code>mem_cmd_merger</code> 合流(远端读优先)发往图 1 的 mux;每条命令 <strong>1:1 写 pkgInfo</strong>,返回载荷全靠顺序对号入座——"按命令序回数"契约的出处。</li>
-        <li>头部面:<code>meta_merger</code> 固定优先级仲裁(ACK &gt; 读响应 &gt; 本地/重传);<code>generate_exh</code> 生成 RETH/AETH,<code>append_payload</code> 拼接,整包左移 12B 后 <code>generate_ibh</code> 分配 PSN 填 BTH。</li>
+        <li>头部面(上图 TX 带上排,右→左):<code>meta_merger</code> 固定优先级仲裁(ACK &gt; 读响应 &gt; 本地/重传)→ <code>generate_exh</code> 生成 RETH/AETH → <code>generate_ibh</code> 分配 PSN 填 BTH。<strong>注意这三站在同一排</strong>——<code>generate_ibh</code> <em>不</em>在 <code>append_payload</code> 下游。载荷面是另起的一排(<code>tx_pkg_arbiter</code> → <code>append_payload</code>,后者把 <code>generate_exh</code> 递下来的 EXH 与载荷拼在一起、左移 4B/16B 腾位)。<strong>两排在 <code>prepend_ibh_header</code> 汇合</strong>,整包在此左移 12B 写入 BTH。<span style="opacity:.75">(勘误 2026-07-29:本条原写成"<code>generate_exh</code> 生成 RETH/AETH,<code>append_payload</code> 拼接,整包左移 12B 后 <code>generate_ibh</code> 分配 PSN"的一条串行链,与本页 SVG 自身连线矛盾;以 SVG 与 <code>fig2</code> 步 10 为准。)</span></li>
         <li>PSN 分配唯一发生在 <code>generate_ibh</code>:READ REQ 一次预留 ⌈len/PMTU⌉ 个 PSN;读响应/ACK/重传自带 PSN 跳过查表。destQP 经 conn_table 反馈环填入(源码自注 "hack")。</li>
       </ol>
       <div class="ref">ib_transport_protocol.cpp L1074–2020 / L2634–2713</div>
