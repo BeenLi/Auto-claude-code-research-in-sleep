@@ -72,9 +72,16 @@ Key overridable parameters: `AUTO_PROCEED` (true), `human_checkpoint` (false), `
 Register reviewer MCP servers in the active agent runtime using that runtime's MCP configuration command.
 
 ```bash
-# Codex CLI reviewer server command
-npm install -g @openai/codex && codex setup
-codex mcp-server
+# Codex reviewer. codex-cli 0.154 removed `codex mcp-server`; the codex-exec
+# bridge serves the same `codex` / `codex-reply` tools over `codex exec`.
+# Run from the ARIS repo root. PATH must reach node: codex is a node script,
+# and Homebrew's node@22 is keg-only.
+npm install -g @openai/codex && codex login
+claude mcp add codex -s user \
+  -e CODEX_BIN="$(command -v codex)" \
+  -e PATH="$(dirname "$(command -v node)"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  -- /usr/bin/python3 "$PWD/mcp-servers/codex-exec/server.py"
+claude mcp get codex    # expect: Status: Connected
 
 # llm-chat (OpenAI-compatible API bridge)
 pip install httpx

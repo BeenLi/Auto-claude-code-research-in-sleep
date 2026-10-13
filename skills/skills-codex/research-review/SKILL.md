@@ -44,8 +44,9 @@ equally to both backends.
 
 - **Codex subagent Server** configured in Claude Code:
   ```bash
-  claude mcp add codex -s user -- codex mcp-server
+  claude mcp add codex -s user -- python3 "<ARIS repo>/mcp-servers/codex-exec/server.py"
   ```
+  codex-cli 0.154 removed `codex mcp-server`; the codex-exec bridge replaces it. See the repo's `AGENT.md` for the full command with the environment it needs.
 - This gives Claude Code access to `spawn_agent` and `send_input` tools
 
 ## Workflow
