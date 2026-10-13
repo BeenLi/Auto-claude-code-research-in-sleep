@@ -31,6 +31,7 @@ Extract the canonical idea handoff fields from
 - baselines and ablations
 - required outputs and metrics
 - resource needs: CPU, memory, walltime, license, board/testbed
+- lab inventory and env-spec: resolve `lab-resources.yaml` and `.aris/compute/env-spec.yaml` per `../shared-references/hw-env-contract.md` §0; create a missing env-spec from `templates/HW_ENV_SPEC_TEMPLATE.yaml`
 
 ## Default Execution Path
 
@@ -40,7 +41,7 @@ Extract the canonical idea handoff fields from
 4. Map `handoff_to_workflow_1_5` to `idea_execution_readiness`.
 5. Select an evaluation backend from `core_baseline` plus the platform/workload IDs in `canon_mapping`.
 6. Apply the baseline reproduction Go/No-Go rule.
-7. Run baseline smoke first when required.
+7. Validate the environment first (env-spec tiers 1 and 2 per `../shared-references/hw-env-contract.md` §5, ledger block appended), then run baseline smoke when required.
 8. Generate or reuse scripts/configs for the selected backend.
 9. Run the smallest sanity/smoke stage for the idea variant.
 10. Review code/configs before launching expensive runs.

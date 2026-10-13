@@ -1,0 +1,144 @@
+# Hardware env-spec: one top-level key per environment.
+#
+# Copy to <project>/.aris/compute/env-spec.yaml and fill the nulls.
+# Contract: skills/shared-references/hw-env-contract.md (extends compute-env-contract.md).
+#
+# - Each environment is hashed separately (contract §4), so editing one env
+#   never invalidates the ledger entry of another.
+# - `host` and `slot_type` must match ids / slot types in lab-resources.yaml.
+# - A null in `source.rev` or a toolchain version blocks validation: an
+#   unpinned simulator is not a reproducible environment.
+# - `witness.expect` is a regex matched against the command's combined output.
+
+gem5-x86-opt:
+  shape: direct_ssh_host
+  host: sim-server
+  base: null                       # e.g. "Ubuntu 22.04 + Python 3.10 + SCons 4.x"
+  source:
+    repo: https://github.com/gem5/gem5
+    rev: null                      # pin a release tag or commit
+  build_phases:                    # ORDERED; each entry is one command
+    - scons build/X86/gem5.opt -j 60
+  artifacts:
+    binary: build/X86/gem5.opt
+  env:
+    GEM5_HOME: null
+  resource_shape: {slot_type: cpu_sim, cpu_cores: 1, memory_gib: null}   # memory: measured peak RSS
+  smoke:
+    cli_checks:
+      - test -x "$GEM5_HOME/build/X86/gem5.opt"
+    witness:
+      # gem5 v23+ fetches the hello binary through gem5-resources on first run;
+      # pre-stage it if the server has no internet access.
+      - cmd: cd "$GEM5_HOME" && build/X86/gem5.opt configs/learning_gem5/part1/simple.py
+        expect: 'Exiting @ tick [0-9]+'
+
+verilator-5:
+  shape: direct_ssh_host
+  host: sim-server
+  base: null
+  source:
+    repo: https://github.com/verilator/verilator
+    rev: null                      # pin a release tag, e.g. the version in lab-resources.yaml
+  build_phases:
+    - autoconf && ./configure --prefix="$VERILATOR_PREFIX"
+    - make -j 60 && make install
+  artifacts:
+    binary: $VERILATOR_PREFIX/bin/verilator
+  env:
+    VERILATOR_PREFIX: null
+  resource_shape: {slot_type: cpu_rtl, cpu_cores: 8, memory_gib: null}  # cores: match --threads
+  smoke:
+    cli_checks:
+      - verilator --version
+    witness:
+      - cmd: |
+          W=$(mktemp -d)
+          printf '%s\n' 'module t; initial begin $display("WITNESS verilator"); $finish; end endmodule' > "$W/t.v"
+          verilator --binary --Mdir "$W/obj" "$W/t.v" && "$W/obj/Vt"
+        expect: '^WITNESS verilator'
+
+vivado-vu9p:
+  shape: direct_ssh_host
+  host: sim-server
+  base: null
+  source:
+    vendor_tool: Vivado
+    version: null                  # e.g. the version in lab-resources.yaml; IP versions follow it
+  build_phases: []                 # vendor install; record the installer version instead
+  artifacts:
+    binary: vivado
+  env:
+    XILINXD_LICENSE_FILE: null     # or the node-locked license path
+  resource_shape: {slot_type: license_vivado, cpu_cores: 8, memory_gib: null}
+  smoke:
+    cli_checks:
+      - vivado -version
+    witness:
+      # Synthesizing for the VU9P needs a licensed edition, so this doubles as
+      # the license check. util.rpt's "Available" column is the part capacity
+      # that lab-resources.yaml asks for.
+      - cmd: |
+          W=$(mktemp -d) && cd "$W"
+          printf '%s\n' 'module top(input clk, input [7:0] a, output reg [7:0] q); always @(posedge clk) q <= q + a; endmodule' > top.v
+          printf '%s\n' 'read_verilog top.v' 'synth_design -top top -part xcvu9p-flga2104-2L-e' 'report_utilization -file util.rpt' 'puts "WITNESS vivado synth_ok"' > w.tcl
+          vivado -mode batch -nojournal -nolog -source w.tcl
+        expect: '^WITNESS vivado synth_ok'
+
+vcu118-boards:
+  shape: device
+  host: sim-server                 # the server whose hw_server reaches the boards
+  base: null
+  source:
+    vendor_tool: Vivado hw_server
+    version: null
+  build_phases: []
+  artifacts: {}
+  env: {}
+  resource_shape: {slot_type: fpga_vcu118, cpu_cores: 1, memory_gib: 4}
+  smoke:
+    cli_checks:
+      - command -v hw_server
+    witness:
+      # Expect one line per board listed for this host in lab-resources.yaml.
+      - cmd: |
+          W=$(mktemp -d) && cd "$W"
+          printf '%s\n' 'open_hw_manager' 'connect_hw_server -url localhost:3121' 'foreach t [get_hw_targets] { puts "WITNESS target $t" }' > hw.tcl
+          vivado -mode batch -nojournal -nolog -source hw.tcl
+        expect: '^WITNESS target '
+
+bf2-dpu:
+  shape: device
+  host: sim-server
+  base: null                       # host RDMA stack, e.g. the OFED / DOCA host packages
+  source:
+    vendor_tool: DOCA
+    version: null                  # e.g. toolchains.doca in lab-resources.yaml
+  build_phases: []
+  artifacts: {}
+  env: {}
+  resource_shape: {slot_type: dpu_bf2, cpu_cores: 2, memory_gib: 4}
+  smoke:
+    cli_checks:
+      - command -v ibv_devinfo
+    witness:
+      # Device presence only. PORT_ACTIVE needs a cable and a live peer, which a
+      # lab without a switch has only on a back-to-back link.
+      - cmd: ibv_devinfo -l
+        expect: 'mlx5_'
+
+l40-workload:
+  shape: direct_ssh_host
+  host: sim-server
+  base: null                       # e.g. conda env with the pinned torch / vLLM stack
+  source: {}
+  build_phases: []                 # use upstream compute-env-contract §2 pip_phases here
+  artifacts: {}
+  env: {}
+  resource_shape: {slot_type: gpu_l40, cpu_cores: 8, memory_gib: null}
+  smoke:
+    cli_checks:
+      - nvidia-smi -L
+    witness:
+      - cmd: nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+        expect: 'L40'

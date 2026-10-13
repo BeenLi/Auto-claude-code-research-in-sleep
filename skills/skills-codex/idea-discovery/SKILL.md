@@ -109,11 +109,11 @@ Invoke `/idea-creator` with the landscape context (and `idea-stage/REF_PAPER_SUM
 **Idea selection summary:** Present the `Idea selection` checkpoint from `../shared-references/workflow1-checkpoints.md`. Use field names and domains from `../shared-references/idea-handoff-schema.md`. Ask:
 
 ```
-💡 Generated X ideas, filtered to Y, wrote Z evaluation handoff plans. Top results:
+💡 Generated X ideas: Y active, P parked, K eliminated on evidence; wrote Z evaluation handoff plans. Top results:
 
 1. [Idea 1] — merit: [1-5], evaluation_feasibility_score: [4|5], evaluation_feasibility_breakdown: platform_workload_access=[...], evaluation_adapter_cost=[...], first_signal_runtime=[...], core_baseline: [idea-local baseline record], baseline_artifact_readiness: score=[2|1], status=[...], verification=[...], canon_mapping: platform=[EC-P*], workload=[EC-W*], target_validation_style: [style], clarity: [clear], handoff: ready
 2. [Idea 2] — merit: [1-5], evaluation_feasibility_score: [1-5], evaluation_feasibility_breakdown: [main weak factor], core_baseline: [idea-local baseline record or new baseline with rationale], baseline_artifact_readiness: score=[2|1|0], status=[...], verification=[...], canon_mapping: [mapping], target_validation_style: [style], clarity: [partial], handoff: needs_canon_clarification
-3. [Idea 3] — merit: [1-5], evaluation_feasibility_score: [1|2], handoff: designed_not_run, blocker: [main_blocker]
+3. [Idea 3] — merit: [1-5], evaluation_feasibility_score: [1|2], handoff: designed_not_run, blocker: [main_blocker], pool: parked, revisit: [revisit_condition]
 
 Which ideas should I validate further? Or should I regenerate with different constraints?
 (If no response, I'll proceed with the top-ranked ideas.)
@@ -139,7 +139,7 @@ For each selected top idea with strong overall merit and a credible evaluation h
 - Check for concurrent work (last 3-6 months)
 - Identify closest existing work and differentiation points
 
-**Update** **`idea-stage/IDEA_REPORT.md`** with deep novelty results. Eliminate any idea that turns out to be already published.
+**Update** **`idea-stage/IDEA_REPORT.md`** with deep novelty results. Eliminate an idea only if its mechanism and claim are both already published (`already_done`, cite the paper). Close prior work lowers `overall_merit_score` and adds a differentiation note; the idea stays in the pool.
 
 ### Phase 4: External Critical Review
 
@@ -201,7 +201,7 @@ Proceed to implementation? Or adjust the proposal?
 
 Present the final report summary before writing the latest copy. Then finalize `idea-stage/IDEA_REPORT.md` with all accumulated information using `templates/IDEA_REPORT_TEMPLATE.md`.
 
-The report must make the selected idea explicit, keep backup/deferred ideas documented, and link:
+The report must make the selected idea explicit, keep backup and parked ideas documented, and link:
 - `refine-logs/FINAL_PROPOSAL.md`
 - `refine-logs/EXPERIMENT_PLAN.md`
 - `idea-stage/docs/research_contract.md`
@@ -230,10 +230,10 @@ This file is intentionally small (\~30 lines) so downstream skills and session r
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 - **Don't skip phases.** Each phase filters and validates — skipping leads to wasted effort later.
 - **Summarize between phases.** Briefly state what was found before moving on.
-- **Kill ideas early.** It's better to kill 10 bad ideas in Phase 3 than to implement one and fail.
+- **Park ideas early, kill only on evidence.** It's better to park 10 weak ideas in Phase 3 than to implement one and fail. Parked ideas keep their scores and a `revisit_condition`, so a new lab resource or artifact can bring them back.
 - **Evaluation clarity beats vibes.** A publishable idea needs a credible baseline, workload, metrics, and handoff path, even if Workflow 1 does not run the experiment yet.
 - **Document everything.** Dead ends are just as valuable as successes for future reference.
-- **Be honest with the reviewer.** Include unclear canon mapping, unclear comparison targets, feasibility limits, and deferred platform blockers in the review prompt.
+- **Be honest with the reviewer.** Include unclear canon mapping, unclear comparison targets, feasibility limits, and parked ideas with their platform blockers in the review prompt.
 - **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final report. If absent/off, skip silently.
 
 ## Composing with Workflow 1.5 & 2

@@ -116,7 +116,7 @@ Recommended: Idea 1. Shall I proceed to Workflow 1.5 evaluation contract and imp
 - **Reject all ideas** → collect feedback on what's missing, re-run Stage 1 with adjusted research direction. Repeat until the user commits to an idea.
 - **Stop here** → save current state to `idea-stage/IDEA_REPORT.md` for future reference.
 
-**If `AUTO_PROCEED=true`:** Present the top ideas, wait briefly for user input if interactive, auto-select the #1 ranked idea with the strongest overall merit and evaluation feasibility score. If the highest-merit idea has `evaluation_feasibility_score <= 3`, keep it as deferred or clarification-needed and select the highest-ranked idea with `evaluation_feasibility_score` 4 or 5 for immediate Workflow 1.5. Log the actual selected label and title, for example: `"AUTO_PROCEED: selected [Idea N] — [title]"`.
+**If `AUTO_PROCEED=true`:** Present the top ideas, wait briefly for user input if interactive, auto-select the #1 ranked idea with the strongest overall merit and evaluation feasibility score. If the highest-merit idea has `evaluation_feasibility_score <= 3`, keep it parked (clarification-needed or designed-not-run, with a `revisit_condition`) and select the highest-ranked idea with `evaluation_feasibility_score` 4 or 5 that is not parked for immediate Workflow 1.5. Log the actual selected label and title, for example: `"AUTO_PROCEED: selected [Idea N] — [title]"`.
 
 ### Stage 2: Evaluation Contract + Implementation Bridge (Workflow 1.5)
 

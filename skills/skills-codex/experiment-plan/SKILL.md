@@ -94,7 +94,7 @@ For every kept block, fully specify:
 - **Workload / trace / benchmark / configuration**
 - **Compared systems**: strongest baselines, ablations, and variants only
 - **Metrics**: decisive metrics first, secondary metrics second; metrics may follow the baseline's original `metrics_used` or add idea-specific metrics, but must explain why they decide the question
-- **Setup details**: simulator/prototype backend, frozen vs modified subsystems, key parameters, smoke/full-run budget, repetitions if variance matters
+- **Setup details**: simulator/prototype backend, frozen vs modified subsystems, key parameters, smoke/full-run budget, repetitions if variance matters, and the env-spec name the block runs in (`../shared-references/hw-env-contract.md` §4)
 - **Success criterion**: what outcome would count as convincing evidence?
 - **Failure interpretation**: if the result is negative, what does it mean?
 - **Table / figure target**: where this result should appear in the paper
@@ -192,6 +192,8 @@ Use this structure:
 
 ## Validation Budget
 - Total estimated simulator/prototype hours:
+- Slot-hours by lab slot type (`cpu_sim`, `cpu_rtl`, `license_vivado`, `fpga_vcu118`, `dpu_bf2`, `gpu_l40`; see `../shared-references/hw-env-contract.md` §3):
+- Peak parallel width and what bounds it (memory, licenses, boards):
 - Trace / workload preparation needs:
 - Platform setup needs:
 - Biggest bottleneck:

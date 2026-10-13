@@ -13,7 +13,9 @@
 |---|------|---------------|-------------|-----------------|-----------------------------|---------------|-------------------|---------|--------|
 | 1 | [title] | 5 | 5 | IB1 | verified_by_research_lit | platform=[EC-P1]; workload=[EC-W1] | n/a | ready | selected |
 | 2 | [title] | 4 | 4 | IB2 | new_baseline_lookup | platform=[EC-P2]; workload=[EC-W2] | addresses: NE-* (...) | ready | backup |
-| 3 | [title] | 3 | 2 | IB3 | verification_unresolved | platform=[EC-P3]; workload=[EC-W3] | conflicts: NE-* (...) | designed_not_run | deferred |
+| 3 | [title] | 3 | 2 | IB3 | verification_unresolved | platform=[EC-P3]; workload=[EC-W3] | conflicts: NE-* (...) | designed_not_run | parked |
+
+Parked ideas keep their `park_reason` and `revisit_condition` in `IDEA_REPORT.md` under Parked Ideas.
 
 ## Active Idea: #1 -- [title]
 

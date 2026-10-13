@@ -45,6 +45,8 @@ Supported resource concepts:
 - exclusive FPGA/DPU/testbed devices
 - legacy GPU slots only for compatibility
 
+For this lab's slot types (`cpu_sim`, `cpu_rtl`, `license_vivado`, `fpga_vcu118`, `dpu_bf2`, `gpu_l40`), sweep-width rules, and the cross-run device lock, follow `../shared-references/hw-env-contract.md` §3. Build `resources.slots` from `../shared-references/lab-resources.yaml` instead of guessing counts.
+
 ## Manifest Shape
 
 ```yaml

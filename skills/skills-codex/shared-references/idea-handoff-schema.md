@@ -11,8 +11,8 @@ these fields; Workflow 1.5 validates them before executing anything.
 - `refine-logs/EXPERIMENT_PLAN.md`
 - `idea-stage/docs/research_contract.md`
 
-Only the selected top idea enters `/research-refine-pipeline`. Other viable
-ideas remain in `IDEA_REPORT.md` as `backup` or `deferred` options.
+Only the selected top idea enters `/research-refine-pipeline`. Other ideas
+remain in `IDEA_REPORT.md` as `backup` or `parked` entries; see Candidate Pool.
 
 ## Evaluation Canon
 
@@ -83,7 +83,24 @@ evaluation_feasibility_breakdown:
 | `negative_evidence_response` | `n/a` \| `evades: NE-* (...)` \| `addresses: NE-* (...)` \| `conflicts: NE-* (...)` | Required audit trail for the Section 2.5 Negative Evidence hard gate. Every surviving idea must explain how it handles any relevant `NE-*` affected assumption, or use `n/a` when no `NE-*` applies. |
 
 ready handoff requires `evaluation_feasibility_score` 4 or 5. Scores 1-3
-belong in backup, deferred, clarification, or designed-not-run entries.
+belong in parked entries (`needs_canon_clarification` or `designed_not_run`).
+
+## Candidate Pool
+
+Scores rank ideas and gate the handoff; they do not delete ideas. Every idea in
+`IDEA_REPORT.md` has exactly one `pool_status`.
+
+| field | domain | semantics |
+|---|---|---|
+| `pool_status` | `selected` \| `backup` \| `parked` \| `eliminated` | `selected` is the single refined idea. `backup` could be handed off now (`evaluation_feasibility_score` 4 or 5). `parked` keeps every scored field and waits on `revisit_condition`. `eliminated` is evidence-only. |
+| `park_reason` | `low_overall_merit` \| `low_feasibility` \| `needs_canon_clarification` \| `designed_not_run` \| `no_credible_evaluation_path` | Required when `pool_status: parked`. |
+| `revisit_condition` | string | Required when parked. Names the change that would justify re-scoring: a lab resource in inventory terms (`hw-env-contract.md` §2), an artifact release, a clarified comparison target, or a finding from the selected idea. |
+| `elimination_evidence` | `already_done: <citation>` \| `refuted_by_NE-*` | Required when `pool_status: eliminated`. Close prior work is not `already_done`; it lowers `overall_merit_score`. |
+
+A parked idea re-enters ranking only after its `revisit_condition` is met and it
+is re-scored. It never bypasses the Workflow 1 Exit Gate, and it never carries
+`handoff_to_workflow_1_5: ready`, even when its `evaluation_feasibility_score` is
+4 or 5 (for example, a parked low-merit idea).
 
 ## Workflow 1 Exit Gate
 

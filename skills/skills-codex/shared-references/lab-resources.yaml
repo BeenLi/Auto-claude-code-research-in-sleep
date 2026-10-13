@@ -1,0 +1,100 @@
+# Lab resource inventory: the hardware this fork's research can actually use.
+#
+# Contract:  hw-env-contract.md (same directory)
+# Consumers: /idea-creator      -> judges platform_workload_access against this file
+#            /experiment-plan   -> Validation Budget in slot-hours
+#            /experiment-bridge, /run-experiment, /experiment-queue -> slots + env-spec
+# Override:  a project may copy this file to <project>/.aris/compute/lab-resources.yaml;
+#            the project copy wins.
+#
+# Rule: declare only what is known. `null` means "not yet recorded", never "absent".
+# Use `false` / `[]` for things confirmed absent. Fill each null from the machine
+# itself with the command in its comment, not from memory or a spec sheet.
+
+schema_version: 1
+updated: 2026-10-13
+
+servers:
+  - id: sim-server
+    hostname: null            # fill: hostname -f
+    ssh_alias: null           # fill: the ~/.ssh/config Host that skills use for remote runs
+    cpu:
+      cores: 64
+      threads: null           # fill: nproc
+      model: null             # fill: lscpu | grep 'Model name'
+    memory_gib: null          # fill: free -g   (bounds parallel gem5 / Vivado jobs, see contract §1)
+    scratch:
+      path: null              # fill: fast local disk for checkpoints, traces, Vivado run dirs
+      free_tib: null          # fill: df -h <path>
+    gpus:
+      count: 8
+      model: NVIDIA L40
+      memory_gib_each: 48
+      interconnect: pcie      # L40 has no NVLink / NVSwitch
+      driver_and_cuda: null   # fill: nvidia-smi
+    network:
+      ethernet_switch: false  # confirmed: no switch, so no switched multi-endpoint network
+      multi_node: false       # single server
+      nics:
+        - id: bf2
+          model: NVIDIA BlueField-2 DPU
+          rdma: true
+          ports: null         # fill: ibv_devinfo -l ; port count and link speed from ibv_devinfo
+          link_gbps: null
+          mode: null          # fill from mlxconfig query: DPU (embedded) | separated_host | nic
+      # Back-to-back cables exist. Without a switch the topology is one-to-one:
+      # one link between two endpoints (BF2 <-> VCU118, or VCU118 <-> VCU118).
+      direct_links:
+        available: true
+        topology: point_to_point
+        max_endpoints_per_link: 2
+        pairs: []             # fill: which ports are cabled, e.g. "bf2:p0 <-> fpga0:qsfp0"
+    os: null                  # fill: . /etc/os-release && echo "$PRETTY_NAME"
+    roles: [cpu_sim, cpu_rtl, vivado_build, gpu_workload, dpu_bf2]
+
+fpga:
+  boards:
+    - id: fpga0
+      board: VCU118
+      part: xcvu9p-flga2104-2L-e
+      host: null              # fill: server id whose JTAG/PCIe reaches this board (e.g. sim-server)
+      hw_server_target: null  # fill: Vivado Tcl `open_hw_manager; connect_hw_server; get_hw_targets`
+      pcie_attached: null     # fill: lspci | grep -i xilinx on the host ; true / false
+      roles: [onboard_measurement, emulation]
+    - id: fpga1
+      board: VCU118
+      part: xcvu9p-flga2104-2L-e
+      host: null
+      hw_server_target: null
+      pcie_attached: null
+      roles: [onboard_measurement, emulation]
+    - id: fpga2
+      board: VCU118
+      part: xcvu9p-flga2104-2L-e
+      host: null
+      hw_server_target: null
+      pcie_attached: null
+      roles: [onboard_measurement, emulation]
+  # Device capacity (LUT / FF / BRAM / URAM / DSP): copy it from the first real
+  # `report_utilization` run on this part, or from the Virtex UltraScale+ datasheet.
+  part_capacity: null
+  # Board interfaces (QSFP28, DDR4, PCIe edge, FMC): confirm in the VCU118 user
+  # guide before an idea depends on one.
+  interfaces_confirmed: []
+  # A VCU118 can act as an RDMA NIC only with a RoCE stack on the FPGA.
+  # Record the stack once one runs on this board; null = it must be built first.
+  rdma_stack: null
+
+toolchains:                   # what is installed; env-specs pin against these
+  gem5:      {version: null, path: null}   # fill: git -C <gem5> describe --tags
+  htsim:     {variant: Broadcom/csg-htsim, path: null}
+  verilator: {version: null}               # fill: verilator --version
+  vcs:       {available: null}
+  vivado:    {version: null, license: null}  # fill: vivado -version ; license: node_locked | floating
+  cuda:      {version: null}               # fill: nvcc --version
+  ofed:      {version: null}               # fill: ofed_info -s   (host RDMA stack for the BF2)
+  doca:      {version: null}               # fill: DOCA / BlueField BSP version on the BF2
+
+limits:                       # lab policy; null = no limit recorded yet
+  vivado_parallel_jobs: null  # how many synth/impl runs may share the server at once
+  reserved_cores: 4           # cores kept free for the OS, ssh, and monitoring

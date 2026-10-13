@@ -18,16 +18,16 @@
 
 - **Idea shape**: [compact summary of gap, mechanism/study, and why the answer matters]
 - **negative_evidence_response**: [n/a | evades: NE-* (...) | addresses: NE-* (...) | conflicts: NE-* (...)]
-- **Status**: selected
+- **Status** (`pool_status`): selected
 - **overall_merit_score**: [1-5] -- [rationale]
 - **evaluation_feasibility_score**: [1-5]
 - **Feasibility Breakdown**:
-  - *platform_workload_access*: [ready | near_ready | nontrivial | weak | blocked -- evidence]
+  - *platform_workload_access*: [ready | near_ready | nontrivial | weak | blocked -- evidence against lab-resources.yaml]
   - *baseline_artifact_readiness*: [score/status/verification/evidence/adapter notes]
   - *evaluation_adapter_cost*: [small | moderate | major | new_platform | blocked -- evidence]
   - *first_signal_runtime*: [minutes | hours | 1-2_days | multi_day | weeks | blocked -- decisive metric]
 - **Evaluation handoff**: follow `skills/shared-references/idea-handoff-schema.md`
-- **Novelty check**: [confirmed / needs work / killed]
+- **Novelty check**: [confirmed / needs work / already_done]
 - **Reviewer score**: [score]
 - **Next step**: `/research-refine-pipeline`
 
@@ -35,7 +35,7 @@
 
 - **Idea shape**:
 - **negative_evidence_response**:
-- **Status**: backup
+- **Status** (`pool_status`): backup
 - **overall_merit_score**:
 - **evaluation_feasibility_score**:
 - **Feasibility Breakdown**:
@@ -46,17 +46,22 @@
 - **Evaluation handoff**: follow `skills/shared-references/idea-handoff-schema.md`
 - **Main blocker**:
 
-## Deferred Ideas
+## Parked Ideas
 
-| Idea | Reason deferred | Required clarification or platform path |
-|------|-----------------|-----------------------------------------|
-| [idea] | [main_blocker] | [what must become available] |
+Kept in the candidate pool with their scores. Not eligible for handoff until the
+revisit condition is met and the idea is re-scored.
+
+| Idea | overall_merit_score | evaluation_feasibility_score | park_reason | main_blocker | revisit_condition |
+|------|---------------------|------------------------------|-------------|--------------|-------------------|
+| [idea] | [1-5] | [1-5] | [low_overall_merit / low_feasibility / needs_canon_clarification / designed_not_run / no_credible_evaluation_path] | [main_blocker] | [e.g. needs: ethernet_switch=true and a second server] |
 
 ## Eliminated Ideas
 
-| Idea | Category | Reason | Revisit condition |
-|------|----------|--------|-------------------|
-| [idea] | [already_done / low_overall_merit / no_credible_evaluation_path] | [why] | [condition] |
+Evidence only. Close prior work lowers the merit score instead.
+
+| Idea | Category | Evidence | Revisit condition |
+|------|----------|----------|-------------------|
+| [idea] | [already_done / refuted_by_NE-*] | [citation or NE-* row] | [condition] |
 
 ## Evaluation Handoff Summary
 

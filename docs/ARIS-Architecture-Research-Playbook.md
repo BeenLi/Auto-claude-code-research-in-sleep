@@ -391,7 +391,7 @@ flowchart TB
 - Inputs: `idea-stage/LITERATURE_REVIEW.md`, its `Landscape Pack`, optional `idea-stage/REF_PAPER_SUMMARY.md`, optional `research-wiki/` query pack, and domain constraints.
 - Process: load prior memory, generate 8-12 ideas, filter by literature-derived topic fit and concrete research question, extract Evaluation Canon platform/workload mappings, run first-pass ranking with `overall_merit_score` and `evaluation_feasibility_score`, and prepare deeper validation for priority-ordered survivors.
 - Outputs: `idea-stage/IDEA_REPORT_{YYYYMMDD_HHmmssZ}.md`, latest copy `idea-stage/IDEA_REPORT.md`, optional `idea-stage/IDEA_CANDIDATES.md` in compact mode, wiki idea pages when enabled, and `MANIFEST.md` rows.
-- Handoff: writes `evaluation_handoff_plan` in priority order until one idea is `handoff_to_workflow_1_5: ready`; later viable ideas stay as backup, deferred, or clarification-needed entries.
+- Handoff: writes `evaluation_handoff_plan` in priority order until one idea is `handoff_to_workflow_1_5: ready`; later viable ideas stay as backups; low-score ideas stay parked with a `revisit_condition` instead of being deleted.
 - Stop or degrade: Workflow 1 does not run pilots or baseline reproduction; unclear platform/workload/baseline paths become `needs_canon_clarification` or `designed_not_run`, not fake readiness.
 
 `/novelty-check` tests whether the selected idea has a defensible technical delta.
@@ -444,8 +444,8 @@ These are compact template summaries for auditing output shape. The detailed can
 - Header: direction, UTC generation time, generated/survived/handoff/recommended counts.
 - `Landscape Summary`: concise synthesis from the literature review.
 - `Recommended Ideas`: ranked ideas with idea shape, `overall_merit_score`, idea-local `core_baseline`, `baseline_artifact_readiness`, `canon_mapping`, metrics, validation style, `evaluation_feasibility_score`, `evaluation_feasibility_breakdown`, refine score/verdict/drift/refresh fields, `baseline_verification_delta`, blocker, reviewer objection, and rationale.
-- `Eliminated Ideas`: idea, category, reason, revisit condition.
-- `Deferred / Designed-Not-Run Ideas`: why deferred and what must become available.
+- `Parked Ideas`: scores, `park_reason`, blocker, and `revisit_condition`; kept in the candidate pool, not deleted.
+- `Eliminated Ideas`: evidence-only exits (`already_done` with a citation, or `refuted_by_NE-*`).
 - `Evaluation Handoff Summary`: compact table of ranking, feasibility, baseline, canon, metrics, validation style, `negative_evidence_response`, handoff status, blocker.
 - `Suggested Execution Order` and `Next Steps`: selected idea goes to `/research-refine-pipeline`, then Workflow 1.5 creates `EVALUATION_CONTRACT.md`.
 

@@ -19,6 +19,7 @@ Shared references:
 - Handoff fields and Workflow 1 exit gate: `../shared-references/idea-handoff-schema.md`
 - Report template: `templates/IDEA_REPORT_TEMPLATE.md`
 - Compact candidates template: `templates/IDEA_CANDIDATES_TEMPLATE.md`
+- Lab resources and resource-fit policy: `../shared-references/hw-env-contract.md` (inventory: `../shared-references/lab-resources.yaml`)
 
 ## Constants
 
@@ -52,11 +53,29 @@ Default weighted score:
 
 - **CRITICAL DISTINCTION in Systems Research**: "Baseline" (code) is separate from "Platform/Workload" (hardware/data). A perfectly open-source baseline still yields a low feasibility score if it requires inaccessible hardware or proprietary traces. Summarize the dominant rationale among these 4 factors in the score value or adjacent prose instead of adding separate handoff columns.
 
+- **Judge `platform_workload_access` against the lab inventory.** Resolve `lab-resources.yaml` per `../shared-references/hw-env-contract.md` §0 and set the level with that file's §2 resource-fit table. When the lab lacks something the idea needs, name the missing item in inventory terms; it becomes the idea's `revisit_condition`. If the inventory or the §2 table is unavailable, use the generic descriptions below.
+
 - `5`: ready evaluation path: `baseline_artifact_readiness.score` is `2`; platform/workload access is ready; adapter cost is small; first-signal runtime is minutes to hours.
 - `4`: near-ready evaluation path: comparison target and platform/workload path are credible; implementation intrusiveness is minor to moderate; first signal should arrive within one to two days; no hard blocker is present.
 - `3`: feasible but nontrivial: the path likely works, but needs major architectural changes, multi-day/multi-week bring-up, or reimplementing a closed-source baseline.
 - `2`: weak feasibility: `baseline_artifact_readiness.score` is `0` or `1`, platform/workload needs major bring-up, the idea needs a new platform/prototype, workload is unavailable, or pilot cost is large-scale/long-running.
 - `1`: no credible evaluation path: key artifact, platform, workload, baseline, comparison target, or runtime information is unavailable/unknown enough to block Workflow 1.5.
+
+## Candidate Pool: Park Low Scores, Eliminate Only on Evidence
+
+Scores rank ideas and gate the Workflow 1.5 handoff. They do not delete ideas.
+Every generated idea ends Phase 6 with exactly one `pool_status`, using the
+domains in `../shared-references/idea-handoff-schema.md` (Candidate Pool):
+
+| `pool_status` | Meaning |
+|---|---|
+| `selected` | The single idea handed to `/research-refine-pipeline`. |
+| `backup` | Could be handed off now: `evaluation_feasibility_score` 4 or 5, with a clear baseline and canon mapping. |
+| `parked` | Kept with every scored field, a `park_reason`, and a `revisit_condition`. Not eligible for handoff until the condition is met and the idea is re-scored. |
+| `eliminated` | Removed on evidence only: `already_done` (same mechanism and same claim already published, with a citation) or `refuted_by_NE-*`. |
+
+Close prior work is not an exit. An idea with near neighbors keeps its place
+with a lower `overall_merit_score` and a differentiation note.
 
 ## Evaluation Canon And Baseline Extraction
 
@@ -143,7 +162,7 @@ Use the shared schema's `baseline_artifact_readiness.score` rule: `2` is verifie
 and official/open-source/config reproducible, `1` is verified but paper-only or
 unknown reproducibility, and `0` is proprietary/unavailable/unverified-only.
 Score `0` must not be marked
-`handoff_to_workflow_1_5: ready`; downrank, defer, or set the blocker instead.
+`handoff_to_workflow_1_5: ready`; downrank, park, or set the blocker instead.
 
 ## Reviewer Calling Convention
 
@@ -302,6 +321,9 @@ Bundle contents:
     Verified baseline evidence extracted from the literature:
     [paste verified paper/system and competitor rows that could become idea-local baseline records]
 
+    Lab resources (from lab-resources.yaml; see hw-env-contract.md §1):
+    [paste a one-paragraph summary: server cores, memory, GPUs and their interconnect; FPGA boards and part; installed simulators and EDA tools; RDMA endpoints (BF2, FPGA RoCE stack if recorded); known absences such as an Ethernet switch, a second server, or NVLink; fields still null]
+
     Generate 8-12 concrete research ideas. Phase 2 is divergent: do not assign final ranking, feasibility, handoff, or Workflow 1.5 contract fields yet. For each idea:
     1. idea_id: stable short ID
     2. title
@@ -323,6 +345,7 @@ Bundle contents:
     - Targeting the venue bar implied by the topic scope and closest competing papers
 
     Be creative but grounded. A strong idea is one whose answer — positive or negative — changes design judgment in the loaded topic.
+    Use the lab resources to fill evaluation_platform_candidates and estimated_effort. Do not drop an idea because it exceeds them; Phase 3 parks it with the gap named.
 ```
 
 Save the agent id for follow-up.
@@ -357,7 +380,7 @@ For each generated idea, convert the Phase 2 hints into authoritative ranking an
    - Run a quick novelty check with 2-3 targeted searches for closest work; full `/novelty-check` comes later for survivors.
    - Assign `overall_merit_score: 1 | 2 | 3 | 4 | 5` using the reviewer-style scale above.
    - Write `overall_merit_rationale`: closest known work, differentiation, likely impact, and whether positive or negative results would matter.
-   - Use quick closest-work checks only to calibrate `overall_merit_score`: already-covered ideas should usually become `already_done` or score 1; differentiated and impactful ideas may score 4 or 5.
+   - Use quick closest-work checks only to calibrate `overall_merit_score`: an idea whose mechanism and claim are both already published becomes `already_done` (cite it); close neighbors lower the score and add a differentiation note but keep the idea in the pool; differentiated and impactful ideas may score 4 or 5.
 
 3. **Evaluation target definition**:
    - Populate the handoff fields from `../shared-references/idea-handoff-schema.md`.
@@ -367,21 +390,23 @@ For each generated idea, convert the Phase 2 hints into authoritative ranking an
 4. **Evaluation target feasibility assessment**:
    - For every idea, you MUST explicitly output both the `overall_merit_score` (1-5) and the `evaluation_feasibility_score` (1-5).
    - For the `evaluation_feasibility_score`, you MUST provide `evaluation_feasibility_breakdown` with four sub-factors:
-     1) **`platform_workload_access`**: access to required platform/hardware and workload/data
+     1) **`platform_workload_access`**: access to required platform/hardware and workload/data, set with the lab resource-fit table in `../shared-references/hw-env-contract.md` §2
      2) **`baseline_artifact_readiness`**: `score`, `status`, `verification_status`, `evidence`, and `adapter_notes`
      3) **`evaluation_adapter_cost`**: adapter/integration work required before the first pilot
      4) **`first_signal_runtime`**: time required to run the decisive metric experiment
    - Summarize how these four sub-factors yield the final merged `evaluation_feasibility_score`.
 
-5. **Defer, eliminate, and rank**:
-   - Eliminate `overall_merit_score: 1` ideas by default. Negative-result, benchmark, or measurement ideas should only survive if the likely finding itself justifies `overall_merit_score: 3-5`.
-   - Mark high-merit but `evaluation_feasibility_score <= 3` ideas as not immediate: use `needs_canon_clarification` when clarification could raise readiness, or `designed_not_run` for long-horizon platform/prototype work.
+5. **Park, eliminate on evidence, and rank** (see Candidate Pool above):
+   - Park `overall_merit_score: 1` ideas by default with `park_reason: low_overall_merit`; do not delete them. Negative-result, benchmark, or measurement ideas should only rank among survivors if the likely finding itself justifies `overall_merit_score: 3-5`.
+   - Mark high-merit but `evaluation_feasibility_score <= 3` ideas as not immediate: use `needs_canon_clarification` when clarification could raise readiness, or `designed_not_run` for long-horizon platform/prototype work. Park them with the matching `park_reason` and a `revisit_condition`.
    - Mark missing EC-P/EC-W evidence as `needs_canon_clarification` or `main_blocker: unclear_canon_mapping`.
    - Mark unclear comparison targets as `main_blocker: unclear_comparison_target`.
    - Mark `baseline_artifact_readiness.score: 0` ideas as `designed_not_run`, `needs_canon_clarification`, or blocked by `main_blocker`; they must not be marked `handoff_to_workflow_1_5: ready`.
    - Mark `handoff_to_workflow_1_5: ready` only when `evaluation_feasibility_score` is `4` or `5`.
-   - Mark ideas with no credible analytical, simulation, artifact, benchmark, trace/workload, or prototype route as `main_blocker: no_credible_evaluation_path` and eliminate or defer based on merit.
+   - Mark ideas with no credible analytical, simulation, artifact, benchmark, trace/workload, or prototype route as `main_blocker: no_credible_evaluation_path` and park them with the missing route as `revisit_condition`.
+   - Eliminate only on evidence: `refuted_by_NE-*` from step 1, or `already_done` from step 2.
    - Rank surviving ideas with `overall_merit_score` 60% and `evaluation_feasibility_score` 40%. Keep all viable ideas in priority order; handoff planning will attempt them one at a time.
+   - Rank parked ideas with the same weights in a separate list. A parked idea never takes a handoff attempt until its `revisit_condition` is met and it is re-scored.
 
 ### Phase 4: Deep Validation (for priority-ordered survivors)
 
@@ -400,6 +425,11 @@ For each surviving idea in priority order, run a deeper evaluation:
    Here are our top ideas after filtering:
    [write surviving ideas with idea_shape, quick novelty results, overall_merit_score, overall_merit_rationale, canon_mapping, core_baseline, baseline_artifact_readiness, baseline_verification_delta, metrics, target_validation_style, evaluation_target_clarity, evaluation_feasibility_score, evaluation_feasibility_breakdown, handoff_to_workflow_1_5, and main_blocker into this bundle file]
 
+   Parked ideas, one line each (idea_id, title, overall_merit_score, evaluation_feasibility_score, park_reason, revisit_condition):
+   [write the parked list into the same bundle file]
+
+   Lab resources: [the same one-paragraph summary used in Phase 2]
+
    For each, play devil's advocate:
    - What's the strongest objection a target-venue reviewer would raise?
    - What's the most likely failure mode (e.g., bottleneck too small, model abstraction too weak, overhead dominates, workload not representative)?
@@ -409,19 +439,20 @@ For each surviving idea in priority order, run a deeper evaluation:
      `addresses: NE-X`, does the proposed `decisive_metric` actually surface
      the NE-X failure mode and not just hide it behind aggregate scores?
    - Evaluate and provide the `overall_merit_score` (1-5), and explain why.
-   - Evaluate and provide the `evaluation_feasibility_score` (1-5). You MUST explicitly break down this score into the 4 sub-factors: 1) `platform_workload_access`, 2) `baseline_artifact_readiness`, 3) `evaluation_adapter_cost`, and 4) `first_signal_runtime`. Is the evaluation target feasible enough for a credible first-signal pilot, or should it be deferred?
+   - Evaluate and provide the `evaluation_feasibility_score` (1-5). You MUST explicitly break down this score into the 4 sub-factors: 1) `platform_workload_access`, 2) `baseline_artifact_readiness`, 3) `evaluation_adapter_cost`, and 4) `first_signal_runtime`. Is the evaluation target feasible enough for a credible first-signal pilot, or should it be parked?
    - Does the proposed platform/workload mapping cite the right EC-P*/EC-W* items?
    - Is the selected core baseline credible for this idea, and are the chosen metrics decisive?
    - Is the novelty credible after considering the closest papers?
    - Which ideas have a positive-or-negative answer that would change design judgment?
    - How would you rank these for a top venue submission?
-   - Which highest-priority idea is ready for Workflow 1.5 now, and which high-upside backups should be deferred or sent back for EC-P*/EC-W* or comparison-target clarification?
+   - Which highest-priority idea is ready for Workflow 1.5 now, and which high-upside backups should be parked or sent back for EC-P*/EC-W* or comparison-target clarification?
+   - Look at the parked list. Name at most one parked idea whose upside justifies un-parking, and the concrete change (lab resource, artifact, clarification) that would make it feasible. Your ranking allocates the next handoff attempt; it is not an elimination verdict.
 
    For systems or architecture ideas:
    - Is the named bottleneck real and central, or is the idea mostly an implementation detail without a decisive research question?
    ```
 
-3. **Combine rankings**: Merge your assessment with the reviewer's ranking. Produce a single priority-ordered survivor list. The first idea with a clear comparison target, platform/workload mapping, decisive metrics, and feasible baseline path becomes the immediate Workflow 1.5 candidate; later viable ideas remain backups or deferred options.
+3. **Combine rankings**: Merge your assessment with the reviewer's ranking. Produce a single priority-ordered survivor list. The first idea with a clear comparison target, platform/workload mapping, decisive metrics, and feasible baseline path becomes the immediate Workflow 1.5 candidate; later viable ideas remain backups, and the rest stay parked. A reviewer un-park suggestion sends that idea back through Phase 3 scoring with the proposed change recorded; it never bypasses the handoff gate.
 
 ### Phase 5: Evaluation Handoff Planning (priority-ordered ideas)
 
@@ -434,7 +465,7 @@ inline.
 
 If the highest-ranked idea cannot reach a reproducible baseline path, stop
 trying to force it into `ready`: warn the user, record the failed handoff attempt
-in `baseline_verification_delta`, `main_blocker`, and the report's deferred
+in `baseline_verification_delta`, `main_blocker`, and the report's parked
 ideas section, then try the next ranked surviving idea. Continue in priority
 order until one idea reaches `handoff_to_workflow_1_5: ready` or every survivor
 has a recorded blocker.
@@ -443,7 +474,7 @@ has a recorded blocker.
 
 Write `idea-stage/IDEA_REPORT.md` from
 `templates/IDEA_REPORT_TEMPLATE.md`. The report must include all
-selected, backup, deferred, and eliminated ideas, but only the selected top idea
+selected, backup, parked, and eliminated ideas, but only the selected top idea
 should be marked for `/research-refine-pipeline`.
 
 If `COMPACT=true`, also write `idea-stage/IDEA_CANDIDATES.md` from
@@ -464,10 +495,11 @@ require the helper are skipped with a single warning.
 
 ```
 if research-wiki/ exists:
-    for each idea in recommended_ideas + eliminated_ideas:
+    for each idea in recommended_ideas + parked_ideas + eliminated_ideas:
         1. Create page: research-wiki/ideas/<idea_id>.md
            - node_id: idea:<id>
-           - stage: proposed (or: handed_off, deferred, archived)
+           - stage: proposed (or: handed_off, parked, archived)
+           - parked pages also record: park_reason, revisit_condition
            - outcome: unknown (or: negative, mixed, positive)
            - based_on: [paper:<slug>, ...]
            - target_gaps: [gap:<id>, ...]
@@ -481,7 +513,7 @@ if research-wiki/ exists:
     Rebuild query pack (only if $WIKI_SCRIPT resolved):
         [ -n "$WIKI_SCRIPT" ] && python3 "$WIKI_SCRIPT" rebuild_query_pack research-wiki/
     Log (only if $WIKI_SCRIPT resolved):
-        [ -n "$WIKI_SCRIPT" ] && python3 "$WIKI_SCRIPT" log research-wiki/ "idea-creator wrote N ideas (M recommended, K eliminated)"
+        [ -n "$WIKI_SCRIPT" ] && python3 "$WIKI_SCRIPT" log research-wiki/ "idea-creator wrote N ideas (M recommended, P parked, K eliminated)"
 
     if [ -z "$WIKI_SCRIPT" ]:
         echo "WARN: idea pages were written but edges / query_pack / log were skipped because research_wiki.py is unreachable (see Phase 0 warning above)." >&2
@@ -499,12 +531,12 @@ if research-wiki/ exists:
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 
 - The user provides a DIRECTION, not an idea. Your job is to generate the ideas.
-- Quantity first, quality second: brainstorm broadly, then filter ruthlessly.
+- Quantity first, quality second: brainstorm broadly, then rank strictly. Ranking decides what runs next, not what is forgotten.
 - A good negative result is just as publishable as a positive one. Prioritize ideas where the answer matters regardless of direction.
-- Don't fall in love with any idea before validating it. Be willing to kill ideas.
-- Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up should get `evaluation_feasibility_score <= 2` or a `designed_not_run` handoff; that is not the same as scientific rejection.
+- Don't fall in love with any idea before validating it, and let evidence do the killing: park low-score ideas with a `revisit_condition`; eliminate only `already_done` or `refuted_by_NE-*` ideas.
+- Always estimate implementation and validation cost. An idea that needs a new simulator, a private trace corpus, or a long platform bring-up should get `evaluation_feasibility_score <= 2` or a `designed_not_run` handoff; that is not the same as scientific rejection. Score cost against the lab inventory in `../shared-references/lab-resources.yaml`.
 - "Apply X to Y" is the lowest form of research idea. Push for deeper questions.
-- Include eliminated ideas in the report — they save future time by documenting dead ends.
+- Include parked and eliminated ideas in the report. Parked ideas are the pool the next run or a new lab resource draws from; eliminated ideas document dead ends.
 - **If the user's direction is too broad (e.g., only a field name with no workload, mechanism, object of study, or validation target), STOP and ask them to narrow it.** A good direction is 1-2 sentences specifying the problem, workload or mechanism focus, and validation constraint, using terms that match the loaded literature scope.
 
 ## Composing with Other Skills

@@ -17,6 +17,9 @@ Launch one architecture experiment and verify that it produced the expected arti
 - RTL simulation through VCS/Verilator/Vivado xsim
 - FPGA synthesis/implementation report generation
 - DPU/SmartNIC/FPGA micro-benchmark
+- On-board VCU118 measurement or emulation (`fpga_vcu118` slot)
+- BlueField-2 micro-benchmark or offload program (`dpu_bf2` slot)
+- LLM workload run or trace capture on the L40 GPUs, only when the plan names a `gpu_l40` slot
 - Generic shell experiment
 
 Do not assume ML training, CUDA, W&B, or GPU allocation unless the user explicitly asks for a GPU experiment.
@@ -29,6 +32,7 @@ Read project configuration from `AGENTS.md`, `CLAUDE.md`, or the experiment mani
 - working directory
 - environment setup command
 - resource needs: CPU cores, memory, walltime, license tokens, exclusive devices
+- env-spec name and its ledger block (`../shared-references/hw-env-contract.md` §4); if the observed tool versions differ from the ledger, stop and report drift
 - required outputs
 - metrics to parse
 
@@ -40,6 +44,8 @@ test -x path/to/htsim_roce
 ```
 
 For RTL/synthesis jobs, check license/tool availability only through non-destructive commands.
+
+Run the env-spec `smoke.witness` once per session before the first job. For `fpga_vcu118` and `dpu_bf2` jobs, take the per-device lock from `../shared-references/hw-env-contract.md` §3 and release it when measurement ends; a one-to-one link test holds both locks. Resource-overhead numbers (utilization, timing, Fmax) come from a Vivado build on `license_vivado` and do not need a board.
 
 ## Launch Pattern
 

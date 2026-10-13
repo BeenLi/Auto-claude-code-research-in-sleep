@@ -36,6 +36,8 @@ On new session or post-compaction recovery:
 
 ## Project Constraints
 
+- Lab resources: `lab-resources.yaml` in the installed `shared-references/` (project override: `.aris/compute/lab-resources.yaml`); env-specs in `.aris/compute/env-spec.yaml`. See `hw-env-contract.md`.
+
 - {constraint 1}
 - {constraint 2}
 

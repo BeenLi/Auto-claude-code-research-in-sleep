@@ -192,7 +192,7 @@ Cover:
 3. **Complexity budget**: what is frozen or reused, what is new, and what tempting additions are intentionally excluded.
 4. **System graph**: modules, data flow, inputs, outputs.
 5. **Data path design**: what hardware state, buffer, queue, or pipeline register is used; where in the Tx/Rx path does the new mechanism insert?
-6. **Implementation plan**: RTL vs HLS vs P4, pipeline stages, clock domain, critical path estimate, FPGA/ASIC synthesis target.
+6. **Implementation plan**: RTL vs HLS vs P4, pipeline stages, clock domain, critical path estimate, FPGA/ASIC synthesis target. The default FPGA target is the part in `../shared-references/lab-resources.yaml` (VCU118, XCVU9P).
 7. **Runtime data path**: how the mechanism operates at the target rate and what control signals flow between host, accelerator, memory, NIC, storage, and runtime.
 8. **Why the mechanism stays small**: why a larger hardware block is unnecessary (area/power budget argument).
 9. **Exact role of any platform primitive**: if you use an accelerator primitive, HBM/CXL tier, DPU offload engine, P4 match-action table, FPGA IP block, storage datapath, or RDMA verb extension, specify its role concretely.

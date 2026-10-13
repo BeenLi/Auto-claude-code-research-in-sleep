@@ -25,10 +25,11 @@ Show after `/idea-creator`, novelty checks, and review:
 - `baseline_artifact_readiness`
 - `canon_mapping`
 - `handoff_to_workflow_1_5`
-- `main_blocker` for backups or deferred ideas
+- `main_blocker` for backups, and `park_reason` plus `revisit_condition` for parked ideas
+- pool counts: active, parked, eliminated on evidence
 
 Only the selected top idea proceeds to `/research-refine-pipeline`. Ready
-backups remain documented in `IDEA_REPORT.md`.
+backups and parked ideas remain documented in `IDEA_REPORT.md`.
 
 ## Refined proposal ready
 
