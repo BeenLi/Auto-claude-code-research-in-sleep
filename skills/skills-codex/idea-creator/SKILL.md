@@ -23,7 +23,7 @@ Shared references:
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.5`** — Default model for the Codex backend. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Manual backend uses whatever model the user chooses.
+- **REVIEWER_MODEL = `gpt-6-astra`** — Default model for the Codex backend. Must be an OpenAI model (e.g., `gpt-6-astra`, `o3`, `gpt-4o`). Manual backend uses whatever model the user chooses.
 - **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 

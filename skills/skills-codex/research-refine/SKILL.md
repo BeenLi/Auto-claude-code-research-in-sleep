@@ -1,6 +1,6 @@
 ---
 name: research-refine
-description: 'Turn a vague research direction into a problem-anchored, elegant, platform-aware, implementation-oriented method plan via iterative GPT-5.5 review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
+description: 'Turn a vague research direction into a problem-anchored, elegant, platform-aware, implementation-oriented method plan via iterative GPT-6-Astra review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, spawn_agent, send_input
 ---
 
@@ -25,7 +25,7 @@ Four principles dominate this skill:
 User input (PROBLEM + vague APPROACH)
   -> Phase 0 (Claude): Freeze Problem Anchor
   -> Phase 1 (Claude): Scan grounding papers -> identify technical gap -> choose the sharpest route -> write focused proposal
-  -> Phase 2 (Codex/GPT-5.5): Review for fidelity, specificity, contribution quality, and platform leverage
+  -> Phase 2 (Codex/GPT-6-Astra): Review for fidelity, specificity, contribution quality, and platform leverage
   -> Phase 3 (Claude): Anchor check + simplicity check -> revise method -> rewrite full proposal
   -> Phase 4 (Codex, same agent): Re-evaluate revised proposal
   -> Repeat Phase 3-4 until OVERALL SCORE >= 9, READY, no drift, and handoff refresh passes, or MAX_ROUNDS reached
@@ -35,7 +35,7 @@ User input (PROBLEM + vague APPROACH)
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.5`** — Reviewer model used via Codex subagent.
+- **REVIEWER_MODEL = `gpt-6-astra`** — Reviewer model used via Codex subagent.
 - **MAX_ROUNDS = 5** — Maximum review-revise rounds.
 - **SCORE_THRESHOLD = 9** — Minimum overall score to stop.
 - **OUTPUT_DIR = `refine-logs/`** — Directory for round files and final report.
@@ -317,7 +317,7 @@ Use this structure:
 
 ### Phase 2: External Method Review (Round 1)
 
-Send the proposal to GPT-5.5 for an **elegance-first, platform-aware,
+Send the proposal to GPT-6-Astra for an **elegance-first, platform-aware,
 method-first** review. The reviewer should spend most of the critique budget
 on the method itself, not on expanding the experiment menu. For Codex subagent, do
 not inline the whole rubric + proposal once the prompt becomes large. Instead,
@@ -511,7 +511,7 @@ Save to `refine-logs/round-N-refinement.md`:
 
 ### Phase 4: Re-evaluation (Round 2+)
 
-Send the revised proposal back to GPT-5.5 in the **same agent**. Again, keep
+Send the revised proposal back to GPT-6-Astra in the **same agent**. Again, keep
 the MCP payload short: write `refine-logs/codex_round_N_review_bundle.md`
 containing the re-evaluation instructions below, the key changes, and the
 absolute path to `refine-logs/round-N-refinement.md`, then ask Codex to read
@@ -716,7 +716,7 @@ If the final verdict is not READY, still write the best current final version he
 <details>
 <summary>Round 1 Review</summary>
 
-[Full verbatim response from GPT-5.5]
+[Full verbatim response from GPT-6-Astra]
 
 </details>
 

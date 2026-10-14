@@ -283,7 +283,7 @@ upstream remote 已添加为 `upstream`（`https://github.com/wanshuiyin/Auto-cl
 - `/paper-poster` 变为指向 `/paper-poster-html` 的跳转。
 - `/gemini-search` 默认模型改为 upstream 的 auto-gemini-3。
 - `/auto-review-loop` 的停止条件改由 `tools/review_gate.py` 判定。
-- 桶 2 文件的默认评审模型是 `gpt-6-astra`，桶 3 文件仍是 `gpt-5.5`；两者在本机 Codex 上对 `ultra` 与 `xhigh` 都已实测可用。
+- 默认评审模型统一为 `gpt-6-astra`：桶 2 文件随 upstream 带入；桶 3 的 idea-creator、idea-discovery、research-review、research-refine、research-pipeline 随后同步改过，research-review 新建线程的调用块补上了显式 `model:`（此前未指定，实际落到 Codex 配置默认的 `gpt-6.1-sol`）。推理强度保持 `xhigh`；`gpt-5.5` 只留在 reviewer-routing 的回退链里。`gpt-6-astra` 与 `gpt-5.5` 在本机 Codex 上对 `ultra` 与 `xhigh` 都已实测可用。
 
 ### 未采纳或留待以后
 

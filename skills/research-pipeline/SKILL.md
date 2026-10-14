@@ -63,9 +63,9 @@ Resolve the helper via the canonical chain (integration-contract §2):
 
   | phase | what sets `accepted` | record as reviewer |
   |-------|----------------------|--------------------|
-  | `idea-discovery` | Gate 1 cross-model jury / novelty-check passed | `codex-gpt-5.5` + thread id |
+  | `idea-discovery` | Gate 1 cross-model jury / novelty-check passed | `codex-gpt-6-astra` + thread id |
   | `experiment-bridge` | experiments actually ran (jobs completed) — deterministic | `deterministic:experiment-bridge` |
-  | `auto-review-loop` | the loop hit its positive STOP (`score>=6 AND verdict∈{ready,almost}` — codex's verdict) | `codex-gpt-5.5` + final review trace id |
+  | `auto-review-loop` | the loop hit its positive STOP (`score>=6 AND verdict∈{ready,almost}` — codex's verdict) | `codex-gpt-6-astra` + final review trace id |
   | `summary` | `NARRATIVE_REPORT.md` written (+ rendered if `RENDER_HTML`) — deterministic | `deterministic:summary` |
   | `paper-writing` | submission audits passed (`verify_paper_audits.sh` exit 0) — deterministic | `deterministic:verify_paper_audits.sh` |
 
@@ -199,7 +199,7 @@ Once initial results are in, start the autonomous improvement loop:
 ```
 
 **What this does (up to 4 rounds):**
-1. GPT-5.5 xhigh reviews the work (score, weaknesses, minimum fixes)
+1. GPT-6-Astra xhigh reviews the work (score, weaknesses, minimum fixes)
 2. Claude Code implements fixes (code changes, new experiments, reframing)
 3. Deploy fixes, collect new results
 4. Re-review → repeat until score ≥ 6/10 or 4 rounds reached

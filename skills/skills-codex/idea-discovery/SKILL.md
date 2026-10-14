@@ -30,7 +30,7 @@ Shared references:
 
 - **Handoff planning is priority-ordered** — Attempt the highest-ranked survivor first; if it records a concrete blocker, move to the next survivor. Only one selected ready idea crosses into Workflow 1.5.
 - **AUTO\_PROCEED = true** — After each phase summary, automatically proceed with the best option if the user does not respond. Set to `false` to wait for explicit user confirmation at phase decision points.
-- **REVIEWER\_MODEL =** **`gpt-5.5`** — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-5.5`, `o3`, `gpt-4o`). Passed to sub-skills.
+- **REVIEWER\_MODEL =** **`gpt-6-astra`** — Model used via Codex subagent. Must be an OpenAI model (e.g., `gpt-6-astra`, `o3`, `gpt-4o`). Passed to sub-skills.
 - **OUTPUT\_DIR =** **`idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 - **ARXIV\_DOWNLOAD = false** — When `true`, `/research-lit` downloads the top relevant arXiv PDFs during Phase 1. When `false` (default), only fetches metadata. Passed through to `/research-lit`.
 - **COMPACT = false** — When `true`, generate compact summary files for short-context models and session recovery. Writes `idea-stage/IDEA_CANDIDATES.md` (top 3-5 ideas only) at the end of this workflow. Downstream skills read this instead of the full `idea-stage/IDEA_REPORT.md`.
@@ -135,7 +135,7 @@ For each selected top idea with strong overall merit and a credible evaluation h
 **What this does:**
 
 - Multi-source literature search (arXiv, Scholar, Semantic Scholar)
-- Cross-verify with GPT-5.5 xhigh
+- Cross-verify with GPT-6-Astra xhigh
 - Check for concurrent work (last 3-6 months)
 - Identify closest existing work and differentiation points
 
@@ -151,7 +151,7 @@ For the surviving top idea(s), get brutal feedback:
 
 **What this does:**
 
-- GPT-5.5 xhigh acts as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level)
+- GPT-6-Astra xhigh acts as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level)
 - Scores the idea, identifies weaknesses, suggests minimum viable improvements
 - Provides concrete feedback on experimental design
 
@@ -168,7 +168,7 @@ After review, refine only the selected top idea into a concrete proposal and pla
 **What this does:**
 
 - Freeze a **Problem Anchor** to prevent scope drift
-- Iteratively refine the method via GPT-5.5 review (up to 5 rounds, until score ≥ 9)
+- Iteratively refine the method via GPT-6-Astra review (up to 5 rounds, until score ≥ 9)
 - Generate a claim-driven experiment roadmap with ablations, budgets, and run order
 - Output: `refine-logs/FINAL_PROPOSAL.md`, `refine-logs/EXPERIMENT_PLAN.md`, `refine-logs/EXPERIMENT_TRACKER.md`
 

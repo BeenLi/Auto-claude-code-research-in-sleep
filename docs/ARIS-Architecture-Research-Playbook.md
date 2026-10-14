@@ -167,7 +167,7 @@ Controls and defaults:
 - `AUTO_PROCEED = true`: proceed with the best option at checkpoints unless the user overrides.
 - `COMPACT = false`: when enabled, write a lean `idea-stage/IDEA_CANDIDATES.md` for recovery and downstream handoff.
 - `REF_PAPER = false`: when set, summarize the reference paper and use it as context for literature and idea generation.
-- `REVIEWER_MODEL = gpt-5.5`: reviewer model passed to review/refine sub-skills via Codex subagent/Codex MCP.
+- `REVIEWER_MODEL = gpt-6-astra`: reviewer model passed to review/refine sub-skills via Codex subagent/Codex MCP.
 - `OUTPUT_DIR = idea-stage/`: all idea-stage outputs are written under this directory. (由于workflow1有多个SKILL，需要具体看是哪个SKILLS产出了文件，就看那个SKILLS中约束的OUTPUT_DIR为准)
 - `ARXIV_DOWNLOAD = false`: default metadata-only; when true, Phase 1 downloads top relevant arXiv PDFs.
 
