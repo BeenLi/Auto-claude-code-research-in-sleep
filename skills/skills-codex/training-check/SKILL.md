@@ -1,7 +1,7 @@
 ---
 name: training-check
 description: Periodically check WandB metrics during training to catch problems early (NaN, loss divergence, idle GPUs). Avoids wasting GPU hours on broken runs. Use when training is running and you want automated health checks.
-argument-hint: [wandb-run-path]
+argument-hint: "[wandb-run-path]"
 allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, spawn_agent, send_input
 ---
 
@@ -9,13 +9,21 @@ allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, spawn_agent, send_input
 
 Periodically read WandB metrics during training to catch problems early. Do not wait until training finishes to discover it was a waste of GPU time.
 
+> ⏱ This skill is **correctly** cron-wired (see below): it polls
+> machine-checkable training health (NaN / divergence / idle GPU) — the additive
+> external-wait shape in
+> [`shared-references/external-cadence.md`](../shared-references/external-cadence.md).
+> The occasional Codex call for an ambiguous metric is a **one-shot** check per
+> tick, not a multi-round verdict loop, so it stays additive — it never grows
+> into a wrapped verdict skill.
+
 ## Context: $ARGUMENTS
 
 ## Constants
 
 - WANDB_ENTITY and WANDB_PROJECT: read from CLAUDE.md or passed as argument (format: `entity/project/run_id`)
 - CHECK_INTERVAL: starts at 10 minutes, then gradually increases if consistently healthy: 10 min → 20 min → 30 min → 60 min (cap)
-- REVIEWER_MODEL = `gpt-5.5` — used via Codex subagent for ambiguous cases only
+- REVIEWER_MODEL = `gpt-6-astra` — used via Codex subagent for ambiguous cases only
 
 ## When to Use
 
@@ -65,7 +73,8 @@ Only escalate to Codex when the signal is ambiguous. For clearly good or clearly
 
 ```
 spawn_agent:
-  config: {"model_reasoning_effort": "high"}
+  model: gpt-6-astra
+  config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     TRAINING HEALTH CHECK — need your judgment on ambiguous metrics.
 

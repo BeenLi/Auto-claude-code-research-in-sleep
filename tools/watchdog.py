@@ -2,7 +2,7 @@
 """
 watchdog.py — Server-side unified monitoring daemon for ARIS.
 
-One process per server, monitors all registered tasks (training / download).
+One process per server, monitors all registered tasks (training / download / loop).
 Outputs per-task status JSON + aggregated summary.txt for low-frequency polling.
 
 Usage:
@@ -32,23 +32,23 @@ Directory structure:
 """
 
 import argparse
+import contextlib
+try:
+    import fcntl
+except ImportError:  # Windows: keep the previous best-effort behaviour
+    fcntl = None
 import json
 import os
 import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_BASE = "/tmp/aris-watchdog"
 DEFAULT_INTERVAL = 60
 SLOW_SPEED_THRESHOLD = 1 * 1024 * 1024  # 1 MB/s
 GPU_IDLE_THRESHOLD = 5  # percent
-
-
-def utc_timestamp():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def get_paths(base_dir):
@@ -65,40 +65,71 @@ def get_paths(base_dir):
 # ── Task registration ────────────────────────────────────────────
 
 
+@contextlib.contextmanager
+def tasks_lock(paths):
+    """Serialize the tasks.json read-modify-write across processes (#407)."""
+    if fcntl is None:
+        yield
+        return
+    with open(paths["base"] / ".tasks.lock", "w") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        yield
+
+
 def register_task(base_dir, task_json):
     paths = get_paths(base_dir)
     paths["base"].mkdir(parents=True, exist_ok=True)
     paths["status"].mkdir(parents=True, exist_ok=True)
 
     task = json.loads(task_json)
-    required = {"name", "type", "session"}
-    missing = required - set(task.keys())
+    missing = {"name", "type"} - set(task.keys())
     if missing:
         print(f"error: missing required fields: {missing}", file=sys.stderr)
         sys.exit(1)
 
-    if task["type"] not in ("training", "download"):
-        print(f"error: type must be 'training' or 'download', got '{task['type']}'", file=sys.stderr)
+    ttype = task["type"]
+    if ttype not in ("training", "download", "loop"):
+        print(f"error: type must be 'training', 'download', or 'loop', got '{ttype}'", file=sys.stderr)
+        sys.exit(1)
+    if ttype in ("training", "download") and "session" not in task:
+        print(f"error: {ttype} task requires 'session'", file=sys.stderr)
+        sys.exit(1)
+    if ttype == "loop" and ("state_file" not in task or "stale_after_seconds" not in task):
+        print("error: loop task requires 'state_file' and 'stale_after_seconds'", file=sys.stderr)
         sys.exit(1)
 
-    # Default session_type: auto-detect or fallback to screen
-    if "session_type" not in task:
+    if ttype == "loop":
+        try:
+            if int(task["stale_after_seconds"]) <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            print("error: loop 'stale_after_seconds' must be a positive integer (seconds)", file=sys.stderr)
+            sys.exit(1)
+        # Absolutize WITHOUT resolving symlinks: a loop may update its state file via
+        # atomic os.replace, which swaps a symlink for a new file; we must keep watching
+        # the registered path, not its resolve()-time target. (os is imported at module top.)
+        task["state_file"] = os.path.abspath(os.path.expanduser(task["state_file"]))
+    elif "session_type" not in task:
+        # Default session_type for session-backed tasks: fallback to screen
         task["session_type"] = "screen"
 
-    tasks = []
-    if paths["tasks"].exists():
-        try:
-            tasks = json.loads(paths["tasks"].read_text())
-        except (json.JSONDecodeError, OSError):
-            tasks = []
+    with tasks_lock(paths):
+        tasks = []
+        if paths["tasks"].exists():
+            try:
+                tasks = json.loads(paths["tasks"].read_text())
+            except (json.JSONDecodeError, OSError):
+                tasks = []
 
-    # Deduplicate: replace existing task with same name
-    tasks = [t for t in tasks if t["name"] != task["name"]]
-    task["registered_at"] = utc_timestamp()
-    tasks.append(task)
+        # Deduplicate: replace existing task with same name
+        tasks = [t for t in tasks if t["name"] != task["name"]]
+        task["registered_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        task["registered_epoch"] = time.time()  # tz-free grace anchor (loop PENDING→MISSING)
+        tasks.append(task)
 
-    paths["tasks"].write_text(json.dumps(tasks, indent=2))
-    print(f"registered: {task['name']} ({task['type']}, {task['session_type']})")
+        paths["tasks"].write_text(json.dumps(tasks, indent=2))
+    detail = f"stale_after={task['stale_after_seconds']}s" if ttype == "loop" else task["session_type"]
+    print(f"registered: {task['name']} ({ttype}, {detail})")
 
 
 def unregister_task(base_dir, name):
@@ -106,12 +137,13 @@ def unregister_task(base_dir, name):
     if not paths["tasks"].exists():
         print(f"no tasks file found")
         return
-    try:
-        tasks = json.loads(paths["tasks"].read_text())
-    except (json.JSONDecodeError, OSError):
-        return
-    tasks = [t for t in tasks if t["name"] != name]
-    paths["tasks"].write_text(json.dumps(tasks, indent=2))
+    with tasks_lock(paths):
+        try:
+            tasks = json.loads(paths["tasks"].read_text())
+        except (json.JSONDecodeError, OSError):
+            return
+        tasks = [t for t in tasks if t["name"] != name]
+        paths["tasks"].write_text(json.dumps(tasks, indent=2))
     status_file = paths["status"] / f"{name}.json"
     if status_file.exists():
         status_file.unlink()
@@ -174,7 +206,7 @@ def check_download(task, status_dir, interval):
     session_type = task.get("session_type", "screen")
     target = task.get("target_path", "")
     status_file = status_dir / f"{name}.json"
-    now = utc_timestamp()
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
     if not session_alive(session, session_type):
         return write_status(status_file, {
@@ -226,7 +258,7 @@ def check_training(task, status_dir):
     session = task["session"]
     session_type = task.get("session_type", "screen")
     status_file = status_dir / f"{name}.json"
-    now = utc_timestamp()
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
     if not session_alive(session, session_type):
         return write_status(status_file, {
@@ -253,6 +285,73 @@ def check_training(task, status_dir):
     })
 
 
+# ── Loop-liveness check (detect-only) ───────────────────────────
+
+
+LOOP_COMPLETED_STATUSES = {"completed", "done", "finished"}
+
+
+def _loop_is_completed(state):
+    """True if the watched JSON shows the loop finished (silence is then expected, not a stall)."""
+    if not isinstance(state, dict):
+        return False
+    if str(state.get("status", "")).lower() in LOOP_COMPLETED_STATUSES:
+        return True
+    phases = state.get("phases")  # run_state.py shape: all phases terminal ⇒ done
+    if isinstance(phases, list) and phases and all(
+        isinstance(p, dict) and p.get("status") in ("accepted", "skipped") for p in phases
+    ):
+        return True
+    return False
+
+
+def check_loop(task, status_dir):
+    """Loop-liveness via state-file mtime, DETECT-ONLY.
+
+    Liveness = freshness of the file the loop rewrites/touches each iteration, judged against the
+    loop's OWN declared `stale_after_seconds` (NOT the daemon interval). This function only reads
+    files and writes a status; it NEVER restarts the loop, spawns a process, or invokes a skill —
+    a STALE loop is surfaced via alerts.log + summary.txt for a human/cron, honoring
+    external-cadence.md's fence on verdict-bearing loops. JSON is read best-effort only to
+    recognize a COMPLETED loop; an unparseable file never causes STALE on its own.
+    """
+    name = task["name"]
+    state_file = Path(task.get("state_file", ""))
+    stale_after = int(task.get("stale_after_seconds", 21600))
+    status_file = status_dir / f"{name}.json"
+    now_str = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    if not state_file.exists():
+        # Fail-safe: a missing registered_epoch ⇒ epoch 0 ⇒ MISSING, never infinite grace.
+        grace = time.time() - float(task.get("registered_epoch", 0.0))
+        if grace <= stale_after:
+            return write_status(status_file, {
+                "status": "PENDING", "task": name, "type": "loop",
+                "msg": "state file not present yet", "ts": now_str})
+        return write_status(status_file, {
+            "status": "MISSING", "task": name, "type": "loop",
+            "msg": f"state file absent {int(grace)}s after register (path typo?)", "ts": now_str})
+
+    try:
+        state = json.loads(state_file.read_text())
+        if _loop_is_completed(state):
+            return write_status(status_file, {
+                "status": "COMPLETED", "task": name, "type": "loop",
+                "msg": "loop reports completion", "ts": now_str})
+    except (json.JSONDecodeError, OSError):
+        pass  # not a terminal state we can read → fall through to mtime liveness
+
+    age = int(time.time() - state_file.stat().st_mtime)
+    if age > stale_after:
+        return write_status(status_file, {
+            "status": "STALE", "task": name, "type": "loop",
+            "age_s": age, "stale_after": stale_after,
+            "msg": f"no state write in {age}s (> {stale_after}s)", "ts": now_str})
+    return write_status(status_file, {
+        "status": "OK", "task": name, "type": "loop",
+        "age_s": age, "stale_after": stale_after, "ts": now_str})
+
+
 # ── Status output ────────────────────────────────────────────────
 
 
@@ -261,9 +360,9 @@ def write_status(path, data):
     path.write_text(json.dumps(data))
 
     status = data.get("status", "OK")
-    if status in ("DEAD", "STALLED", "IDLE", "ERROR"):
+    if status in ("DEAD", "STALLED", "STALE", "MISSING", "IDLE", "ERROR"):
         alert_file = path.parent.parent / "alerts.log"
-        ts = data.get("ts", utc_timestamp())
+        ts = data.get("ts", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
         task = data.get("task", "?")
         msg = data.get("msg", "")
         alert_line = f"[{ts}] {task}: {status} — {msg}\n"
@@ -289,6 +388,12 @@ def write_summary(status_dir):
                 extra = f" gpu={d.get('gpu_util', '?')}"
             elif status == "DEAD":
                 extra = f" {d.get('msg', '')}"
+            elif status in ("STALE", "MISSING"):
+                extra = f" {d.get('msg', '')}"
+            elif status == "PENDING":
+                extra = " (awaiting first state write)"
+            elif status == "COMPLETED":
+                extra = " ✓"
             lines.append(f"{name}({typ}): {status}{extra}")
         except Exception:
             continue
@@ -335,11 +440,13 @@ def run_watchdog(base_dir, interval):
                     check_download(task, paths["status"], interval)
                 elif task["type"] == "training":
                     check_training(task, paths["status"])
+                elif task["type"] == "loop":
+                    check_loop(task, paths["status"])
             except Exception as e:
                 write_status(
                     paths["status"] / f"{task['name']}.json",
                     {"status": "ERROR", "task": task["name"], "msg": str(e),
-                     "ts": utc_timestamp()},
+                     "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
                 )
 
         write_summary(paths["status"])

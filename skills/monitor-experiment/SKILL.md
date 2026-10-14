@@ -1,7 +1,7 @@
 ---
 name: monitor-experiment
 description: Monitor Computer Architecture experiments, simulator queues, logs, required artifacts, and result JSON. Use when user asks to check progress, inspect results, or see whether simulator jobs are done.
-argument-hint: [queue-state-or-run-id]
+argument-hint: "[queue-state-or-run-id]"
 allowed-tools: Bash(ssh *), Bash(echo *), Read, Write, Edit
 ---
 

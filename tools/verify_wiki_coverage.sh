@@ -65,12 +65,18 @@ ARXIV_RE='\b(arXiv:|arxiv:|abs/)?([0-9]{4}\.[0-9]{4,5}(v[0-9]+)?|[a-z\-]+(\.[A-Z
 REFERENCED=$(mktemp)
 trap 'rm -f "$REFERENCED" "$INGESTED" "$MISSING"' EXIT
 
-for path in "${SCAN_PATHS[@]}"; do
-    if [[ -e "$path" ]]; then
-        # grep recursively for files, flat for directories; suppress "is a directory"
-        grep -rohE "$ARXIV_RE" "$path" 2>/dev/null || true
+# bash 3.2: empty-array "${ARR[@]}" trips `set -u`; SCAN_PATHS is empty when no
+# scan target exists in the invoking directory — the report should just be empty.
+{
+    if [[ ${#SCAN_PATHS[@]} -gt 0 ]]; then
+        for path in "${SCAN_PATHS[@]}"; do
+            if [[ -e "$path" ]]; then
+                # grep recursively for files, flat for directories; suppress "is a directory"
+                grep -rohE "$ARXIV_RE" "$path" 2>/dev/null || true
+            fi
+        done
     fi
-done \
+} \
     | sed -E 's#^(arXiv:|arxiv:|abs/)##; s/v[0-9]+$//' \
     | grep -v '^$' \
     | sort -u > "$REFERENCED"
@@ -154,6 +160,11 @@ if [[ "$MISS_COUNT" -gt 0 ]]; then
     HINT_SCRIPT=".aris/tools/research_wiki.py"
     [[ -f "$HINT_SCRIPT" ]] || HINT_SCRIPT="tools/research_wiki.py"
     [[ -f "$HINT_SCRIPT" ]] || { [[ -n "${ARIS_REPO:-}" ]] && HINT_SCRIPT="$ARIS_REPO/tools/research_wiki.py"; }
+    # Layer 4: global pointer file written by the installer/updater (#366).
+    if [[ -z "${ARIS_REPO:-}" && ! -f "$HINT_SCRIPT" && -f "$HOME/.aris/repo" ]]; then
+        ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
+        [[ -n "$ARIS_REPO" ]] && HINT_SCRIPT="$ARIS_REPO/tools/research_wiki.py"
+    fi
     [[ -f "$HINT_SCRIPT" ]] || HINT_SCRIPT="<resolve-via-shared-ref>/research_wiki.py"
     echo "Backfill suggestion:" >&2
     echo "    python3 \"$HINT_SCRIPT\" sync $WIKI_ROOT --arxiv-ids $HINT_IDS" >&2

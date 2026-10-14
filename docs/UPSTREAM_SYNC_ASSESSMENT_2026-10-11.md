@@ -245,3 +245,52 @@ git checkout upstream/main -- <path>
 ```
 
 upstream remote 已添加为 `upstream`（`https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git`）。
+
+## 10. 桶 1 / 桶 2 执行记录（2026-10-14）
+
+结果：全量测试 611 通过、0 失败、4 跳过（改动前为 330 通过、9 失败）。Codex 镜像用 `tools/sync_codex_skill_mirror.py` 重新生成，dry-run 干净。未提交。
+
+### 取自 upstream 的内容
+
+- **桶 1 新增**：7 个 shared-references（acceptance-gate、taste-calibration、fan-out-pattern、external-cadence、review-scope-limits、output-composition、skill-governance）；render-html、web-debug-search、paper-poster-html；`tools/iteration_log.py`、`tools/idea_discovery_gate.py`；MIT `LICENSE`。
+- **依赖闭包带入**（桶 2 新版文件会引用它们，不带就是悬空引用）：meta-apply、integrity-forensics（+ `forensics_gate.py`）、resubmit-pipeline、paper-talk、slides-polish、lean-formalize、paper-illustration-image2（+ `codex-image2` MCP、`paper_illustration_image2.py`）、grok-exec 与 antigravity-exec MCP、`review_gate.py`、`provenance.py`、`extract_paper_style.py`、`tools/meta_opt/trigger_eval.py`。
+- **upstream 单方修改、本地从未改动的文件**（无本地内容可丢）：analyze-results、feishu-notify、formula-derivation、mermaid-diagram、overleaf-sync、paper-compile、paper-illustration、pixel-art、prior-art-search、proof-writer、system-profile、writing-systems-papers；citation-discipline、effort-contract；gemini-review MCP；`arxiv_fetch.py`、`exa_search.py`、`figure_renderer.py`、`meta_opt/check_ready.sh`；`.gitattributes`、WATCHDOG_GUIDE、RESEARCH_BRIEF_TEMPLATE_CN。
+- **桶 2 整体替换**：32 个 SKILL.md（含 auto-review-loop、proof-checker、paper-writing 系列、citation-audit、meta-optimize、result-to-claim、rebuttal、kill-argument、openalex、gemini-search 与五个检索 skill）；8 个 shared-references；`run_state.py`、`openalex_fetch.py`、`save_trace.sh`、`watchdog.py` 等工具；claude-review、llm-chat、manual-review、minimax-chat 四个 MCP 服务器与对应测试。
+
+### 保留或重放的本地内容
+
+- `tools/verify_papers.py` 保留本地版本（本地 research-lit 依赖它的输入校验与 BLOCKED/ERROR 结论信封），移植 upstream 三个修复：406 视为限流（1075e21）、S2 API key 与节流（7554932）、拒绝不算 unverified（e64c347）。
+- `integration-contract.md`：重放“Workflow 1 -> 1.5 idea handoff schema”一节和“Candidate paper verification”一行；§2 编号未变，现有引用有效。
+- `novelty-check`：重放体系结构会议/期刊列表、2021-2026 检索年份、领域设定的审稿问题；保留 upstream 新增的“新颖性判定边界”。
+- `result-to-claim`：重放 EXPERIMENT_PLAN 输入与 Step 4.5 研究契约后置检查。
+- `paper-plan`、`auto-review-loop`：重放以 `idea-stage/docs/research_contract.md` 为结论边界。
+- UTC：review-tracing 目录日期与示例、`save_trace.sh` 目录日期、`watchdog.py`、llm-chat 与 minimax 调试日志。
+- `output-manifest` 的 idea-discovery 行补回 /research-lit；`RESEARCH_BRIEF_TEMPLATE.md` 三方合并（只加了长度提示）；`.gitignore` 保留本地逐项写法，未采纳 upstream 的整体忽略 `.aris/`。
+
+### 测试上的本地调整
+
+- `tests/_llm_chat_helpers.py`、`tests/_minimax_helpers.py` 补回 httpx 替身；两份服务器测试的 mock 目标改为辅助模块里的 `httpx.Client`（装了 httpx 时语义相同）；三个直接加载真实服务器的测试在缺少 httpx 时跳过。
+- `test_idea_discovery_gate.py` 中检查 idea-discovery 接线的一个用例标为 skip：idea-discovery 属桶 3，证据门尚未接入。
+
+### 顺带修复（桶 3 文件，纯机械）
+
+9 个本地 skill 的 `argument-hint` 加了引号：experiment-bridge、experiment-queue、idea-creator、monitor-experiment、research-lit、research-pipeline、research-review、research-wiki、run-experiment。此前前 8 个被 YAML 解析成列表，research-pipeline 的头部整个解析失败，Codex 无法加载。
+
+### 随之而来的行为变化
+
+- 投稿级 assurance 下默认运行 `/integrity-forensics`。
+- `/render-html` 在关键检查点自动输出 HTML，其评审门会消耗评审调用。
+- `/paper-poster` 变为指向 `/paper-poster-html` 的跳转。
+- `/gemini-search` 默认模型改为 upstream 的 auto-gemini-3。
+- `/auto-review-loop` 的停止条件改由 `tools/review_gate.py` 判定。
+- 桶 2 文件的默认评审模型是 `gpt-6-astra`，桶 3 文件仍是 `gpt-5.5`；两者在本机 Codex 上对 `ultra` 与 `xhigh` 都已实测可用。
+
+### 未采纳或留待以后
+
+- 可选未取：proof-orchestrator、interview-cheatsheet、aris-monitor、corpus_write_guard hook、`copilot_native_evidence.py`（`review_gate.py` 延迟导入它，只影响 Copilot 原生评审路径）。
+- `skills-codex-claude-review/`、`skills-codex-gemini-review/` 覆盖包及其生成器未更新，现已落后于主线。
+- README、AGENT_GUIDE 及其余 docs 留给以后的文档同步。
+
+### 仅存在于文字中的悬空引用（无害）
+
+`tools/check_skills_inventory.py`（fan-out-pattern，CI 工具）、`tools/poster_check.py` 与 `tools/render_preview.py`（paper-poster-html 的上游出处说明）、`tools/smart_update.sh`（wiki-helper-resolution 的修复提示，本地已删）、`tools/threat_patterns.py`（署名）；compute-env-contract 与 review-scope-limits 提到已归档的 vast-gpu、serverless-modal、qzcli。

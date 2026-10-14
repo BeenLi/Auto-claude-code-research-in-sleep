@@ -34,18 +34,54 @@ REPLACEMENTS_TEXT: list[tuple[str, str]] = [
     ("mcp__codex__codex-reply", "mcp__llm-chat__chat"),
     ("mcp__codex__codex", "mcp__llm-chat__chat"),
     # Description text
+    ("Always pin `model: gpt-6-astra` + `config: {\"model_reasoning_effort\": \"ultra\"}` (deep-audit tier).",
+     "Ask the LLM reviewer for its strictest, deepest review (deep-audit tier)."),
+    ("for new review threads\n  (`model: gpt-6-astra`, `config: {\"model_reasoning_effort\": \"ultra\"}`).",
+     "for new review threads."),
+    ("`model: gpt-6-astra`, `reasoning: ultra`", "the configured `LLM_MODEL`, deepest available reasoning"),
+    ("- **ALWAYS use `config: {\"model_reasoning_effort\": \"xhigh\"}`** for all Codex review calls.",
+     "- **Always ask the LLM reviewer for strict, high-rigor feedback** in every review round."),
+    ("ALWAYS pin `model: gpt-6-astra` + `config: {\"model_reasoning_effort\": \"ultra\"}` for reviews (deep-audit tier; capability fallback per `reviewer-routing.md`, never below `xhigh`)",
+     "ALWAYS ask the LLM reviewer for strict, maximum-depth review"),
+    ("Always use `model_reasoning_effort: \"xhigh\"` for maximum analysis depth.",
+     "Always ask the LLM reviewer for maximum analysis depth."),
+    ("(`gpt-6-astra` via Codex MCP)", "(via llm-chat MCP)"),
+    ("override the default reviewer (`gpt-6-astra`)", "override the default reviewer"),
+    ("via GPT-6-Astra xhigh review", "via llm-chat MCP review"),
+    ("via GPT-6-Astra ultra review", "via llm-chat MCP review"),
+    ("GPT-6-Astra xhigh", "LLM reviewer"),
+    ("GPT-6-Astra ultra", "LLM reviewer"),
     ("via GPT-5.5 xhigh review", "via llm-chat MCP review"),
     ("GPT-5.5 xhigh", "LLM reviewer"),
+    ("a second Codex agent", "an LLM via llm-chat MCP"),
     ("secondary Codex agent", "LLM reviewer via llm-chat MCP"),
     ("Codex agent", "LLM reviewer"),
-    ("a second Codex agent", "an LLM via llm-chat MCP"),
+    ("- ALWAYS use `config: {\"model_reasoning_effort\": \"xhigh\"}` for maximum reasoning depth",
+     "- ALWAYS ask the LLM reviewer for maximum reasoning depth"),
+    ("pin `model: gpt-6-astra` + `config: {\"model_reasoning_effort\": \"xhigh\"}` per `../shared-references/reviewer-routing.md`",
+     "ask for strict, high-rigor review"),
+    ("pin `model: gpt-6-astra` + `config: {\"model_reasoning_effort\": \"ultra\"}` (deep-audit tier)",
+     "ask for strict, maximum-depth review"),
+    ("with `model: gpt-6-astra`, `config: {model_reasoning_effort: xhigh}`, `sandbox: read-only`, fresh thread",
+     "with a fresh thread"),
+    ("with `model: gpt-6-astra`, `config: {model_reasoning_effort: ultra}`, `sandbox: read-only`, fresh thread",
+     "with a fresh thread"),
+    ("model_reasoning_effort: \"ultra\"", "# (reasoning effort not supported by llm-chat)"),
+    ("model_reasoning_effort: \"xhigh\"", "# (reasoning effort not supported by llm-chat)"),
+    ("model_reasoning_effort: ultra", "# (reasoning effort not supported by llm-chat)"),
+    ("model_reasoning_effort: xhigh", "# (reasoning effort not supported by llm-chat)"),
+    ("reasoning_effort: ultra", "# (reasoning effort not supported by llm-chat)"),
     ("reasoning_effort: xhigh", "# (reasoning effort not supported by llm-chat)"),
     ("reasoning_effort: high", "# (reasoning effort not supported by llm-chat)"),
 ]
 
 # Regex patterns for structural changes
 CONFIG_LINE_RE = re.compile(
-    r'^(\s*)config:\s*\{[^}]*model_reasoning_effort[^}]*\}\s*$',
+    r'^(\s*)(?:- )?`?config`?:\s*\{[^}]*model_reasoning_effort[^}]*\}`?\s*$',
+    re.MULTILINE,
+)
+MODEL_LINE_RE = re.compile(
+    r'^(\s*)(?:- )?`?"?model"?`?:\s*(?:["\'`]?gpt-[^\s"\'`]+["\'`]?|REVIEWER_MODEL)\s*$',
     re.MULTILINE,
 )
 THREAD_ID_LINE_RE = re.compile(
@@ -92,6 +128,7 @@ def convert_content(text: str) -> str:
     # 2. Remove Codex-specific parameter lines
     for pattern in (
         CONFIG_LINE_RE,
+        MODEL_LINE_RE,
         THREAD_ID_LINE_RE,
         APPROVAL_POLICY_LINE_RE,
         SANDBOX_LINE_RE,
@@ -119,6 +156,9 @@ def convert_content(text: str) -> str:
                 text = text[:fm_end + 1] + note + text[fm_end + 1:]
 
     # 5. Clean up multiple blank lines from removed lines
+    # the Codex tier-pinning bullet (auto-review-loop) has no meaning for an HTTP reviewer
+    text = re.sub(r"^- \*\*Codex backend:\*\* pin `model: [^`]+` \+ `config: .*$",
+                  "- ALWAYS ask the LLM reviewer for strict, high-rigor feedback", text, flags=re.MULTILINE)
     text = re.sub(r'\n{3,}', '\n\n', text)
 
     return text
@@ -178,6 +218,11 @@ def main() -> None:
         help="Target directory for converted skills (default: source, in-place)",
     )
     parser.add_argument(
+        "--force-in-place",
+        action="store_true",
+        help="Allow in-place conversion of the repo's canonical skills/ tree (dangerous)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview changes without writing files",
@@ -188,6 +233,17 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     source_dir = args.source or repo_root / "skills"
     target_dir = args.target or source_dir  # in-place by default
+
+    # Refuse to rewrite the repo's canonical skill tree in place — that destroys
+    # the Codex-native sources (this exact accident has happened). Convert INTO
+    # a separate --target, or pass --force-in-place if you really mean it.
+    canonical = (repo_root / "skills").resolve()
+    tgt = target_dir.resolve()
+    if (tgt == canonical or canonical in tgt.parents) \
+            and not args.dry_run and not args.force_in_place:
+        print("Error: refusing to convert the repo's canonical skills/ tree in place.")
+        print("Pass --target <dir> (recommended) or --force-in-place to override.")
+        sys.exit(1)
 
     if not source_dir.exists():
         print(f"Error: source directory not found: {source_dir}")

@@ -1,8 +1,8 @@
 ---
 name: paper-write
 description: "Draft LaTeX paper section by section from an outline. Use when user says \"写论文\", \"write paper\", \"draft LaTeX\", \"开始写\", or wants to generate LaTeX content from a paper plan."
-argument-hint: [venue-or-section]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, mcp__codex__codex, mcp__codex__codex-reply
+argument-hint: "[venue-or-section] [— style-ref: <source>]"
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
 # Paper Write: Section-by-Section LaTeX Generation
@@ -11,7 +11,7 @@ Draft a LaTeX paper based on: **$ARGUMENTS**
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.5`** — Model used via Codex MCP for section review. Must be an OpenAI model.
+- **REVIEWER_MODEL = `gpt-6-astra`** — Model used via Codex MCP for section review. Must be an OpenAI model.
 - **TARGET_VENUE = `ICLR`** — Default venue. Supported: `ICLR`, `NeurIPS`, `ICML`, `CVPR` (also ICCV/ECCV), `ACL` (also EMNLP/NAACL), `AAAI`, `ACM` (ACM MM, SIGIR, KDD, CHI, etc.), `IEEE_JOURNAL` (IEEE Transactions / Letters, e.g., T-PAMI, JSAC, TWC, TCOM, TSP, TIP), `IEEE_CONF` (IEEE conferences, e.g., ICC, GLOBECOM, INFOCOM, ICASSP). Determines style file and formatting.
 - **ANONYMOUS = true** — If true, use anonymous author block. Set `false` for camera-ready. Note: most IEEE venues do NOT use anonymous submission — set `false` for IEEE.
 - **MAX_PAGES = 9** — Main body page limit. For ML conferences: counts from first page to end of Conclusion section, references and appendix NOT counted. **For IEEE venues: references ARE counted toward the page limit.** Typical limits: IEEE journal = no strict limit (but 12-14 pages typical for Transactions, 4-5 for Letters), IEEE conference = 5-8 pages including references.
@@ -36,6 +36,71 @@ Keep the existing `insleep` workflow, file layout, and defaults. Use the shared 
 - Read `../shared-references/citation-discipline.md` only when the built-in DBLP/CrossRef workflow is insufficient.
 
 These references are support material, not extra workflow phases.
+
+## Optional: Style reference (`— style-ref: <source>`, opt-in)
+
+Lets the user steer **structural** style (section ordering, theorem density, sentence cadence, figure density, bibliography style) toward a reference paper. **Default OFF — when the user does not pass `— style-ref`, do nothing differently from before.**
+
+Only when `— style-ref: <source>` appears in `$ARGUMENTS`, run the helper FIRST, before drafting:
+
+```bash
+# Resolve $STYLE_HELPER via the canonical strict-safe chain (see
+# shared-references/integration-contract.md §2). Policy A — gate:
+# unresolved helper means --style-ref cannot be satisfied, so abort.
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
+    ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
+fi
+STYLE_HELPER=".aris/tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || STYLE_HELPER="tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || { [ -n "${ARIS_REPO:-}" ] && STYLE_HELPER="$ARIS_REPO/tools/extract_paper_style.py"; }
+[ -f "$STYLE_HELPER" ] || {
+  echo "ERROR: extract_paper_style.py not resolved at .aris/tools/, tools/, \$ARIS_REPO/tools/, or via ~/.aris/repo." >&2
+  echo "       Fix: rerun bash tools/install_aris.sh or smart_update.sh (refreshes ~/.aris/repo), export ARIS_REPO, or copy the helper to tools/." >&2
+  echo "       --style-ref cannot be satisfied; aborting." >&2
+  exit 1
+}
+STYLE_STATUS=0
+CACHE=$(python3 "$STYLE_HELPER" --source "<source>") || STYLE_STATUS=$?
+case "$STYLE_STATUS" in
+  0) ;;                                       # use $CACHE/style_profile.md as structural guidance
+  2) echo "warning: style-ref skipped (missing optional dep)" >&2 ;;
+  3) echo "error: --style-ref source failed; aborting draft" >&2 ; exit 1 ;;
+  *) echo "error: helper failed unexpectedly; aborting draft" >&2 ; exit 1 ;;
+esac
+```
+
+Sources accepted: local TeX dir / file, local PDF, arXiv id (`2501.12345` or `arxiv:2501.12345`), http(s) URL. Overleaf URLs and project IDs are rejected — clone via `/overleaf-sync setup <id>` first and pass the local clone path.
+
+**Strict rules** (full contract in `tools/extract_paper_style.py` docstring):
+
+- Use `style_profile.md` as **structural** guidance only. Match section count, section ordering tendency, theorem-environment density, caption-length distribution, sentence cadence, math display ratio, citation style.
+- **Never copy prose, claims, examples, or terminology** from anything reachable through the cache. The profile is intentionally aggregate; if you need substance, use the user's own outline.
+- **Never pass `— style-ref` (or the cache contents) to reviewer / auditor sub-agents.** Cross-model review independence (`../shared-references/reviewer-independence.md`) requires reviewers see only the artifact and the user's prompt, not the author's stylistic context.
+
+### `<!-- DATA_NEEDED -->` markers (when `GAP_REPORT.md` exists)
+
+If `/paper-plan` ran with `— style-ref:` it will have emitted `GAP_REPORT.md` alongside `PAPER_PLAN.md`. This file lists structural slots (ablation tables, scaling experiments, failure-case analyses, …) the exemplar implies but the user has **no evidence to fill**.
+
+When `GAP_REPORT.md` is present and a section slot is classified as `status: missing`:
+
+1. **Do not fabricate numerical results, figure references, or qualitative claims** to fill that slot.
+2. Emit an HTML-comment placeholder at the exact location the missing content would go:
+
+   ```latex
+   <!-- DATA_NEEDED: GAP_S5_ABLATION — ablation table comparing X across the 3 axes implied by exemplar -->
+   ```
+
+3. Slot ID and one-line description come straight from `GAP_REPORT.md`. **Never invent Slot IDs.** Never reword the description to be more confident than the report.
+4. The marker is intentionally an HTML comment so it is invisible in the rendered PDF but **searchable via `grep -r "DATA_NEEDED" sec/`** for human triage / `/experiment-bridge` follow-up.
+5. For `status: partial`, write what the user has and emit `<!-- DATA_NEEDED: <Slot ID> — <what specifically is short> -->` at the gap point in the same paragraph (do not split the section).
+
+**Carve-out from "no placeholder" rule.** The default `/paper-write` discipline (no placeholders such as "see supplementary" or "TBD") still applies for everything **except** GAP_REPORT-listed missing slots. The marker is the principled way to surface genuine evidence deficits without compromising claim integrity.
+
+Original idea: @zhangpelf in [#217](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/217).
 
 ## Templates
 
@@ -142,7 +207,7 @@ Process sections in order. For each section:
 
 1. **Read the plan** — what claims, evidence, citations belong here
 2. **Read NARRATIVE_REPORT.md** — extract relevant content, findings, and quantitative results
-3. **Draft content** — write complete LaTeX (not placeholders)
+3. **Draft content** — write complete LaTeX (no fabricated placeholders). **Exception:** if `GAP_REPORT.md` exists and the section has slots with `status: missing`, emit `<!-- DATA_NEEDED: <Slot ID> — <description> -->` at those points instead of inventing data — see the DATA_NEEDED markers subsection above.
 4. **Insert figures/tables** — use snippets from `figures/latex_includes.tex`
 5. **Add citations** — for ML conferences (ICLR/NeurIPS/ICML/CVPR/ACL/AAAI): use `\citep{}` / `\citet{}` (natbib). **For IEEE venues**: use `\cite{}` (numeric style via `cite` package). Never mix natbib and cite commands.
 
@@ -196,7 +261,7 @@ Before drafting the front matter, re-read the one-sentence contribution from `PA
 
 **§5 Conclusion:**
 - Summarize contributions (NOT copy-paste from intro — rephrase)
-- Limitations (be honest — reviewers appreciate this)
+- Limitations (2-4 material, specific limits — dataset scale, compute regime, assumption X; real ones only, never invented to fill a count. This section is the ONLY home for generic caveats)
 - Future work (1-2 concrete directions)
 - Ethics statement and reproducibility statement (if venue requires)
 - Target: 0.5 pages
@@ -237,7 +302,7 @@ If no standalone full-proof source exists:
 - If the appendix needs different wording, add an explicit notation bridge instead of silently renaming concepts
 - Resolve all mismatches before Step 4
 
-**Empirical motivation:** in our April 2026 NeurIPS run, the default behavior generated `"see supplementary proof document"` placeholders in the appendix. We had to manually pull 1264 lines of full proofs from a standalone `proof_dllm_full.tex` file. Without this pass, theory papers ship with sketch-only appendices that fail at theory venues.
+**Empirical motivation:** in a real theory-paper run, the default behavior generated `"see supplementary proof document"` placeholders in the appendix. The author had to manually pull hundreds of lines of full proofs from a standalone proofs file (e.g. `proof_full.tex`). Without this pass, theory papers ship with sketch-only appendices that fail at theory venues.
 
 ### Step 4: Build Bibliography
 
@@ -382,7 +447,7 @@ If `VERIFY` or `MISMATCH` is printed, do not invent metadata:
 
 **Citation reachability rule:** an entry is dead if its key does not appear in any `\cite...{}` command in `paper/main.tex` or any `paper/sections/*.tex` file.
 
-**Empirical motivation:** in our April 2026 NeurIPS run, 3 dead bib entries (`bresler2015`, `sedd2024`, `wainwright2008`) sat in `references.bib` for 5+ improvement rounds, and a `codd2025` entry had `year = {2026}` (key/year mismatch). Neither was flagged by the existing automated cleaning.
+**Empirical motivation:** in a real submission run, several dead bib entries sat in `references.bib` for many improvement rounds, and at least one entry had a key/year mismatch. Neither was flagged by the existing automated cleaning.
 
 **Citation verification rules (from claude-scholar + Imbad0202):**
 1. Every BibTeX entry must have: author, title, year, venue/journal
@@ -425,7 +490,9 @@ Remove AI-isms: delve, pivotal, landscape, tapestry, underscore, noteworthy, int
 
 Passive voice IS acceptable for: established facts, methods where agent is irrelevant, or when required by venue style.
 
-**Pass 3: Sentence Architecture** — Structure and flow.
+**Pass 3: Sentence Architecture** — Structure and flow. Vary paragraph shape:
+if every paragraph runs problem → method → benefit → summary, the mold numbs
+the reader — break it.
 
 - Flag sentences > 40 words for splitting
 - Ensure subject and verb are close together (no long parenthetical insertions between them)
@@ -454,14 +521,21 @@ Passive voice IS acceptable for: established facts, methods where agent is irrel
 
 ### Step 6: Cross-Review with REVIEWER_MODEL
 
-Send the complete draft to GPT-5.5 xhigh:
+Send the complete draft to GPT-6-Astra xhigh:
 
 ```
 mcp__codex__codex:
-  model: gpt-5.5
+  model: gpt-6-astra
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     Review this [VENUE] paper draft (main body, excluding appendix).
+
+    Judge claim calibration in BOTH directions. Recommend narrowing only when the
+    current scope or modality exceeds the evidence; do not ask for extra hedges
+    around a supported result. Flag stacked hedges, self-defence ("we do not
+    claim"), instruction confessions ("we do not address X"), and generic caveats
+    outside Limitations as writing defects to remove. Tone fixes must never alter
+    facts, negation, modality, scope, comparison direction, or numbers.
 
     Focus on:
     1. Does each claim from the intro have supporting evidence?
@@ -512,19 +586,88 @@ Before declaring done:
 
 ## Key Rules
 
+=== CONFIDENT PROSE, HONEST LIMITS (never upgrades claims) ===
+1. Calibrate each claim to the evidence's actual scope and modality, then state
+   that calibrated claim directly. Necessary assumptions, uncertainty, and
+   scope are part of the claim; stacked hedges and defensive throat-clearing
+   are not.
+2. If the current claim is unsupported, narrow it to a version the evidence
+   supports or cut it. Do not substitute a softer-sounding synonym for fixing
+   scope, modality, comparison, or aggregation.
+3. Put generic caveats and broader boundary discussion in one Limitations
+   section. Outside it, remove generic disclaimers such as "further research
+   is needed", "may not generalize", and "should be interpreted with caution".
+   Claim-defining scope, assumptions, and statistical qualifications stay
+   attached to the claims they make true.
+4. Aim for 2-4 material, specific limitations (dataset scale, compute regime,
+   assumption X). Real ones only — never invent one to meet a count, never
+   apologize generically, never repeat the same limitation through the paper.
+5. Writing instructions are not manuscript content. "Do not mention X" means
+   omit X, not write "we do not address/claim/discuss X". Never expose
+   drafting instructions, requested omissions, reviewer feedback, or revision
+   history in manuscript prose.
+6. Replace self-defence ("we do not claim", "our goal is merely") with a
+   positive, evidence-matched statement of what the paper does establish. If
+   the defensive sentence carries a real boundary, keep that boundary in the
+   claim or Limitations; do not delete truth-conditional content.
+7. Tone-only edits never alter facts, negation, modality, scope, assumptions,
+   comparison direction, aggregation, numbers, formulas, or citations. Genuine
+   overclaims must still be narrowed; supported claims wrapped in redundant
+   caution must be stated directly.
+8. One causal spine: gap -> question -> insight -> consequence -> evidence ->
+   implication. Every section advances it. Make the method feel inevitable:
+   the gap creates a concrete question, the key insight answers it, the method
+   follows from the insight, each major experiment tests a consequence of it,
+   and the conclusion states exactly what the evidence establishes.
+   Front-load the contribution; never narrate the drafting or revision process.
+9. The paper is a launch, not a progress report. Organize the narrative
+   around the work's strongest genuine advantage — a new capability, problem,
+   mechanism or viewpoint, wider applicability, lower cost, a better tradeoff.
+   Material that does not form an advantage stays out of the main line. If the
+   results cannot carry the original story, rebuild the story around the
+   strongest evidence instead of defending the original one.
+10. Pick the contest the paper wins. Do not build the narrative on a metric
+    where the method is not ahead; frame the comparison around the task
+    definition, evaluation dimension or constraint that reflects what the
+    method is for, and say explicitly which contest it wins. Unfavorable
+    numbers still appear — tables stay complete. Where the evidence supports
+    it, explain them as a goal difference or a deliberate tradeoff rather
+    than narrating a defeat ("underperforms", "fails to surpass"); where it
+    does not, state the underperformance neutrally, narrow the claim, and
+    keep it in Limitations if it is material. Never elevate a local
+    observation into a verdict on the whole method, and never invent a
+    tradeoff to cover a weakness.
+11. Every experiment has an argumentative duty: it shows the method works,
+    shows the gain comes from the key mechanism, shows value in the target
+    scenario, or rules out the most likely alternative explanation. An
+    experiment carrying none of these is cut, shortened, moved to the
+    appendix, or redesigned. The experiments section is an argument, not a
+    results warehouse.
+12. State the advantage yourself — under which condition it appears, why it
+    appears, what it solves — rather than expecting the reviewer to find it
+    in a table. Abstract and introduction open like a launch: an important
+    unsolved problem, the gap in existing methods, this paper's distinct
+    idea, the heaviest result. The conclusion reinforces what was solved,
+    proposed and proven and why it matters; no new self-negation or widened
+    limitations in the last paragraph.
+
+
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 - **Do NOT generate author names, emails, or affiliations** — use anonymous block or placeholder
 - **Write complete sections, not outlines** — the output should be compilable LaTeX
 - **One file per section** — modular structure for easy editing
 - **Every claim must cite evidence** — cross-reference the Claims-Evidence Matrix
 - **Compile-ready** — the output should compile with `latexmk` without errors (modulo missing figures)
-- **No over-claiming** — use hedging language ("suggests", "indicates") for weak evidence
+- **Calibrate, don't hedge** — match each claim to its evidence's actual scope and modality, then state it directly; generic caveats live in Limitations only (the CONFIDENT PROSE, HONEST LIMITS block above is the contract)
+- **Launch, not progress report** — organize around the strongest genuine advantage, pick the contest the paper wins, give every experiment an argumentative duty; unfavorable numbers stay in the tables, explained as tradeoffs where the evidence supports that and stated neutrally where it does not — never narrated as defeats, never dressed as a tradeoff they are not (rules 9-12 above)
 - **Venue style matters** — ML conferences (ICLR/NeurIPS/ICML) use `natbib` (`\citep`/`\citet`); **IEEE venues use `cite` package (`\cite{}`, numeric)**. Never mix.
 - **Page limit rules differ by venue** — ML conferences: main body to Conclusion, references/appendix NOT counted. **IEEE: references ARE counted toward the page limit.**
 - **Clean bib** — references.bib must only contain entries that are actually `\cite`d
 - **Section count is flexible** — match PAPER_PLAN structure, don't force into 5 sections
 - **Backup before overwrite** — never destroy existing `paper/` directory without backing up
 - **Front-load the contribution** — do not hide the payoff until the experiments or appendix
+- **Order results by argument, not by lab notebook** — present experiments in the sequence that best builds the case, never in the order they happened to run
+- **Controls and ablations sit next to the claim they test** — not pooled in a distant subsection where the reader has forgotten what was at stake
 
 ## Writing Quality Reference
 

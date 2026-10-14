@@ -11,6 +11,10 @@ Set MINIMAX_API_KEY environment variable to run live API tests.
 Tests marked with @unittest.skipUnless will be skipped without the API key.
 """
 
+import pytest
+
+pytest.importorskip("httpx", reason="local fork: these tests load the real server, which needs httpx (pip install httpx)")
+
 import json
 import os
 import sys
@@ -55,10 +59,13 @@ class TestMCPInitializationFlow(unittest.TestCase):
         self.assertEqual(len(tools), 1)
         self.assertEqual(tools[0]["name"], "minimax_chat")
 
-        # Verify M2.7 models are listed
+        # Verify M3 + M2.7 models are listed
         model_enum = tools[0]["inputSchema"]["properties"]["model"]["enum"]
+        self.assertIn("MiniMax-M3", model_enum)
         self.assertIn("MiniMax-M2.7", model_enum)
         self.assertIn("MiniMax-M2.7-highspeed", model_enum)
+        # Older M2.5 variants have been removed
+        self.assertNotIn("MiniMax-M2.5", model_enum)
 
     def test_ping_during_session(self):
         """Ping should work at any point during the session."""
@@ -74,7 +81,7 @@ class TestEndToEndToolCall(unittest.TestCase):
     """Test full tool call lifecycle with mocked API."""
 
     @patch('_minimax_helpers.MINIMAX_API_KEY', 'test-integration-key')
-    @patch('_minimax_helpers.httpx.Client')
+    @patch('httpx.Client')
     def test_chat_with_system_and_temperature(self, mock_client_cls):
         """Full tool call with system prompt, custom model, and temperature."""
         mock_response = MagicMock()
@@ -125,7 +132,7 @@ class TestEndToEndToolCall(unittest.TestCase):
         self.assertEqual(payload["messages"][1]["role"], "user")
 
     @patch('_minimax_helpers.MINIMAX_API_KEY', 'test-key')
-    @patch('_minimax_helpers.httpx.Client')
+    @patch('httpx.Client')
     def test_temperature_zero_clamped_in_full_flow(self, mock_client_cls):
         """Temperature=0 should be clamped to 0.01 in the full tool call flow."""
         mock_response = MagicMock()
@@ -160,6 +167,25 @@ class TestLiveAPI(unittest.TestCase):
 
     Only run when MINIMAX_API_KEY is set in the environment.
     """
+
+    def test_live_m3_chat(self):
+        """Live test: send a simple prompt to MiniMax-M3 (default)."""
+        from _minimax_helpers import call_minimax
+        # Temporarily set the API key
+        import _minimax_helpers
+        original_key = _minimax_helpers.MINIMAX_API_KEY
+        _minimax_helpers.MINIMAX_API_KEY = MINIMAX_API_KEY
+        try:
+            content, error = call_minimax(
+                [{"role": "user", "content": "Say 'hello' and nothing else."}],
+                model="MiniMax-M3",
+                temperature=0.1
+            )
+            self.assertIsNone(error, f"API returned error: {error}")
+            self.assertIsNotNone(content)
+            self.assertIn("hello", content.lower())
+        finally:
+            _minimax_helpers.MINIMAX_API_KEY = original_key
 
     def test_live_m27_chat(self):
         """Live test: send a simple prompt to MiniMax-M2.7."""
@@ -207,7 +233,7 @@ class TestLiveAPI(unittest.TestCase):
                 resp = client.post(
                     "https://api.minimax.io/v1/chat/completions",
                     headers={"Content-Type": "application/json"},
-                    json={"model": "MiniMax-M2.7", "messages": []}
+                    json={"model": "MiniMax-M3", "messages": []}
                 )
                 # Should get 401 (no auth) or 400 (bad request), NOT connection error
                 self.assertIn(resp.status_code, [400, 401, 403, 422])

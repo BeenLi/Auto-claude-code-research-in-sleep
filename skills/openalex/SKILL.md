@@ -1,7 +1,7 @@
 ---
 name: openalex
 description: Search academic papers via OpenAlex API for open citation data, institutional affiliations, and funding information. Use when user says "openalex search", "search openalex", "open citation graph", or wants comprehensive academic metadata beyond arXiv/Semantic Scholar.
-argument-hint: [search-query]
+argument-hint: "[search-query]"
 allowed-tools: Bash(*), Read, Write
 ---
 
@@ -33,7 +33,10 @@ Use OpenAlex when you want:
 
 - **MAX_RESULTS = 10** — Default number of results. Override with `— max: 20`.
 - **DEFAULT_SORT = relevance** — Sort by relevance. Override with `— sort: citations` or `— sort: date`.
-- **FETCH_SCRIPT** — `tools/openalex_fetch.py` relative to the project root.
+- **OPENALEX_FETCHER** — canonical name `openalex_fetch.py`, resolved per
+  [`shared-references/integration-contract.md`](../shared-references/integration-contract.md) §2
+  (Policy D1 — standalone `/openalex` has no documented inline fallback,
+  so unresolved helper terminates with an explicit error).
 
 > Overrides (append to arguments):
 > - `/openalex "topic" — max: 20` — return up to 20 results
@@ -59,13 +62,13 @@ Use OpenAlex when you want:
    ```bash
    # Copy from template
    cp .claude/.env.example .claude/.env
-
+   
    # Edit and add your keys
    # .claude/.env
    OPENALEX_API_KEY=your-key-here
    OPENALEX_EMAIL=your-email@example.com
    ```
-
+   
    Claude Code automatically loads `.claude/.env` as environment variables.
 
 3. **Get API keys** (optional but recommended):
@@ -75,8 +78,10 @@ Use OpenAlex when you want:
 ### Verify Setup
 
 ```bash
-python3 tools/openalex_fetch.py search "machine learning" --max 3
+python3 "$OPENALEX_FETCHER" search "machine learning" --max 3
 ```
+
+(Resolve `$OPENALEX_FETCHER` via the canonical chain first — see Step 2 below.)
 
 ## Workflow
 
@@ -93,27 +98,42 @@ Parse `$ARGUMENTS` for:
 
 ### Step 2: Locate Script
 
-```bash
-SCRIPT=$(find tools/ -name "openalex_fetch.py" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find ~/.claude/skills/openalex/ -name "openalex_fetch.py" 2>/dev/null | head -1)
-```
+Resolve `$OPENALEX_FETCHER` via the canonical strict-safe chain (see
+[`shared-references/integration-contract.md`](../shared-references/integration-contract.md) §2).
+Policy D1: there is no native inline fallback for OpenAlex
+(retrieval requires the `requests` SDK + optional API key — the
+fetcher script encapsulates pagination, throttling, and per-source
+parameters), so unresolved helper terminates with explicit remediation.
 
-If not found, tell the user:
-```
-openalex_fetch.py not found. Make sure tools/openalex_fetch.py exists and requests is installed:
-  pip install requests
+```bash
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
+    ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
+fi
+OPENALEX_FETCHER=".aris/tools/openalex_fetch.py"
+[ -f "$OPENALEX_FETCHER" ] || OPENALEX_FETCHER="tools/openalex_fetch.py"
+[ -f "$OPENALEX_FETCHER" ] || { [ -n "${ARIS_REPO:-}" ] && OPENALEX_FETCHER="$ARIS_REPO/tools/openalex_fetch.py"; }
+[ -f "$OPENALEX_FETCHER" ] || {
+  echo "ERROR: openalex_fetch.py not resolved at .aris/tools/, tools/, \$ARIS_REPO/tools/, or via ~/.aris/repo." >&2
+  echo "       Fix: rerun bash tools/install_aris.sh or smart_update.sh (refreshes ~/.aris/repo), export ARIS_REPO, or copy the helper to tools/." >&2
+  echo "       Also ensure 'requests' is installed: pip install requests" >&2
+  exit 1
+}
 ```
 
 ### Step 3: Execute Search
 
 **Basic search:**
 ```bash
-python3 "$SCRIPT" search "QUERY" --max 10
+python3 "$OPENALEX_FETCHER" search "QUERY" --max 10
 ```
 
 **With filters:**
 ```bash
-python3 "$SCRIPT" search "QUERY" --max 10 \
+python3 "$OPENALEX_FETCHER" search "QUERY" --max 10 \
   --year 2023- \
   --type article \
   --open-access \
@@ -123,12 +143,12 @@ python3 "$SCRIPT" search "QUERY" --max 10 \
 
 **Get specific work by DOI:**
 ```bash
-python3 "$SCRIPT" work "10.1109/TWC.2024.1234567"
+python3 "$OPENALEX_FETCHER" work "10.1109/TWC.2024.1234567"
 ```
 
 **Get specific work by OpenAlex ID:**
 ```bash
-python3 "$SCRIPT" work "W2741809807"
+python3 "$OPENALEX_FETCHER" work "W2741809807"
 ```
 
 ### Step 4: Parse Results
@@ -156,7 +176,7 @@ Format results as a structured table:
 
 ```
 | # | Title | Venue | Year | Citations | OA | Summary |
-|---|-------|-------|------|-----------|----|---------|
+|---|-------|-------|------|-----------|----|---------| 
 | 1 | ... | IEEE TWC | 2024 | 156 | ✓ | ... |
 | 2 | ... | NeurIPS | 2023 | 89 | ✓ | ... |
 ```

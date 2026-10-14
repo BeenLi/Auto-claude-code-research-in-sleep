@@ -287,6 +287,8 @@ def run_claude_review(
             cmd,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             stdin=subprocess.DEVNULL,
             timeout=DEFAULT_TIMEOUT_SEC,
             check=False,
@@ -294,9 +296,9 @@ def run_claude_review(
     except subprocess.TimeoutExpired:
         return None, f"Claude review timed out after {DEFAULT_TIMEOUT_SEC} seconds"
 
-    payload, parse_error = parse_claude_json(result.stdout)
+    payload, parse_error = parse_claude_json(result.stdout or "")
     if parse_error:
-        stderr = result.stderr.strip()
+        stderr = (result.stderr or "").strip()
         message = parse_error if not stderr else f"{parse_error}. stderr: {stderr}"
         return None, message
 
@@ -319,7 +321,7 @@ def run_claude_review(
             payload.get("result")
             or payload.get("error")
             or errors_text
-            or result.stderr.strip()
+            or (result.stderr or "").strip()
             or "Claude review failed"
         )
         return None, message

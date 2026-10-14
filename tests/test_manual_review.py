@@ -10,6 +10,7 @@ Covers:
 7. Concurrency (fail-fast on second review)
 """
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -23,13 +24,25 @@ from pathlib import Path
 
 import pytest
 
-# Add the server directory to path for import
-SERVER_DIR = Path(__file__).parent.parent / "mcp-servers" / "manual-review"
-sys.path.insert(0, str(SERVER_DIR))
-
-# Prevent auto-open browser during tests
-os.environ["MANUAL_REVIEW_AUTO_OPEN"] = "false"
+# Set env BEFORE loading the server: server.py reads MANUAL_REVIEW_AUTO_OPEN
+# and MANUAL_REVIEW_TIMEOUT_SEC at import time into module constants, so these
+# must be in place before exec_module (the old per-test `import server` ran
+# after this block; loading once at module level does not).
+os.environ["MANUAL_REVIEW_AUTO_OPEN"] = "false"   # no browser popup in tests
 os.environ["MANUAL_REVIEW_TIMEOUT_SEC"] = "10"
+
+# Load the server by explicit path under a UNIQUE module name. A bare
+# `import server` is unsafe here: every mcp-server is named server.py, and
+# sibling test modules (e.g. test_minimax_chat_server) do
+# `sys.path.insert(0, <their-server-dir>)` at collection time — so by the time
+# these tests run, a bare `import server` can resolve to the wrong server and
+# fail with AttributeError. spec_from_file_location sidesteps sys.path entirely.
+SERVER_DIR = Path(__file__).parent.parent / "mcp-servers" / "manual-review"
+_SRV_SPEC = importlib.util.spec_from_file_location(
+    "manual_review_server", SERVER_DIR / "server.py")
+assert _SRV_SPEC and _SRV_SPEC.loader
+srv = importlib.util.module_from_spec(_SRV_SPEC)
+_SRV_SPEC.loader.exec_module(srv)
 
 
 def _send_jsonrpc(proc, method, params=None, req_id=1):
@@ -104,7 +117,6 @@ def _start_server(**extra_env):
 # Test 1: Module import
 # ============================================================
 def test_import():
-    import server as srv
     assert hasattr(srv, "handle_request")
     assert hasattr(srv, "create_thread")
     assert hasattr(srv, "do_review")
@@ -156,7 +168,6 @@ def test_tools_list():
 # Test 4: Thread management
 # ============================================================
 def test_thread_management():
-    import server as srv
     tid = srv.create_thread()
     assert tid and len(tid) == 12, f"bad thread id: {tid}"
     srv.append_exchange(tid, "user", "hello")
@@ -174,7 +185,6 @@ import socketserver
 # Test 5: Browser mode — HTTP server + submit flow
 # ============================================================
 def test_browser_mode_http():
-    import server as srv
 
     prompt = "Test review prompt for unit testing"
     config = {"model_reasoning_effort": "xhigh"}
@@ -264,10 +274,48 @@ def test_browser_mode_http():
 
 
 # ============================================================
+# Strict cross-family identity gate
+# ============================================================
+
+def test_strict_manual_reviewer_identity_gate():
+    strict_openai = {
+        "require_reviewer_model": True,
+        "executor_model": "gpt-5.4",
+    }
+
+    assert srv.validate_reviewer_identity(
+        "Reviewer-Model: claude-sonnet-4.5\n\nScore: 7/10", strict_openai
+    ) is None
+    assert "must begin" in srv.validate_reviewer_identity(
+        "Score: 7/10", strict_openai
+    )
+    assert "different model family" in srv.validate_reviewer_identity(
+        "Reviewer-Model: gpt-6-astra\n\nScore: 7/10", strict_openai
+    )
+    assert "model family" in srv.validate_reviewer_identity(
+        "Reviewer-Model: mystery-model\n\nScore: 7/10", strict_openai
+    )
+
+    # Legacy/manual uses that do not request a verdict-bearing identity gate
+    # retain their existing transport behavior.
+    assert srv.validate_reviewer_identity("Score: 7/10", {}) is None
+
+
+def test_file_mode_warning_uses_actual_executor_family():
+    warning = srv.file_mode_warning({
+        "require_reviewer_model": True,
+        "executor_model": "gpt-5.4",
+    })
+    assert "gpt-5.4" in warning
+    assert "openai" in warning
+    assert "Reviewer-Model: <exact-model-id>" in warning
+    assert "non-Claude" not in warning
+
+
+# ============================================================
 # Test 6: File mode — prompt + response + cross-model warning
 # ============================================================
 def test_file_mode():
-    import server as srv
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = srv.PENDING_DIR
@@ -314,8 +362,8 @@ def test_file_mode():
 
             content = prompt_path.read_text(encoding="utf-8")
             assert "Cross-Model Warning" in content, "missing cross-model warning"
-            assert "do NOT paste this prompt into any Claude product" in content, \
-                "missing Claude-specific warning"
+            assert "DIFFERENT model family" in content, \
+                "missing executor-agnostic cross-family warning"
             assert "File mode test prompt" in content, f"wrong content: {content[:200]}"
 
             # Simulate user writing response
@@ -339,7 +387,6 @@ def test_file_mode():
 # Test 7: File mode — empty file rejected
 # ============================================================
 def test_file_mode_empty_rejected():
-    import server as srv
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = srv.PENDING_DIR
@@ -405,7 +452,6 @@ def test_file_mode_empty_rejected():
 # Test 8: review rejects empty prompt
 # ============================================================
 def test_review_missing_prompt():
-    import server as srv
     resp = srv.handle_review({"prompt": ""}, 99, threading.Event(), "")
     assert resp["result"].get("isError") is True, f"unexpected: {resp}"
 
@@ -414,7 +460,6 @@ def test_review_missing_prompt():
 # Test 9: review_reply rejects unknown threadId
 # ============================================================
 def test_review_reply_unknown_thread():
-    import server as srv
     resp = srv.handle_review_reply(
         {"threadId": "nonexistent", "prompt": "hi"}, 100, threading.Event(), "",
     )
@@ -425,7 +470,6 @@ def test_review_reply_unknown_thread():
 # Test 10: Pending state file
 # ============================================================
 def test_pending_state():
-    import server as srv
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = srv.PENDING_DIR
@@ -448,7 +492,6 @@ def test_pending_state():
 # Test 11: File mode cancellation via _PendingCall
 # ============================================================
 def test_file_mode_cancelled():
-    import server as srv
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = srv.PENDING_DIR

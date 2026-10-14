@@ -19,7 +19,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -29,12 +32,36 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 _ATOM_NS = "http://www.w3.org/2005/Atom"
-_API_BASE = "http://export.arxiv.org/api/query"
-_USER_AGENT = (
-    "arxiv-skill/1.0 "
-    "(github.com/wanshuiyin/Auto-claude-code-research-in-sleep)"
-)
+_API_BASE = "https://export.arxiv.org/api/query"
 _MIN_PDF_BYTES = 10_240
+
+
+def _validate_pdf(size_bytes: int, first_bytes: bytes) -> None:
+    """Reject truncated downloads and non-PDF response bodies."""
+    if size_bytes < _MIN_PDF_BYTES:
+        raise ValueError(
+            f"Downloaded file is only {size_bytes} bytes - likely an error page, not a PDF"
+        )
+    if b"%PDF-" not in first_bytes[:1024]:
+        raise ValueError("Downloaded file has no PDF header - likely an error page, not a PDF")
+
+
+def _arxiv_user_agent() -> str:
+    """Descriptive User-Agent for arXiv API calls.
+
+    arXiv rate-limits the default ``Python-urllib/x.y`` agent far more
+    aggressively than a named client; sending a descriptive UA (with an
+    optional contact address) lands requests in arXiv's more lenient pool.
+    The contact is read from ``ARIS_VERIFY_EMAIL`` — the same env var
+    ``tools/research_wiki.py`` and ``tools/verify_papers.py`` already use —
+    so no address is hard-coded. Falls back to a contactless UA when unset.
+    """
+    contact = os.environ.get("ARIS_VERIFY_EMAIL", "").strip()
+    base = ("arxiv-skill/1.0 "
+            "(+https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)")
+    return f"{base} (mailto:{contact})" if contact else base
+
+
 _NEW_STYLE_ID_RE = re.compile(r"^\d{4}\.\d{4,5}(v\d+)?$")
 _OLD_STYLE_ID_RE = re.compile(r"^[A-Za-z.-]+/\d{7}(v\d+)?$")
 
@@ -75,11 +102,59 @@ def _api_url(query: str, max_results: int, start: int) -> str:
     return f"{_API_BASE}?{urllib.parse.urlencode(params)}"
 
 
+def _curl_get(url: str, headers: dict, timeout: float) -> bytes | None:
+    """Re-issue a GET through ``curl`` after urllib was answered HTTP 406.
+
+    export.arxiv.org refuses urllib from some networks for minutes at a time
+    while curl gets 200 on the same URL, so retrying urllib cannot recover.
+    Returns the body, or None when curl is missing or the request fails.
+    """
+    curl = shutil.which("curl")
+    if curl is None:
+        return None
+    cmd = [curl, "-sf", "--max-time", str(int(timeout))]
+    for key, value in headers.items():
+        cmd += ["-H", f"{key}: {value}"]
+    proc = subprocess.run(cmd + [url], capture_output=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
 def _fetch_atom(url: str) -> ET.Element:
-    """Fetch an arXiv Atom feed and return the parsed XML root."""
-    req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return ET.fromstring(resp.read())
+    """Fetch an arXiv Atom feed and return the parsed XML root.
+
+    Sends a descriptive User-Agent (landing requests in arXiv's lenient pool)
+    and retries up to 3 times on HTTP 429, transient network errors, and the
+    plain-text ``Rate exceeded.`` body the API sometimes returns with 200 OK.
+    Raises RuntimeError when all retries are exhausted.
+    """
+    headers = {"User-Agent": _arxiv_user_agent()}
+    req = urllib.request.Request(url, headers=headers)
+    for attempt in (1, 2, 3):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = resp.read()
+        except urllib.error.HTTPError as e:
+            rescued = _curl_get(url, headers, 30) if e.code == 406 else None
+            if rescued is not None:
+                body = rescued
+            elif e.code in (406, 408, 429) and attempt < 3:
+                time.sleep(5 * attempt)
+                continue
+            else:
+                raise RuntimeError(f"arXiv API fetch failed: {e}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            if attempt < 3:
+                time.sleep(2 * attempt)
+                continue
+            raise RuntimeError(f"arXiv API fetch failed: {e}")
+        if body.strip() == b"Rate exceeded.":
+            if attempt < 3:
+                time.sleep(5 * attempt)
+                continue
+            raise RuntimeError("arXiv API rate-limited after 3 attempts")
+        return ET.fromstring(body)
+    # unreachable; loop either returns or raises
+    raise RuntimeError("arXiv API fetch failed: exhausted retries")
 
 
 def _parse_entry(entry: ET.Element) -> dict:
@@ -129,33 +204,47 @@ def download(arxiv_id: str, output_dir: str = "papers") -> dict:
     dest = dest_dir / f"{safe_id}.pdf"
 
     if dest.exists():
+        size_bytes = dest.stat().st_size
+        with dest.open("rb") as cached_file:
+            first_bytes = cached_file.read(1024)
+        try:
+            _validate_pdf(size_bytes, first_bytes)
+        except ValueError:
+            # Poisoned cache entry (e.g. an HTML error page saved as .pdf by an
+            # older version): drop it so the next call re-downloads instead of
+            # failing forever.
+            dest.unlink()
+            raise
         return {
             "id": clean_id,
             "path": str(dest),
-            "size_kb": dest.stat().st_size // 1024,
+            "size_kb": size_bytes // 1024,
             "skipped": True,
         }
 
     pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
-    req = urllib.request.Request(pdf_url, headers={"User-Agent": _USER_AGENT})
+    req = urllib.request.Request(pdf_url, headers={"User-Agent": _arxiv_user_agent()})
 
-    for attempt in (1, 2):
+    data = b""
+    for attempt in (1, 2, 3):
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = resp.read()
             break
         except urllib.error.HTTPError as exc:
-            if exc.code == 429 and attempt == 1:
-                time.sleep(5)
+            if exc.code == 429 and attempt < 3:
+                time.sleep(5 * attempt)
                 continue
             raise
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt < 3:
+                time.sleep(2 * attempt)
+                continue
+            raise RuntimeError(f"Failed to download {pdf_url}: {exc}")
     else:
-        raise RuntimeError(f"Failed to download {pdf_url} after retries")
+        raise RuntimeError(f"Failed to download {pdf_url} after 3 attempts")
 
-    if len(data) < _MIN_PDF_BYTES:
-        raise ValueError(
-            f"Downloaded file is only {len(data)} bytes - likely an error page, not a PDF"
-        )
+    _validate_pdf(len(data), data)
 
     dest.write_bytes(data)
     return {
@@ -173,24 +262,33 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    def _add_search_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "query",
+            help="Search query or arXiv ID (bare ID or id:ARXIV_ID).",
+        )
+        p.add_argument(
+            "--max",
+            type=int,
+            default=10,
+            metavar="N",
+            help="Maximum number of results (default: 10).",
+        )
+        p.add_argument(
+            "--start",
+            type=int,
+            default=0,
+            help="Start offset for pagination (default: 0).",
+        )
+
     search_parser = subparsers.add_parser("search", help="Search arXiv papers")
-    search_parser.add_argument(
-        "query",
-        help="Search query or arXiv ID (bare ID or id:ARXIV_ID).",
-    )
-    search_parser.add_argument(
-        "--max",
-        type=int,
-        default=10,
-        metavar="N",
-        help="Maximum number of results (default: 10).",
-    )
-    search_parser.add_argument(
-        "--start",
-        type=int,
-        default=0,
-        help="Start offset for pagination (default: 0).",
-    )
+    _add_search_args(search_parser)
+
+    # Defensive aliases — models frequently hallucinate `get` / `fetch`
+    # instead of `search`.  Accept them silently so the invocation succeeds
+    # regardless of model quality.
+    for alias in ("get", "fetch"):
+        _add_search_args(subparsers.add_parser(alias, help="Alias for search"))
 
     download_parser = subparsers.add_parser("download", help="Download a paper PDF by arXiv ID")
     download_parser.add_argument(
@@ -216,7 +314,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
-    if args.command == "search":
+    if args.command in ("search", "get", "fetch"):
         results = search(args.query, max_results=args.max, start=args.start)
         print(json.dumps(results, ensure_ascii=False, indent=2))
         return 0

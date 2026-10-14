@@ -1,7 +1,7 @@
 ---
 name: experiment-queue
 description: Generic simulator/job queue for Computer Architecture experiments, including gem5, Broadcom/csg-htsim, window-level co-simulation, RTL/synthesis jobs, and micro-benchmark sweeps. Use for batch experiments, simulator grids, multi-phase runs, or when /run-experiment is insufficient.
-argument-hint: [manifest-or-grid-spec]
+argument-hint: "[manifest-or-grid-spec]"
 allowed-tools: Bash(*), Read, Grep, Glob, Edit, Write, Agent, Skill(run-experiment), Skill(monitor-experiment)
 ---
 

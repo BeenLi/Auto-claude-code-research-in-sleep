@@ -1,7 +1,7 @@
 ---
 name: experiment-bridge
 description: "Workflow 1.5 for Computer Architecture research: turn EXPERIMENT_PLAN.md and idea-stage evaluation handoff fields into an EVALUATION_CONTRACT.md, backend manifest, baseline reproduction path, sanity runs, and initial results."
-argument-hint: [experiment-plan-path-or-topic]
+argument-hint: "[experiment-plan-path-or-topic]"
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
 ---
 

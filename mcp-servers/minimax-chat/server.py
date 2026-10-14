@@ -1,30 +1,44 @@
 #!/usr/bin/env python3
 """MiniMax Chat MCP Server - A robust MCP server that calls MiniMax Chat Completions API"""
 
+import datetime
 import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
 import httpx
 
-# Force unbuffered stdout/stdin
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'wb', buffering=0)
-sys.stdin = os.fdopen(sys.stdin.fileno(), 'rb', buffering=0)
+_stdio_initialized = False
+
+
+def _init_stdio():
+    """Rebind stdio to raw unbuffered binary streams for MCP framing.
+
+    Deferred into a function (called at the top of main()) so that merely
+    IMPORTING this module has no stdio side effects. os.fdopen(fileno) defaults
+    to closefd=True and thus seizes ownership of the fd; doing that at import
+    time under a test harness that captures stdio (pytest fd-capture) closes the
+    harness's capture fd and corrupts capture for every subsequent test. Real
+    server launch (python server.py) still calls this first via main(), so
+    runtime behavior is unchanged. Idempotent."""
+    global _stdio_initialized
+    if _stdio_initialized:
+        return
+    # Force unbuffered stdout/stdin
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'wb', buffering=0)
+    sys.stdin = os.fdopen(sys.stdin.fileno(), 'rb', buffering=0)
+    _stdio_initialized = True
 
 # Debug logging
 DEBUG_LOG = os.path.join(tempfile.gettempdir(), "minimax-mcp-debug.log")
-
-def utc_timestamp():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 def debug_log(msg):
     """Write debug message to log file"""
     try:
         with open(DEBUG_LOG, "a") as f:
-            f.write(f"{utc_timestamp()}: {msg}\n")
+            f.write(f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}: {msg}\n")
             f.flush()
-    except:
+    except Exception:
         pass
 
 debug_log("=== MCP Server Starting (v2.1) ===")
@@ -34,14 +48,22 @@ debug_log(f"MINIMAX_MODEL: {os.environ.get('MINIMAX_MODEL', 'not set')}")
 
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = os.environ.get("MINIMAX_BASE_URL", "https://api.minimax.io/v1")
-DEFAULT_MODEL = os.environ.get("MINIMAX_MODEL", "MiniMax-M2.7")
+DEFAULT_MODEL = os.environ.get("MINIMAX_MODEL", "MiniMax-M3")
 
 # MiniMax requires temperature in (0.0, 1.0]
 def clamp_temperature(temp):
-    """Clamp temperature to MiniMax's allowed range (0.0, 1.0]."""
+    """Clamp temperature to MiniMax's allowed range (0.0, 1.0].
+
+    Raises ValueError on non-numeric input — caller should catch and surface
+    a clear "Invalid temperature: ..." error instead of letting the raw
+    float() exception bubble up through the JSON-RPC layer.
+    """
     if temp is None:
         return None
-    temp = float(temp)
+    try:
+        temp = float(temp)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"Invalid temperature: {temp!r} ({e})")
     if temp <= 0.0:
         return 0.01
     if temp > 1.0:
@@ -51,8 +73,8 @@ def clamp_temperature(temp):
 def log_error(msg):
     try:
         with open(DEBUG_LOG, "a") as f:
-            f.write(f"{utc_timestamp()}: ERROR: {msg}\n")
-    except:
+            f.write(f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}: ERROR: {msg}\n")
+    except Exception:
         pass
 
 # Global flag for output format
@@ -114,7 +136,10 @@ def call_minimax(messages, model=None, temperature=0.7):
                 debug_log(f"API error: {error_msg}")
                 return None, error_msg
             data = response.json()
-            content = data["choices"][0]["message"]["content"]
+            try:
+                content = data["choices"][0]["message"]["content"]
+            except (KeyError, IndexError, TypeError) as e:
+                return None, f"Unexpected API response structure: {e}"
             debug_log(f"API success, response length: {len(content)}")
             return content, None
     except Exception as e:
@@ -166,7 +191,7 @@ def handle_request(request):
             "result": {
                 "tools": [{
                     "name": "minimax_chat",
-                    "description": "Send a message to MiniMax model and get a response. Use this for research reviews, code analysis, and general AI tasks. Supports MiniMax-M2.7 (default, 204K context) and MiniMax-M2.7-highspeed.",
+                    "description": "Send a message to MiniMax model and get a response. Use this for research reviews, code analysis, and general AI tasks. Supports MiniMax-M3 (default, 512K context), MiniMax-M2.7 (204K context) and MiniMax-M2.7-highspeed.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -176,9 +201,9 @@ def handle_request(request):
                             },
                             "model": {
                                 "type": "string",
-                                "description": "Model to use: MiniMax-M2.7 (default, 204K context) or MiniMax-M2.7-highspeed (faster, 204K context)",
-                                "default": "MiniMax-M2.7",
-                                "enum": ["MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M2.5", "MiniMax-M2.5-highspeed"]
+                                "description": "Model to use: MiniMax-M3 (default, 512K context), MiniMax-M2.7 (204K context) or MiniMax-M2.7-highspeed (faster, 204K context)",
+                                "default": "MiniMax-M3",
+                                "enum": ["MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.7-highspeed"]
                             },
                             "system": {
                                 "type": "string",
@@ -321,6 +346,7 @@ def read_message():
 
 def main():
     """Main loop - read JSON-RPC messages from stdin"""
+    _init_stdio()
     debug_log("Entering main loop")
 
     while True:
@@ -346,7 +372,7 @@ def main():
                     "id": None,
                     "error": {"code": -32603, "message": f"Internal error: {e}"}
                 })
-            except:
+            except Exception:
                 pass
 
     debug_log("=== MCP Server Exiting ===")
