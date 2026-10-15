@@ -137,7 +137,7 @@ ssh <server> "nohup python3 \"\$HOME/.aris_queue/queue_manager.py\" \\
 
 Use `--log-dir`, not `--log`; per-job logs in `--log-dir` drive failure detection.
 
-Job states: `pending → running → completed`; transient failures go `failed_retryable → pending` until `oom_retry.max_attempts`, then `stuck`; a screen that exits without the required outputs, or lingers after its process died, ends `stuck`. The scheduler exits when every job is `completed` or `stuck`.
+Job states: `pending → running → completed`; transient failures go `failed_retryable → pending` until `oom_retry.max_attempts`, then `stuck`; a screen that exits without the required outputs, or lingers after its process died, ends `stuck`. The scheduler exits when every job is `completed` or `stuck`. Logs are scanned for retryable markers (license, connection timeout, CUDA OOM) only after a job exits, so RTO or retransmission timeouts in a live co-sim log never kill it.
 
 Resuming reuses `queue_state.json`. A state file written before the 2026-10 scheduler fix holds healthy jobs the old code mis-judged as dead and parked as `stuck`; they are not retried. Delete it, copy the current `queue_manager.py` to the server, and start the run again.
 

@@ -59,9 +59,11 @@ from pathlib import Path
 
 
 OOM_RE = re.compile(r"(CUDA out of memory|torch\.OutOfMemoryError)")
+# Infrastructure faults only. A bare "timeout" / "timed out" is deliberately absent:
+# network co-sim logs report RTO and retransmission timeouts as experiment data.
 TRANSIENT_FAILURE_RE = re.compile(
     r"(CUDA out of memory|torch\.OutOfMemoryError|license unavailable|"
-    r"license checkout failed|timed out|timeout)",
+    r"license checkout failed|cannot connect to license server|connection timed out)",
     re.IGNORECASE,
 )
 DEFAULT_GPU_FREE_THRESHOLD_MIB = 500
@@ -370,25 +372,24 @@ def job_status_check(job, log_dir, cwd):
     if job.get("expected_output") and output_exists(job["expected_output"], cwd):
         return "completed", None
 
-    # 2. Retryable failures (legacy CUDA OOM, EDA license stalls, timeouts)
+    # 2. Alive → running. The log is not read while the job runs, so a healthy
+    #    job whose output mentions a failure-like word is never killed for it.
+    if screen_name and screen_exists(screen_name):
+        if not job.get("pid"):
+            return "running", None          # no pid recorded; trust the screen
+        _, rc = run(f"kill -0 {job['pid']} 2>/dev/null")
+        if rc == 0:
+            return "running", None
+        exit_note = "Process exited without expected output (stale screen)"  # step() kills it
+    else:
+        exit_note = "Screen exited without expected output"
+
+    # 3. Exited without output: retry only infrastructure faults found in the log
+    #    (legacy CUDA OOM, EDA license stalls, connection timeouts); else terminal.
     transient = detect_transient_failure_in_log(log_file)
     if transient:
         return "failed_retryable", f"Retryable failure detected: {transient}"
-
-    # 3. Screen alive + python alive → still running
-    if screen_name and screen_exists(screen_name):
-        if job.get("pid"):
-            _, rc = run(f"kill -0 {job['pid']} 2>/dev/null")
-            if rc == 0:
-                return "running", None
-            # Process exited but the screen lingers → stale; step() kills the screen.
-            return "failed_other", "Process exited without expected output (stale screen)"
-        else:
-            # No pid known; trust screen for now
-            return "running", None
-
-    # 4. Screen gone (or never recorded), no output → failed_other
-    return "failed_other", "Screen exited without expected output"
+    return "failed_other", exit_note
 
 
 def pending_jobs_in_active_phases(state, manifest):
@@ -464,7 +465,9 @@ def step(manifest, state, state_file, log_dir):
     running = [j for j in state["jobs"] if j["status"] == "running"]
     pending = pending_jobs_in_active_phases(state, manifest)
     generic_slots = available_resource_slots(manifest, state)
-    if generic_slots:
+    # Branch on whether slots are configured, not on whether one is free: with
+    # every slot busy, falling through to GPU mode would put cpu_sim jobs on L40s.
+    if resource_slots(manifest):
         launch_pairs = []
         for job in pending:
             match = next((slot for slot in generic_slots if slot_matches(job, slot)), None)

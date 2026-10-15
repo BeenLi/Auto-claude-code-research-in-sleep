@@ -270,3 +270,82 @@ def test_step_parks_resumed_failed_other_as_stuck(tmp_path, monkeypatch):
     assert state["jobs"][0]["status"] == "stuck"
     assert state["jobs"][0]["attempts"] == 1          # parked, not relaunched
     assert qm.all_done(state)
+
+
+# --- step(): busy slots never fall back to GPU mode ---------------------------
+
+
+def test_step_waits_when_every_configured_slot_is_busy(tmp_path, monkeypatch):
+    monkeypatch.setattr(qm, "run", make_run(kill_rc=0))
+    monkeypatch.setattr(qm, "free_gpus", lambda *a, **k: [0, 1])
+    launched = []
+    monkeypatch.setattr(qm, "launch_job",
+                        lambda job, slot, *a, **k: launched.append(slot) or ("EQ_x", 1))
+    busy = _running_job()
+    busy["resource_slot"] = "sim0"
+    waiting = dict(_running_job(), id="rx_ratio_4.0", status="pending",
+                   screen_name=None, pid=None, attempts=0,
+                   resources={"slot_type": "cpu_sim"})
+    state = {"phases": [{"name": "sweep", "depends_on": [], "status": "running"}],
+             "jobs": [busy, waiting]}
+
+    qm.step(_step_manifest(tmp_path), state, str(tmp_path / "queue_state.json"), str(tmp_path))
+
+    assert launched == []                      # not placed on a free L40
+    assert state["jobs"][1]["status"] == "pending"
+
+
+# --- job_status_check(): the log is read only after the job exits --------------
+
+RTO_LOG = (
+    "[cosim] flow 3: RTO timeout at t=1.2ms, cwnd -> 1\n"
+    "[cosim] flow 3: retransmission timed out, backing off\n"
+)
+
+
+def _run_with_tail(**kwargs):
+    """make_run(), plus a real `tail` so detect_transient_failure_in_log reads the log."""
+    fake = make_run(**kwargs)
+
+    def run(cmd, check=False, capture=True):
+        if cmd.startswith("tail "):
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            return res.stdout, res.returncode
+        return fake(cmd, check, capture)
+
+    return run
+
+
+def _write_log(log_dir, text):
+    log_dir.mkdir(exist_ok=True)
+    (log_dir / "rx_ratio_2.0.log").write_text(text)
+
+
+def test_healthy_job_with_rto_timeouts_in_log_keeps_running(tmp_path, monkeypatch):
+    monkeypatch.setattr(qm, "run", _run_with_tail(kill_rc=0))
+    _write_log(tmp_path / "logs", RTO_LOG + "license checkout failed (retrying)\n")
+    status = qm.job_status_check(_running_job(), str(tmp_path / "logs"), str(tmp_path))
+    assert status == ("running", None)
+
+
+def test_exited_job_with_only_rto_timeouts_is_terminal(tmp_path, monkeypatch):
+    monkeypatch.setattr(qm, "run", _run_with_tail(screen_ls="No Sockets found.\n"))
+    _write_log(tmp_path / "logs", RTO_LOG + "Segmentation fault\n")
+    status, err = qm.job_status_check(_running_job(), str(tmp_path / "logs"), str(tmp_path))
+    assert status == "failed_other"
+    assert "Screen exited" in err
+
+
+def test_exited_job_with_license_failure_is_retryable(tmp_path, monkeypatch):
+    monkeypatch.setattr(qm, "run", _run_with_tail(screen_ls="No Sockets found.\n"))
+    _write_log(tmp_path / "logs", "ERROR: [Common 17-345] license checkout failed\n")
+    status, err = qm.job_status_check(_running_job(), str(tmp_path / "logs"), str(tmp_path))
+    assert status == "failed_retryable"
+    assert "license checkout failed" in err
+
+
+def test_stale_screen_with_cuda_oom_is_retryable(tmp_path, monkeypatch):
+    monkeypatch.setattr(qm, "run", _run_with_tail(kill_rc=1))
+    _write_log(tmp_path / "logs", "torch.OutOfMemoryError: CUDA out of memory\n")
+    status, _ = qm.job_status_check(_running_job(), str(tmp_path / "logs"), str(tmp_path))
+    assert status == "failed_retryable"

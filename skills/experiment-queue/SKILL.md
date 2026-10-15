@@ -136,7 +136,7 @@ Use persistent workers plus file-based JSON handshakes. Exchange flow/QP summari
 
 ## Failure Handling
 
-Retry transient failures such as timeouts and license checkout failures. Mark missing required outputs as failed/stuck. For lossy RDMA experiments, packet/drop behavior belongs in the simulator output and result JSON, not in the queue state machine.
+Retry transient infrastructure failures (license checkout failures, license-server or connection timeouts). A job's log is read only after it exits — a running job is never judged from its log, and a bare "timeout" in simulator output (RTO, retransmission) is experiment data, not a failure. Mark missing required outputs as failed/stuck. For lossy RDMA experiments, packet/drop behavior belongs in the simulator output and result JSON, not in the queue state machine.
 
 Job states in `queue_state.json`:
 
@@ -147,7 +147,7 @@ pending → running → completed                      (required outputs exist)
 stale screen (process gone, screen lingering) → failed_other → stuck
 ```
 
-`failed_retryable` covers license checkout failures, timeouts, and legacy CUDA OOM.
+`failed_retryable` covers license checkout failures, license-server or connection timeouts, and legacy CUDA OOM, matched in the log of a job that has already exited.
 `completed` and `stuck` are terminal; the scheduler exits when every job is one of them.
 
 > **Operator note on `stuck` (the agent's move, not the queue's):** the queue
