@@ -278,6 +278,10 @@ frontmatter. It preserves the `PROJECT NOTES` region byte-for-byte where
 practical. `ingest_paper` emits the same markers, with an empty Obsidian
 projection and manual ingest notes in `PROJECT NOTES`.
 
+The `PROJECT NOTES` sections start as `_TODO._` scaffolds. `/wiki-enrich` fills
+them from alphaXiv / DeepXiv / arXiv content and never touches the Obsidian
+projection, the frontmatter or `## Connections`.
+
 ### `/research-wiki sync-obsidian --paper-notes-dir <dir>`
 
 Project Obsidian paper notes into `research-wiki/papers/*.md` while keeping
