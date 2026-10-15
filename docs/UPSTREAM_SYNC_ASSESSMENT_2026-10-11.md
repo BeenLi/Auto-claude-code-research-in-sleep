@@ -294,3 +294,59 @@ upstream remote 已添加为 `upstream`（`https://github.com/wanshuiyin/Auto-cl
 ### 仅存在于文字中的悬空引用（无害）
 
 `tools/check_skills_inventory.py`（fan-out-pattern，CI 工具）、`tools/poster_check.py` 与 `tools/render_preview.py`（paper-poster-html 的上游出处说明）、`tools/smart_update.sh`（wiki-helper-resolution 的修复提示，本地已删）、`tools/threat_patterns.py`（署名）；compute-env-contract 与 review-scope-limits 提到已归档的 vast-gpu、serverless-modal、qzcli。
+
+## 11. 桶 3 执行记录（2026-10-15）
+
+按第 5 节逐条处理：每个文件都是把 upstream 提交当作想法，手工移植到本地版本上，没有对任何桶 3 文件做 `git checkout upstream/main --` 或三方合并。全量测试 698 passed、4 skipped（基线 611）。
+
+### 5.1 idea-creator / idea-discovery / research-pipeline
+
+- **证据门接入**（b2af612 + a387947 + ffec4b7）：idea-discovery 新增 "Per-stage evidence gate"，四个阶段的产物定位分别是 `idea-stage/LITERATURE_REVIEW.md`、`IDEA_REPORT.md#recommended-ideas`、`#novelty-verification`、`#external-critical-review`。门只给 verdict，不授予阶段通过；与 `workflow1_exit_gate.sh` 并存（前者查每阶段确实跑过，后者查 handoff 字段，两者都要过）。research-pipeline 内的 Workflow 1 用独立 run id `<pipeline_run_id>-w1`。`test_idea_discovery_gate.py` 的 skip 已去掉。
+- `templates/IDEA_REPORT_TEMPLATE.md` 补了 `## Novelty Verification`、`## External Critical Review` 两节，以及 `## Recommended Ideas` 下的一行概述——门把"标题后直接跟子标题"视为空节，不补的话真实运行会被误判 BLOCKED。
+- **AUTO_PROCEED 真正非阻塞**（0b4dd9d）、**正面裁决定义**（73ed2a7）、**停滞强制换框架 + watchdog loop**（06039a8 / ead2485）、**output-composition**（5d0169b）、**RENDER_HTML**（eda1c84）均已接入。新增 `tests/test_auto_proceed_contract.py`；其中检查 README/docs 的用例跳过，gemini-review 覆盖包从断言列表中去掉（见下方遗留）。
+- **VENUE**（363589d）：默认值从 `ACM` 改为未设置，在论文写作阶段开始时绑定；`AUTO_PROCEED=true` 且未设置时推迟论文写作而不是猜。本地的 ACM / IEEE 选项保留。
+- **idea-creator**：`upsert_idea` 确定性写 wiki（c03f839），读时扫描缓存 wiki 上下文（bb3bb9d，+测试），lens fan-out（b11bd2b，新 Phase 1.5），每个 idea 先写 `Method (what we actually do)`（1eb5828，两份 IDEA 模板同步），manual-review 传 `require_reviewer_model`（6be7b60）。
+- **放宽淘汰**（78ad58d / 014c16e / fd6b7c6）按决策 1 落地：双模型并集（新常量 `SECOND_GENERATOR_MODEL = gpt-6.1-sol`，在 gpt-6-astra 之后串行调用）、先替每个 idea 说最好的情况、排名只决定下一次 handoff 尝试；没选中的进 backup / parked，不删除。60/40 打分与 `handoff_to_workflow_1_5` 门不变。"score is advisory"、放宽 Lite 模式、pilot 语义未取（与保留的 `refine_overall_score >= 9` 门冲突，且 Workflow 1 不跑 pilot）。
+- 读 wiki 时的硬禁止名单改为只来自本轮 `already_done` / `refuted_by_NE-*` 证据；`low_overall_merit` 只是 park 理由，不再是禁止条目。
+
+### 5.2 research-lit / research-review / research-refine
+
+- research-review：scope block（363589d，与 `review-scope-limits.md` 逐字一致）、对抗默认立场（831af52）、composed 模式、manual 后端的跨家族门（6be7b60）、external-cadence 提示。新建线程仍显式固定 `model: REVIEWER_MODEL` + xhigh；6142715（ultra）未取。
+- research-lit：fan-out、composed 模式（**本地差异**：composed 模式下仍写 `LITERATURE_REVIEW.md`，因为 idea-creator 硬依赖它）、本地论文库路径全部未命中时给 WARN（faca11c）、verify-papers 预检里本地 Step 2.5 门没有的几条规则（3362645）、`~/.aris/repo` 解析说明。
+- research-refine：taste-calibration（df108b0），无锚点时写 `CALIBRATION: none`；顺带把 Phase 3.1 残留的 "Frontier Leverage" 改为 "Platform Leverage"。
+- research-review / research-refine / idea-discovery / research-pipeline / run-experiment / experiment-* 去掉了未使用的 `Agent` 授权（8d26958）；idea-creator 与 research-lit 因 fan-out 保留。
+
+### 5.3 experiment 系列
+
+- **调度器修复**（6be7b60）手工移植到 `tools/experiment_queue/queue_manager.py`：`screen_exists` 用正则匹配真实 TAB；"screen 在、进程没了"返回 `failed_other` 并由 `step()` 杀掉 screen；`output_exists` 改用 `glob.glob`；`depends_on` 裸字符串在新建和续跑两条路径上都规范化为列表。本地 `step()` 原本就把 `failed_other` 直接写成 `stuck`，只补了 upstream 的步骤 2 守卫来处理旧状态文件。新增 `tests/test_experiment_queue_manager.py`（16 个用例，对旧代码全部失败）。
+- **顺带修复（本地 bug）**：配置了 slot 但全部占用时，`if generic_slots:` 为假会落回 GPU 模式，可能把 `cpu_sim` 作业派到 L40 上；改为按 `resource_slots(manifest)` 分支，并加了回归测试。
+- experiment-bridge：新增 "Sanity Failures" 重启教义（1faf11c / 0b5ddb9，2 次补丁 + 2 次干净重写预算，诊断指向 `hw-env-contract.md` §5），research contract 缺失时按 maintenance 规则创建（831af52），"Code/Config Review" 下恢复 Codex 评审调用（`code_review: false` 时跳过，带 scope block，90a65e2）。
+- experiment-queue / monitor-experiment：状态图、`depends_on` 必须是列表、external-cadence 提示、resolver 与 `integration-contract.md` §2 对齐。dse-loop 已与 upstream 一致。569dd51 / e31a6b0（CUDA/pip env-spec）按决策 2 不取。
+
+### 5.4 research-wiki + `tools/research_wiki.py`
+
+- 补齐桶 2 留下的断链：`add_claim`（f4181a5）、`upsert_idea`（c03f839）、`add_experiment`（47ef940），子命令与参数名与 upstream 一致；proof-checker、result-to-claim、idea-creator 的调用现在都能落地。`upsert_idea` 额外接受 `handed_off` / `parked` 阶段与 `--park-reason` / `--revisit-condition`；idea-creator 用 `upsert_idea` + 本地 `update` 写 `pool_status`。
+- query pack 的失败 idea 只从 frontmatter 读 `outcome`（c03f839 的读侧修复）。
+- 全路径 UTF-8 与旧编码友好报错（faca11c / 2f00c51，含 Obsidian 同步、lint、update 路径）、非 ASCII slug（5d8e9e2）、arXiv User-Agent + 批量 id + 429/406 重试（146b328 / 515d348）、RESEARCH_BRIEF 按节抽取（55bd4cd）。
+- `verify_papers.py`：6 处读写加 `encoding="utf-8"`，arXiv 批量调用补 User-Agent（3cd9c3c）。
+- 新增 upstream 测试 claims / ideas / experiments / encoding / fetch_arxiv_metadata，以及本地 `test_research_wiki_local_ports.py`；`tests/conftest.py` 取自 upstream（测试在临时 `$HOME` 下跑，避免安装器测试写真实 `~/.aris`）。
+- **slug 迁移说明**：已有页面不会被改路径（`ingest_paper` 先按 arXiv id 匹配，`sync-obsidian` 按强标识匹配）。变化只在新生成的中文标题和带重音作者名的 slug。剩余风险：手工重新导入一篇没有 arXiv id、旧 slug 被剥成 ASCII 的论文，会生成第二个页面。
+
+### 5.5 `tools/install_aris.sh`
+
+按原计划不动。副作用：多个 skill 新增的 `~/.aris/repo` 解析层在本 fork 上不会生效，除非手工写这个文件。
+
+### 收尾（同日完成）
+
+- **作业日志误杀**：`job_status_check` 原先在检查 screen 是否存活之前先扫日志里的 `timeout` / `timed out`，健康的协同仿真作业只要日志里出现 RTO 字样就会被杀。现在作业存活期间不读日志；退出后才匹配重试标记，且正则去掉了裸 `timeout` / `timed out`，只保留 license、`connection timed out`、CUDA OOM 这类基础设施故障。新增 4 个回归测试，其中两个对修复前的代码失败。
+- **Codex 镜像的安装清单名**：`sync_codex_skill_mirror.py` 新增改写规则 `.aris/installed-skills.txt → .aris/installed-skills-codex.txt`，与 `install_aris.sh --target codex` 一致；加了镜像测试，`test_idea_creator_query_pack_scan.py` 恢复为 upstream 的期望。
+- **评审覆盖包**：`tools/generate_codex_claude_review_overrides.py` 改为同时生成 claude-review 与 gemini-review 两个覆盖包（`--reviewer` 可只生成其一）。claude 部分先与旧生成器逐字节对比一致后再扩展。gemini 包的 `paper-poster` 换成 `paper-poster-html`，与 upstream 一致；生成器还补了两处：Prerequisites 整节替换（原正则遇到缩进代码块会留下残段），以及最后一遍把剩余的 `spawn_agent` / `send_input` 映射到覆盖包自己的评审工具。`test_auto_proceed_contract.py` 重新检查 gemini 覆盖包的 idea-discovery。
+- **README 的 AUTO_PROCEED 描述**：`README.md` 与 `README_CN.md` 的参数表、特性列表和人在回路说明改为"报告后在同一轮内继续 / `false` 先询问"；带日期的 News 条目保持原样。`test_user_docs_match_same_turn_auto_proceed_contract` 改为检查两份 README 并取消 skip。
+- **第二个生成模型**改为 `gpt-6.1-sol`。
+- 5 个子代理工作树及其分支已删除（删除前核对过其改动全部在主工作区）。
+
+### 第二轮收尾
+
+- **Gemini 安装清单**：Gemini 安装（`install_aris.sh --target gemini`）用主线 `skills/`，写的是 `.aris/installed-skills-gemini.txt`，而主线 resolver 只读 `.aris/installed-skills.txt`（upstream 同样如此）。现在主线里 35 处读 Claude 清单的地方（25 处 `if … fi` 块、10 处单行 `${ARIS_REPO:-$(awk …)}`）之后都紧跟一次 Gemini 清单回退；`integration-contract.md` §2 写明三种安装各自的清单名。新增 `tests/test_install_manifest_resolution.py`：静态检查每处 Claude 清单读取都有 Gemini 回退（对改动前的文件会报 35 处），并实际执行 §2 的 resolver 块，确认只有 Gemini 清单时也能解析出 `ARIS_REPO`。
+- **`search-sources.md` 的 `tools/` 硬编码**：可选检索适配器改用 §2 的解析链（`.aris/tools/` → `tools/` → `$ARIS_REPO/tools/`，`ARIS_REPO` 来自两份清单或 `~/.aris/repo`），未解析到的 fetcher 只跳过该来源并打 WARN。已在 bash 和 zsh 下实测。
+- **`main_blocker` 取值**：`idea-handoff-schema.md` 的取值列表补上 `refine_did_not_converge`（research-refine 与 idea-discovery 一直在写这个值），并加了说明。新增测试：skill 与模板里出现的所有 `main_blocker` 值都必须在 schema 的取值列表里。
