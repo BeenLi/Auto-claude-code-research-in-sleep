@@ -24,7 +24,7 @@ Shared references:
 ## Constants
 
 - **REVIEWER_MODEL = `gemini-review`** — Gemini reviewer invoked through the local `gemini-review` MCP bridge. Set `GEMINI_REVIEW_MODEL` if you need a specific Gemini model override.
-- **SECOND_GENERATOR_MODEL = `gpt-5.5`** — Phase 2 runs the brainstorm bundle a second time on this model (Codex backend only, same `xhigh` effort) and takes the union. It generates candidates; it never judges them.
+- **SECOND_GENERATOR_MODEL = `gpt-6.1-sol`** — Phase 2 runs the brainstorm bundle a second time on this model (Codex backend only, same `xhigh` effort) and takes the union. It generates candidates; it never judges them.
 - **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 
@@ -426,7 +426,7 @@ capping the pool:
 
 1. Once with the default reviewer model (`REVIEWER_MODEL`, `gpt-6-astra`
    today), as above.
-2. Once more with `model: SECOND_GENERATOR_MODEL` (`gpt-5.5`) — same `xhigh`
+2. Once more with `model: SECOND_GENERATOR_MODEL` (`gpt-6.1-sol`) — same `xhigh`
    effort, same bundle, a fresh agent, started after the first call returns
    (concurrent codex calls hang; never run the two at once). Save both
    agent_ids; Phase 4's triage follow-up goes to the default-model thread.

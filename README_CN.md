@@ -215,7 +215,7 @@ claude
 >
 > | 参数 | 默认 | 说明 |
 > |------|------|------|
-> | `AUTO_PROCEED` | `true` | 在 idea 选择关卡自动继续。设为 `false` 可在花 GPU 前手动挑选 idea |
+> | `AUTO_PROCEED` | `true` | 在 idea 选择关卡报告首选 idea 并在同一轮内继续。设为 `false` 可在花 GPU 前手动挑选 idea |
 > | `human checkpoint` | `false` | 每轮 review 后暂停，让你查看分数、给出修改意见、跳过特定修复或提前终止 |
 > | `sources` | `all` | 搜索哪些文献源：`zotero`、`obsidian`、`local`、`web`、`semantic-scholar`、`deepxiv`、`exa`、`all`。`semantic-scholar`、`deepxiv` 和 `exa` 都需显式指定 |
 > | `arxiv download` | `false` | 文献调研时下载最相关的 arXiv PDF。为 `false` 时仅获取元数据（标题、摘要、作者） |
@@ -261,7 +261,7 @@ claude
 - 📝 **Peer Review** — 以审稿人视角审阅他人论文，结构化打分 + meta-review
 - 🖥️ **审稿驱动实验** — GPT-5.5 说"跑个消融实验"，Claude Code 自动写脚本、rsync 到服务器、screen 启动、收结果、写回论文。只需在 `CLAUDE.md` 里配好服务器信息（[配置指南](#%EF%B8%8F-gpu-服务器配置自动实验用)）
 - 🔀 **灵活模型** — 默认 Claude × GPT-5.5，也支持 [GLM、MiniMax、Kimi、LongCat、DeepSeek 等](#-替代模型组合)——无需 Claude 或 OpenAI API
-- 🛑 **Human-in-the-loop** — 关键决策点可配置检查点。`AUTO_PROCEED=true` 全自动，`false` 逐步审批
+- 🛑 **Human-in-the-loop** — 可配置的选择检查点。`AUTO_PROCEED=true` 报告选择后在同一轮内继续，`false` 先征求确认
 - 📱 **[飞书通知](#-飞书lark-集成可选)** — 三种模式：**关闭（默认，强烈建议大多数用户保持关闭）**、仅推送（webhook，手机收通知）、双向交互（在飞书里审批/回复）。未配置时零影响
 
   <details>
@@ -407,7 +407,7 @@ ARIS 全流程完成的真实项目。**如果你也用 ARIS 完成了论文，�
 
 > 💡 **一键调用：** `/idea-discovery "你的研究方向"` 自动跑完整个工作流 1。
 
-> 🔄 **人在回路中：** 每个阶段都会展示结果等你反馈。不满意？告诉它哪里不对——调整 prompt 重新生成。信任默认选择？它会自动带着最优方案继续。你决定参与多深。
+> 🔄 **人在回路中：** 在每个受 `AUTO_PROCEED` 控制的选择检查点，`true` 报告结果后在同一轮内继续，`false` 先等你反馈再继续。不满意？告诉它哪里不对——调整 prompt 重新生成。你决定参与多深。
 
 > ⚙️ Pilot 实验预算（最大时长、超时、GPU 总预算）均可配置——见[自定义](#%EF%B8%8F-自定义)。
 
@@ -1286,7 +1286,7 @@ Skills 就是普通的 Markdown 文件，fork 后随意改：
 
 | 常量 | 默认值 | 说明 | 透传 |
 |------|--------|------|:---:|
-| `AUTO_PROCEED` | true | 用户不回复时自动带着最优方案继续 | → `idea-discovery` |
+| `AUTO_PROCEED` | true | 报告最优方案并在同一轮内继续；`false` 则先询问 | → `idea-discovery` |
 | `ARXIV_DOWNLOAD` | false | 搜索后自动下载最相关的 arXiv PDF | → `idea-discovery` → `research-lit` |
 | `HUMAN_CHECKPOINT` | false | 设为 `true` 时每轮 review 后暂停等待确认 | → `auto-review-loop` |
 | `WANDB` | false | 自动给实验脚本加 W&B 日志 | → `experiment-bridge` → `run-experiment` |
@@ -1314,7 +1314,7 @@ Skills 就是普通的 Markdown 文件，fork 后随意改：
 | `PILOT_TIMEOUT_HOURS` | 3h | 硬超时——强制终止，收集部分结果 | — |
 | `MAX_PILOT_IDEAS` | 3 | 最多并行 pilot 几个 idea | — |
 | `MAX_TOTAL_GPU_HOURS` | 8h | 所有 pilot 的总 GPU 预算 | — |
-| `AUTO_PROCEED` | true | 用户不回复时自动带着最优方案继续。设 `false` 则每步都等确认 | — |
+| `AUTO_PROCEED` | true | 报告最优方案并在同一轮内继续。设 `false` 则每个检查点都等确认 | — |
 | `ARXIV_DOWNLOAD` | false | 搜索后自动下载最相关的 arXiv PDF | → `research-lit` |
 
 行内覆盖：`/idea-discovery "方向" — pilot budget: 4h per idea, sources: zotero, arxiv download: true`
@@ -1455,7 +1455,7 @@ claude
 
 ### 已完成
 
-- [x] **Human-in-the-loop 检查点** — idea-discovery 和 research-pipeline 在关键决策点暂停等待用户审批。通过 `AUTO_PROCEED` 配置（默认自动继续，设 `false` 则每步等确认）
+- [x] **Human-in-the-loop 检查点** — idea-discovery 和 research-pipeline 在关键决策点设有选择检查点。通过 `AUTO_PROCEED` 配置（默认报告后在同一轮内继续，设 `false` 则先等确认）
 - [x] **替代模型组合** — [GLM + GPT、GLM + MiniMax](#-替代模型组合) 完整文档及配置指南。无需 Claude 或 OpenAI API
 - [x] **Workflow 3：论文写作流水线** — 完整链路：`/paper-plan` → `/paper-figure` → `/paper-write` → `/paper-compile`。支持 ICLR/NeurIPS/ICML 模板、claims-evidence 矩阵、出版级图表、latexmk 自动修复。参考 [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar)、[Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills)、[baoyu-skills](https://github.com/jimliu/baoyu-skills)
 

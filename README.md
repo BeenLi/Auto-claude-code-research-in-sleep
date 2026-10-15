@@ -261,7 +261,7 @@ claude
 >
 > | Parameter | Default | What it does |
 > |-----------|---------|-------------|
-> | `AUTO_PROCEED` | `true` | Auto-continue at idea selection gate. Set `false` to manually pick which idea to pursue before committing GPU time |
+> | `AUTO_PROCEED` | `true` | At the idea selection gate, report the top idea and continue in the same turn. Set `false` to manually pick which idea to pursue before committing GPU time |
 > | `checkpoint mode` | `standard` | Workflow 1 checkpoint strategy: `auto`, `standard`, `strict`, or `custom`. `standard` pauses at literature scope and idea selection |
 > | `checkpoints` | `literature_scope, idea_selection` | Used when `checkpoint mode: custom`; valid values include `literature_scope`, `idea_selection`, `pre_refine`, `final_report` |
 > | `human checkpoint` | `false` | Pause after each review round so you can read the score, give custom modification instructions, skip specific fixes, or stop early |
@@ -327,7 +327,7 @@ See [full setup guide](#%EF%B8%8F-setup) for details and [alternative model comb
 - 📝 **Peer review** — review others' papers as a conference reviewer, with structured scoring and meta-review
 - 🖥️ **Review-driven experiments** — when GPT-5.5 says "run an ablation", Claude Code automatically writes the script, rsyncs to your GPU server, launches in screen, collects results, and folds them back into the paper. Just configure your server in `CLAUDE.md` ([setup guide](#%EF%B8%8F-gpu-server-setup-for-auto-experiments)). **No GPU?** Use `gpu: vast` to rent one from [Vast.ai](https://vast.ai) on demand
 - 🔀 **Flexible models** — default Claude × GPT-5.5, also supports [GLM, MiniMax, Kimi, LongCat, DeepSeek, etc.](#-alternative-model-combinations) — no Claude or OpenAI API required
-- 🛑 **Human-in-the-loop** — configurable checkpoints at key decisions. `AUTO_PROCEED=true` for full autopilot, `false` to approve each step
+- 🛑 **Human-in-the-loop** — configurable selection checkpoints. `AUTO_PROCEED=true` reports the choice and continues in the same turn; `false` asks for approval
 - 📱 **[Feishu/Lark notifications](#-feishulark-integration-optional)** — three modes: **off (default, strongly recommended for most users)**, push-only (webhook, mobile alerts), interactive (approve/reject from Feishu). Zero impact when unconfigured
 
   <details>
@@ -539,7 +539,7 @@ The output is `idea-stage/IDEA_REPORT.md`, optional `idea-stage/IDEA_CANDIDATES.
 
 > 💡 **One-command shortcut:** `/idea-discovery "your research direction"` runs this entire workflow automatically.
 
-> 🔄 **Human-in-the-loop:** Each phase presents results and waits for your feedback. Not happy? Tell it what's missing — it refines the prompt and regenerates. Trust the defaults? It auto-proceeds with the top-ranked option. You decide how hands-on to be.
+> 🔄 **Human-in-the-loop:** At each `AUTO_PROCEED`-controlled selection checkpoint, `true` reports results and continues in the same turn; `false` asks for your feedback before continuing. Not happy? Tell it what's missing — it refines the prompt and regenerates. You decide how hands-on to be.
 
 > ⚙️ Execution budgets (max hours, timeout, GPU budget) are configured for Workflow 1.5 and later — see [Customization](#%EF%B8%8F-customization).
 
@@ -1747,7 +1747,7 @@ Skills are plain Markdown files. Fork and customize:
 
 | Constant | Default | Description | Pass-through |
 |----------|---------|-------------|:---:|
-| `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | → `idea-discovery` |
+| `AUTO_PROCEED` | true | Report the top-ranked option and continue in the same turn; `false` asks first | → `idea-discovery` |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `idea-discovery` → `research-lit` |
 | `HUMAN_CHECKPOINT` | false | When `true`, pause after each review round for approval | → `auto-review-loop` |
 | `WANDB` | false | Auto-add W&B logging to experiments | → `experiment-bridge` → `run-experiment` |
@@ -1773,7 +1773,7 @@ Override inline: `/research-pipeline "topic" — auto proceed: false, illustrati
 | Constant | Default | Description | Pass-through |
 |----------|---------|-------------|:---:|
 | Handoff planning | priority-ordered | Attempt the highest-ranked survivor first; if blocked, record the blocker and move to the next survivor. Only one selected ready idea crosses into Workflow 1.5 | — |
-| `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | — |
+| `AUTO_PROCEED` | true | Report the top-ranked option and continue in the same turn; `false` asks first | — |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `research-lit` |
 | `COMPACT` | false | Generate compact summary files for short-context models and session recovery | — |
 | `REF_PAPER` | false | Reference paper (PDF path or URL) to base ideas on | — |
@@ -1916,7 +1916,7 @@ claude
 
 ### Done
 
-- [x] **Human-in-the-loop checkpoints** — idea-discovery and research-pipeline pause at key decision points for user approval. Configurable via `AUTO_PROCEED` (default: auto-continue; set `false` to always wait)
+- [x] **Human-in-the-loop checkpoints** — idea-discovery and research-pipeline have selection checkpoints at key decision points. Configurable via `AUTO_PROCEED` (default: report and continue in the same turn; set `false` to ask for approval)
 - [x] **Alternative model combinations** — [GLM + GPT, GLM + MiniMax](#-alternative-model-combinations) fully documented with setup guides. No Claude or OpenAI API required
 - [x] **Workflow 3: Paper Writing Pipeline** — full chain: `/paper-plan` → `/paper-figure` → `/paper-write` → `/paper-compile`. ICLR/NeurIPS/ICML templates, claims-evidence matrix, publication-quality figures, latexmk auto-fix. Inspired by [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar), [Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills), [baoyu-skills](https://github.com/jimliu/baoyu-skills)
 

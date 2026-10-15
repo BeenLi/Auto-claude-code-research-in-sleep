@@ -24,7 +24,7 @@ Shared references:
 ## Constants
 
 - **REVIEWER_MODEL = `gpt-6-astra`** — Default model for the Codex backend. Must be an OpenAI model (e.g., `gpt-6-astra`, `o3`, `gpt-4o`). Manual backend uses a model the user chooses, **but it must be a non-Claude model ARIS can classify** (OpenAI, Google, DeepSeek, Moonshot/Kimi, Qwen) — the executor is Claude, so pasting into any Claude product makes Claude judge Claude and voids the cross-model invariant (see `shared-references/reviewer-routing.md`).
-- **SECOND_GENERATOR_MODEL = `gpt-5.5`** — Phase 2 runs the brainstorm bundle a second time on this model (Codex backend only, same `xhigh` effort) and takes the union. It generates candidates; it never judges them.
+- **SECOND_GENERATOR_MODEL = `gpt-6.1-sol`** — Phase 2 runs the brainstorm bundle a second time on this model (Codex backend only, same `xhigh` effort) and takes the union. It generates candidates; it never judges them.
 - **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 
@@ -425,7 +425,7 @@ capping the pool:
 
 1. Once with the default reviewer model (`REVIEWER_MODEL`, `gpt-6-astra`
    today), as above.
-2. Once more with `model: SECOND_GENERATOR_MODEL` (`gpt-5.5`) — same `xhigh`
+2. Once more with `model: SECOND_GENERATOR_MODEL` (`gpt-6.1-sol`) — same `xhigh`
    effort, same bundle, a fresh thread, started after the first call returns
    (concurrent codex calls hang; never run the two at once). Save both
    threadIds; Phase 4's triage follow-up goes to the default-model thread.

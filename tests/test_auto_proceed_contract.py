@@ -5,8 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PIPELINE_SKILLS = (
@@ -86,12 +84,11 @@ def test_research_pipeline_passes_resolved_mode_to_nested_workflows() -> None:
         assert '/paper-writing "NARRATIVE_REPORT.md — venue: [VENUE]' not in text, path
 
 
-@pytest.mark.skip(reason="local fork: docs/CUSTOMIZATION*.md do not exist here and README.md is deferred to the later docs sync. Remove this skip when README carries the same-turn AUTO_PROCEED wording.")
 def test_user_docs_match_same_turn_auto_proceed_contract() -> None:
+    # Local fork: no docs/CUSTOMIZATION*.md; the two READMEs carry the parameter docs.
     docs = (
         REPO_ROOT / "README.md",
-        REPO_ROOT / "docs" / "CUSTOMIZATION.md",
-        REPO_ROOT / "docs" / "CUSTOMIZATION_CN.md",
+        REPO_ROOT / "README_CN.md",
     )
     stale_phrases = (
         "if user doesn't respond",
