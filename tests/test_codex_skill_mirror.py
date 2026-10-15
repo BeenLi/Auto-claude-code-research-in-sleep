@@ -70,6 +70,17 @@ def test_codex_mirror_uses_subagent_tool_names_when_needed() -> None:
         assert "send_input" in text
 
 
+def test_codex_mirror_reads_the_codex_install_manifest() -> None:
+    # install_aris.sh --target codex writes .aris/installed-skills-codex.txt; a
+    # mirror resolver reading the Claude manifest never finds repo_root.
+    offenders = sorted(
+        str(path.relative_to(CODEX_SKILLS))
+        for path in CODEX_SKILLS.rglob("*.md")
+        if ".aris/installed-skills.txt" in path.read_text(encoding="utf-8")
+    )
+    assert offenders == []
+
+
 def test_codex_shared_reference_links_exist() -> None:
     failures: list[str] = []
     pattern = re.compile(r"\.\./shared-references/([A-Za-z0-9._-]+\.md)")
@@ -105,7 +116,7 @@ def test_codex_overlay_boundaries_are_not_mirrored() -> None:
         "novelty-check",
         "paper-figure",
         "paper-plan",
-        "paper-poster",
+        "paper-poster-html",
         "paper-slides",
         "paper-write",
         "paper-writing",

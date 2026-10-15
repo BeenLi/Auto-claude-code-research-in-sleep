@@ -12,8 +12,8 @@ Generate a structured, section-by-section paper outline from: **$ARGUMENTS**
 ## Constants
 
 - **REVIEWER_MODEL = `gemini-review`** — Gemini reviewer invoked through the local `gemini-review` MCP bridge. Set `GEMINI_REVIEW_MODEL` if you need a specific Gemini model override.
-- **TARGET_VENUE = `ICLR`** — Default venue. User can override (e.g., `/paper-plan "topic" — venue: NeurIPS`). Supported: `ICLR`, `NeurIPS`, `ICML`.
-- **MAX_PAGES** — Main body page limit, measured from first page to end of Conclusion section (excluding references, appendix, and acknowledgements). ICLR=9, NeurIPS=9, ICML=8.
+- **TARGET_VENUE = `ICLR`** — Default venue. User can override (e.g., `/paper-plan "topic" — venue: NeurIPS`). Supported: `ICLR`, `NeurIPS`, `ICML`, `CVPR`, `ACL`, `AAAI`, `ACM`, `IEEE_JOURNAL` (IEEE Transactions / Letters), `IEEE_CONF` (IEEE conferences).
+- **MAX_PAGES** — Page limit. For ML conferences: main body to Conclusion end (excluding references, appendix). ICLR=9, NeurIPS=9, ICML=8, AAAI=7 technical-content pages plus references unless the current AAAI CFP says otherwise. **For IEEE venues: references ARE included in page count.** IEEE journal Transactions ≈ 12-14 pages total, Letters ≈ 4-5 pages total; IEEE conference ≈ 5-8 pages total (including references).
 
 ## Inputs
 
@@ -22,20 +22,130 @@ The skill expects one or more of these in the project directory:
 1. **NARRATIVE_REPORT.md** or **STORY.md** — research narrative with claims and evidence
 2. **review-stage/AUTO_REVIEW.md** — auto-review loop conclusions *(fall back to `./AUTO_REVIEW.md` if not found)*
 3. **Experiment results** — JSON files in `figures/`, screen logs, tables
-4. **idea-stage/IDEA_REPORT.md** — from idea-discovery pipeline (if applicable) *(fall back to `./IDEA_REPORT.md` if not found)*
+4. **idea-stage/docs/research_contract.md** — active idea claim boundary and intended claims; if no complete narrative exists, prefer this over the full `IDEA_REPORT.md`
+5. **idea-stage/IDEA_REPORT.md** — from idea-discovery pipeline (if applicable) *(fall back to `./IDEA_REPORT.md` if not found; use only when switching ideas or the contract is absent)*
+6. **Compact files** (if available): `idea-stage/IDEA_CANDIDATES.md` *(fall back to `./IDEA_CANDIDATES.md` if not found)*, `findings.md`, `EXPERIMENT_LOG.md` — preferred over full files when present, saves context window
 
 If none exist, ask the user to describe the paper's contribution in 3-5 sentences.
+
+## Orchestra-Guided Writing Overlay
+
+Keep the existing `insleep` workflow and outputs, but use the shared references below to improve the quality of the story and outline.
+
+- Read `../shared-references/writing-principles.md` when framing the one-sentence contribution, Abstract, Introduction, Related Work, or hero figure.
+- Read `../shared-references/venue-checklists.md` before freezing the outline for a specific venue.
+- Only load these references when needed; do not paste their full contents into the working draft.
+
+## Optional: Style reference (`— style-ref: <source>`, opt-in)
+
+Lets the user steer the **structural** layout of the outline (section ordering, subsection density, theorem-environment density, figure budget, citation style) toward a reference paper. **Default OFF — when the user does not pass `— style-ref`, do nothing differently from before.**
+
+Only when `— style-ref: <source>` appears in `$ARGUMENTS`, run the helper FIRST, before drafting the outline:
+
+```bash
+# Resolve $STYLE_HELPER via the canonical strict-safe chain (see
+# shared-references/integration-contract.md §2). Policy A — gate:
+# unresolved helper means --style-ref cannot be satisfied, so abort.
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
+    ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
+fi
+STYLE_HELPER=".aris/tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || STYLE_HELPER="tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || { [ -n "${ARIS_REPO:-}" ] && STYLE_HELPER="$ARIS_REPO/tools/extract_paper_style.py"; }
+[ -f "$STYLE_HELPER" ] || {
+  echo "ERROR: extract_paper_style.py not resolved at .aris/tools/, tools/, \$ARIS_REPO/tools/, or via ~/.aris/repo." >&2
+  echo "       Fix: rerun bash tools/install_aris.sh or smart_update.sh (refreshes ~/.aris/repo), export ARIS_REPO, or copy the helper to tools/." >&2
+  echo "       --style-ref cannot be satisfied; aborting." >&2
+  exit 1
+}
+STYLE_STATUS=0
+CACHE=$(python3 "$STYLE_HELPER" --source "<source>") || STYLE_STATUS=$?
+case "$STYLE_STATUS" in
+  0) ;;                                       # use $CACHE/style_profile.md as structural guidance
+  2) echo "warning: style-ref skipped (missing optional dep)" >&2 ;;
+  3) echo "error: --style-ref source failed; aborting outline" >&2 ; exit 1 ;;
+  *) echo "error: helper failed unexpectedly; aborting outline" >&2 ; exit 1 ;;
+esac
+```
+
+Sources accepted: local TeX dir / file, local PDF, arXiv id (`2501.12345` or `arxiv:2501.12345`), http(s) URL. Overleaf URLs and project IDs are rejected — clone via `/overleaf-sync setup <id>` first and pass the local clone path.
+
+**Strict rules** (full contract in `tools/extract_paper_style.py` docstring):
+
+- Use `style_profile.md` as **structural** guidance only when proposing the outline's section list, subsection counts, theorem density, figure budget.
+- **Never copy prose, claims, examples, section names verbatim, or terminology** from anything reachable through the cache. The user's narrative is the only source of substance.
+- **Never pass `— style-ref` (or the cache contents) to reviewer / auditor sub-agents.** Cross-model review independence (`../shared-references/reviewer-independence.md`) requires reviewers see only the artifact and the user's prompt.
+
+### Gap Report (`GAP_REPORT.md`, auto-emitted when style-ref is on)
+
+When `— style-ref:` succeeded AND any of `figures/`, `results/`, `data/`, `tables/`, `sec/`, `NARRATIVE_REPORT.md`, `CLAIMS_FROM_RESULTS.md` exists in the project, **also** emit a gap report before drafting the outline. The gap report maps the exemplar's section topology + density requirements (from `style_profile.md`) against the user's actual assets, surfacing structural slots where the user has **no evidence to fill**. It is the contract by which `/paper-write` decides when to emit `<!-- DATA_NEEDED -->` markers instead of fabricating content.
+
+Procedure:
+
+1. Read `$CACHE/style_profile.md` for exemplar's section list + per-section feature counts (figures, theorems, tables, citations, sentences per section).
+2. Inventory user assets: `figures/*` filenames, `results/*` evidence files, `sec/*.tex` existing prose, `NARRATIVE_REPORT.md`, `CLAIMS_FROM_RESULTS.md` (if `/result-to-claim` ran), `references.bib` for citation density.
+3. For each section slot the exemplar implies (ablation table, scaling experiment, failure-case analysis, proof block, …), classify as `covered` / `partial` / `missing`.
+4. Emit `<output-dir>/GAP_REPORT.md`:
+
+```markdown
+# GAP_REPORT — exemplar vs user assets
+
+- **Exemplar source:** <source identifier (file path, arXiv ID, URL)>
+- **Generated:** <UTC ISO-8601>
+- **Style profile:** <relative path to style_profile.md>
+
+## Section topology gaps
+
+| Exemplar slot | Exemplar feature | User evidence | Status | Slot ID |
+|---|---|---|---|---|
+| §5 Experiments | ablation table (3 axes × 4 levels) | `results/` has no ablation file | missing | `GAP_S5_ABLATION` |
+| §5.3 Scaling | log-N scaling curve | `figures/scaling.pdf` not found | missing | `GAP_S5_SCALING` |
+| §6 Discussion | failure-case analysis | not present in `NARRATIVE_REPORT.md` | missing | `GAP_S6_FAILURE` |
+| §2 Related | citation density ≥ 60 | `references.bib` has 35 entries | partial | `GAP_S2_CITES` |
+
+## Coverage summary
+
+- covered: N
+- partial: M
+- missing: K
+
+## Used by
+
+- `/paper-write` reads this file and emits `<!-- DATA_NEEDED: <Slot ID> — <one-line description> -->` placeholders for `missing` slots instead of fabricating content.
+- `/paper-claim-audit` can use Slot IDs to flag claims that cite sections with `missing` evidence.
+```
+
+Slot ID format: `GAP_<SECTION>_<FEATURE>`, all-caps, stable across regenerations unless user assets change.
+
+**Rules** (hard):
+
+- **Do not** infer, fill, or hallucinate evidence to "close" gaps. Missing is missing.
+- **Do not** propose specific experiment commands to fill gaps — that is `/experiment-bridge`'s job. Gap Report just surfaces deficits.
+- **Do not** include exemplar prose / claim text / author names / quantitative figures from the exemplar.
+- If `style_profile.md` extraction failed or the user has no project assets, skip Gap Report (no error; just do not emit the file).
+- The gap report is **also subject to reviewer isolation** — never passed to reviewer / auditor sub-agents (same rule as `style_profile.md`).
+
+Original idea: @zhangpelf in [#217](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/issues/217).
 
 ## Workflow
 
 ### Step 1: Extract Claims and Evidence
 
-Read all available narrative documents and extract:
+**First check for `CLAIMS_FROM_RESULTS.md`** — if its first line is `verdict: REVIEW_UNAVAILABLE`, treat the file as ABSENT for claim extraction (fall through to the narrative documents below) and then: under `— assurance: submission` (`shared-references/assurance-contract.md`; implied by `— effort: max|beast`) STOP — the claims were never adjudicated, rerun `/result-to-claim` first; under `assurance: draft` continue but tag every claim `[unadjudicated]` in the claims matrix. Otherwise, if it exists (generated by `/result-to-claim` at the end of Workflow 2), use it as the starting point for claims. This file contains validated claims already mapped to experiment evidence. Merge with any additional claims from the narrative documents below.
+
+If `CLAIMS_FROM_RESULTS.md` does not exist, extract claims from scratch:
+
+Treat `idea-stage/docs/research_contract.md` as the claim boundary: do not promote unsupported or explicitly out-of-scope claims into the paper outline. Read all available narrative documents and extract:
 
 1. **Core claims** (3-5 main contributions)
-2. **Evidence** for each claim (which experiments, which metrics, which figures)
-3. **Known weaknesses** (from reviewer feedback)
-4. **Suggested framing** (from review conclusions)
+2. **One-sentence contribution** (the single sentence that best states what the paper contributes)
+3. **Evidence** for each claim (which experiments, which metrics, which figures)
+4. **Known weaknesses** (from reviewer feedback)
+5. **Suggested framing** (from review conclusions)
 
 Build a **Claims-Evidence Matrix**:
 
@@ -49,6 +159,12 @@ Build a **Claims-Evidence Matrix**:
 ### Step 2: Determine Paper Type and Structure
 
 Based on TARGET_VENUE and paper content, classify and select structure.
+
+Before committing to a structure, apply the narrative principle from `../shared-references/writing-principles.md`:
+
+- The paper should tell one coherent technical story.
+- By the end of the Introduction, the outline should make the **What**, **Why**, and **So What** explicit.
+- Front-load the most important material: title, abstract, introduction, and hero figure. Reviewers often form a judgment before reading the full method.
 
 **IMPORTANT**: The section count is FLEXIBLE (5-8 sections). Choose what fits the content best. The templates below are starting points, not rigid constraints.
 
@@ -96,26 +212,32 @@ For each section, specify:
 
 ```markdown
 ### §0 Abstract
-- **One-sentence problem**: [what gap this paper addresses]
-- **Approach**: [what we do, in one sentence]
-- **Key result**: [most compelling quantitative finding]
-- **Implication**: [why it matters]
+- **What we achieve**: [the paper's specific contribution, not field-level background]
+- **Why it matters / is hard**: [why this problem is important and non-trivial]
+- **How we do it**: [approach in one sentence]
+- **Evidence**: [what supports the claim]
+- **Most remarkable result**: [strongest quantitative or theoretical result]
 - **Estimated length**: 150-250 words
 - **Self-contained check**: can a reader understand this without the paper?
 
 ### §1 Introduction
 - **Opening hook**: [1-2 sentences that motivate the problem]
-- **Gap**: [what's missing in prior work]
+- **Gap / challenge**: [what's missing in prior work, and why prior work is insufficient]
+- **One-sentence contribution**: [the main takeaway of the paper]
+- **Approach overview**: [what we do differently]
 - **Key questions**: [the research questions this paper answers]
-- **Contributions**: [numbered list, matching Claims-Evidence Matrix]
+- **Contributions**: [2-4 numbered bullets, specific and falsifiable, matching Claims-Evidence Matrix]
+- **Results preview**: [the strongest result or comparison to surface early]
 - **Hero figure**: [describe what Figure 1 should show — MUST include clear comparison if applicable]
 - **Estimated length**: 1.5 pages
 - **Key citations**: [3-5 papers to cite here]
+- **Front-loading check**: [would a skim reader know the main claim before reaching the method?]
 
 ### §2 Related Work
 - **Subtopics**: [2-4 categories of related work]
 - **Positioning**: [how this paper differs from each category]
 - **Minimum length**: 1 full page (at least 3-4 paragraphs with substantive synthesis)
+- **Organization rule**: organize by methodological family / assumption / question, not paper-by-paper
 - **Must NOT be just a list** — synthesize, compare, and position
 
 ### §3 Method / Setup / Preliminaries
@@ -160,6 +282,7 @@ List every figure and table:
 - Which methods are being compared
 - What the visual difference should demonstrate
 - Caption draft that clearly states the comparison
+- Why the figure helps a skim reader understand the paper before reading the full method
 
 ### Step 5: Citation Scaffolding
 
@@ -180,10 +303,11 @@ For each section, list required citations:
 
 ### Step 6: Cross-Review with REVIEWER_MODEL
 
-Send the complete outline to Gemini review for feedback:
+Send the complete outline to Gemini for feedback:
 
 ```
 mcp__gemini-review__review_start:
+  config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     Review this paper outline for a [VENUE] submission.
     [full outline including Claims-Evidence Matrix]
@@ -194,6 +318,7 @@ mcp__gemini-review__review_start:
     3. Missing experiments or analysis
     4. Positioning relative to prior work
     5. Page budget feasibility (MAX_PAGES = main body to Conclusion end, excluding refs/appendix)
+    6. Front-matter strength — are the abstract, introduction, and hero figure plan strong enough for skim-reading reviewers?
 
     For each weakness, suggest the MINIMUM fix.
     Be specific and actionable — "add X" not "consider more experiments".
@@ -211,6 +336,7 @@ Save the final outline to `PAPER_PLAN.md` in the project root:
 # Paper Plan
 
 **Title**: [working title]
+**One-sentence contribution**: [single-sentence statement of the paper's core takeaway]
 **Venue**: [target venue]
 **Type**: [empirical/theory/method]
 **Date**: [today]
@@ -238,26 +364,25 @@ Save the final outline to `PAPER_PLAN.md` in the project root:
 - [ ] /paper-compile to build PDF
 ```
 
-## Output Protocols
-
-> Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
-
 ## Key Rules
-
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
-
 - **Do NOT generate author information** — leave author block as placeholder or anonymous
 - **Be honest about evidence gaps** — mark claims as "needs experiment" rather than overclaiming
 - **Page budget is hard** — if content exceeds MAX_PAGES, suggest what to move to appendix
-- **MAX_PAGES counts main body only** — from first page to end of Conclusion. References and appendix are NOT counted.
-- **Venue-specific norms** — all three venues (ICLR/NeurIPS/ICML) use `natbib` (`\citep`/`\citet`)
+- **MAX_PAGES counting differs by venue** — ML conferences: main body to Conclusion end, references/appendix NOT counted; AAAI main track is typically 7 technical-content pages plus references. **IEEE venues: references ARE counted toward the page limit.**
+- **Venue-specific norms** — ML conferences (ICLR/NeurIPS/ICML) use `natbib` (`\citep`/`\citet`); **IEEE venues use `cite` package (`\cite{}`, numeric style)**
 - **Claims-Evidence Matrix is the backbone** — every claim must map to evidence, every experiment must support a claim
+- **Front-load the story** — the outline should make the contribution clear in the title, abstract, introduction, and hero figure before the reader reaches the full method
 - **Figures need detailed descriptions** — especially the hero figure, which must clearly specify comparisons and visual expectations
 - **Section count is flexible** — 5-8 sections depending on paper type. Don't force content into a rigid 5-section template.
 
 ## Acknowledgements
 
-Outline methodology inspired by [Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills) (claim-evidence mapping), [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar) (citation verification), and [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills) (claim verification protocol).
+Outline methodology inspired by [Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills) (claim-evidence mapping), [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar) (citation verification), and [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills) (claim verification protocol). The writing-framing overlay in this hybrid pack is adapted from Orchestra Research's paper-writing guidance.
+
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting

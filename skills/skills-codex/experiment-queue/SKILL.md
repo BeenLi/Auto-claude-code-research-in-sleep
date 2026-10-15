@@ -192,8 +192,8 @@ The scheduler implementation lives in `tools/experiment_queue/queue_manager.py`.
 
 ```bash
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
-    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
 fi
 if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
     ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
@@ -204,7 +204,7 @@ QUEUE_TOOLS=".aris/tools/experiment_queue"
 [ -f "$QUEUE_TOOLS/queue_manager.py" ] || { echo "ERROR: experiment_queue helpers not found at .aris/tools/, tools/, or \$ARIS_REPO/tools/ (from the install manifest or ~/.aris/repo); rerun install_aris.sh or export ARIS_REPO" >&2; exit 1; }
 ```
 
-This is the canonical chain from `../shared-references/integration-contract.md` §2. The `.aris/tools` symlink is set up by `install_aris.sh` (#174). Older installs without that symlink fall through to `tools/experiment_queue` when invoked inside the ARIS repo, then to `$ARIS_REPO/tools/experiment_queue`, where `ARIS_REPO` comes from the environment, the project's `.aris/installed-skills.txt`, or the one-line pointer file `~/.aris/repo`.
+This is the canonical chain from `../shared-references/integration-contract.md` §2. The `.aris/tools` symlink is set up by `install_aris.sh` (#174). Older installs without that symlink fall through to `tools/experiment_queue` when invoked inside the ARIS repo, then to `$ARIS_REPO/tools/experiment_queue`, where `ARIS_REPO` comes from the environment, the project's `.aris/installed-skills-codex.txt`, or the one-line pointer file `~/.aris/repo`.
 
 For remote runs, use both a remote-relative path for `scp` and a `$HOME`-prefixed path for `ssh` command strings. Modern `scp` uses SFTP mode and does not reliably expand `$HOME` in destination paths.
 

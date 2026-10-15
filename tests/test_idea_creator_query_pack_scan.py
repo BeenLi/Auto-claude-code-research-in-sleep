@@ -200,10 +200,11 @@ def test_skill_wiring_keeps_immediate_scan_on_read_contract() -> None:
     for skill in SKILLS:
         text = skill.read_text(encoding="utf-8")
         phase_zero = _phase_zero_shell(skill)
-        # Local fork: skills/skills-codex is generated from skills/ by
-        # tools/sync_codex_skill_mirror.py, which does not rename the install
-        # manifest, so both trees resolve through installed-skills.txt.
-        manifest = "installed-skills.txt"
+        manifest = (
+            "installed-skills-codex.txt"
+            if "skills-codex" in skill.parts
+            else "installed-skills.txt"
+        )
         assert 'ARIS_REPO="${ARIS_REPO:-}"' in text
         assert 'ARIS_HOME="${HOME:-}"' in phase_zero
         assert '"$HOME' not in phase_zero, "Phase-0 resolver must tolerate HOME unset"

@@ -53,8 +53,8 @@ fi
 # Layers 1-3: shared-runtime chain (non-CC hosts + manual installs).
 if [ -z "$RENDER_HTML" ]; then
   cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-  if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
-      ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+  if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+      ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
   fi
   RENDER_HTML=".aris/skills/render-html/scripts/render_html.py"
   [ -f "$RENDER_HTML" ] || RENDER_HTML="skills/render-html/scripts/render_html.py"

@@ -1,5 +1,5 @@
 ---
-name: grant-proposal
+name: "grant-proposal"
 description: "Draft a structured grant proposal from research ideas and literature. Supports KAKENHI (Japan), NSF (US), NSFC (China, including 面上/青年/优青/杰青/海外优青/重点), ERC (EU), DFG (Germany), SNSF (Switzerland), ARC (Australia), NWO (Netherlands), and generic formats. Use when user says \"write grant\", \"grant proposal\", \"申請書\", \"write KAKENHI\", \"科研費\", \"基金申请\", \"写基金\", \"NSF proposal\", or wants to turn research ideas into a funding application."
 ---
 
@@ -34,7 +34,7 @@ Grant proposals argue for **future work** (feasibility + potential), not complet
 
 - **GRANT_TYPE = `KAKENHI`** — Default grant type. Supported: `KAKENHI`, `NSF`, `NSFC`, `ERC`, `DFG`, `SNSF`, `ARC`, `NWO`, `GENERIC`. Override via argument (e.g., `/grant-proposal "topic — NSF"`).
 - **GRANT_SUBTYPE = `auto`** — Sub-type within the grant agency. Examples: KAKENHI `Start-up`/`Wakate`/`Kiban-B`; NSFC `Youth`/`Excellent-Youth`/`Distinguished`/`Overseas`/`Key`; NSF `CAREER`/`CRII`/`Standard`. Auto-detected from argument or defaults to the most common sub-type.
-- **REVIEWER_MODEL = `gemini-review`** — Gemini reviewer invoked through the local `gemini-review` MCP bridge for proposal review. Set `GEMINI_REVIEW_MODEL` if you need a specific Gemini model override.
+- **REVIEWER_MODEL = `gemini-review`** — Gemini reviewer invoked through the local `gemini-review` MCP bridge. Set `GEMINI_REVIEW_MODEL` if you need a specific Gemini model override.
 - **OUTPUT_FORMAT = `markdown`** — Output format. Supported: `markdown`, `latex`. LaTeX uses grant-specific templates when available.
 - **MAX_REVIEW_ROUNDS = 2** — Maximum external review-revise cycles before finalizing.
 - **OUTPUT_DIR = `grant-proposal/`** — Directory for generated proposal files.
@@ -42,6 +42,50 @@ Grant proposals argue for **future work** (feasibility + potential), not complet
 - **AUTO_PROCEED = false** — At each checkpoint, **always wait for explicit user confirmation** before proceeding. Grant proposals require PI-specific judgment at every stage. Set `true` only if user explicitly requests fully autonomous mode.
 
 > 💡 These are defaults. Override by telling the skill, e.g., `/grant-proposal "topic — NSF CAREER, latex output"` or `/grant-proposal "topic — NSFC Youth, language: English"`.
+
+## Optional: Style reference (`— style-ref: <source>`, opt-in)
+
+Lets the PI steer the proposal's **structural** layout (section order tendency, paragraph length, figure density, citation style) toward a successful past proposal or paper they'd like to mirror. **Default OFF — when the user does not pass `— style-ref`, do nothing differently from before.**
+
+Only when `— style-ref: <source>` appears in `$ARGUMENTS`, run the helper FIRST, before drafting:
+
+```bash
+# Resolve $STYLE_HELPER via the canonical strict-safe chain (see
+# shared-references/integration-contract.md §2). Policy A — gate:
+# unresolved helper means --style-ref cannot be satisfied, so abort.
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
+    ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
+fi
+STYLE_HELPER=".aris/tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || STYLE_HELPER="tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || { [ -n "${ARIS_REPO:-}" ] && STYLE_HELPER="$ARIS_REPO/tools/extract_paper_style.py"; }
+[ -f "$STYLE_HELPER" ] || {
+  echo "ERROR: extract_paper_style.py not resolved at .aris/tools/, tools/, \$ARIS_REPO/tools/, or via ~/.aris/repo." >&2
+  echo "       Fix: rerun bash tools/install_aris.sh or smart_update.sh (refreshes ~/.aris/repo), export ARIS_REPO, or copy the helper to tools/." >&2
+  echo "       --style-ref cannot be satisfied; aborting." >&2
+  exit 1
+}
+STYLE_STATUS=0
+CACHE=$(python3 "$STYLE_HELPER" --source "<source>") || STYLE_STATUS=$?
+case "$STYLE_STATUS" in
+  0) ;;                                       # use $CACHE/style_profile.md as structural guidance
+  2) echo "warning: style-ref skipped (missing optional dep)" >&2 ;;
+  3) echo "error: --style-ref source failed; aborting proposal" >&2 ; exit 1 ;;
+  *) echo "error: helper failed unexpectedly; aborting proposal" >&2 ; exit 1 ;;
+esac
+```
+
+Sources accepted: local TeX dir / file, local PDF, arXiv id, http(s) URL. Overleaf URLs/IDs are rejected — clone the project locally first and pass the local path.
+
+**Strict rules** (full contract in `tools/extract_paper_style.py` docstring):
+
+- Use `style_profile.md` to align paragraph length tendency, figure budget, and citation density. Grant-type-mandated section order (KAKENHI 研究目的 → 研究計画・方法 → 準備状況, NSF Intellectual Merit → Broader Impacts, etc.) **always takes precedence** — the agency template wins, the style ref only refines secondary structure.
+- **Never copy proposal prose, claims, vision statements, or budget items** from anything reachable through the cache. The reference might be someone else's funded proposal; reproducing language risks plagiarism.
+- **Never pass `— style-ref` (or the cache contents) to the GPT-6-Astra reviewer sub-agent** when it scores the draft — the proposal must be judged on its own merits.
 
 ## Grant Type Specifications
 
@@ -135,11 +179,11 @@ Grant proposal drafting is a long task that may trigger context compaction. Pers
   "grant_type": "KAKENHI",
   "grant_subtype": "Start-up",
   "language": "Japanese",
-  "thread_id": "019cfcf4-...",
+  "codex_agent_id": "019cfcf4-...",
   "gap_statement": "...",
   "aims_count": 3,
   "status": "in_progress",
-  "timestamp": "2026-03-18T07:00:00Z"
+  "timestamp": "2026-03-18T15:00:00"
 }
 ```
 
@@ -176,7 +220,7 @@ If insufficient context exists:
 - No research idea at all → suggest running `/idea-discovery` first
 - No literature survey → will invoke `/research-lit` inline in Phase 1
 - No publication list → leave PI qualification section with `[TODO: Add publications]` placeholders
-- Has `review-stage/AUTO_REVIEW.md` → extract reviewer feedback and use it to strengthen the feasibility narrative
+- Has review-stage/AUTO_REVIEW.md → extract reviewer feedback and use it to strengthen the feasibility narrative
 
 ### Phase 1: Literature & Landscape Positioning
 
@@ -290,7 +334,7 @@ Timeline: [timeline]
 ```
 
 **What this does:**
-- Gemini acts as a grant review panelist (not a paper reviewer)
+- Gemini review acts as a grant review panelist (not a paper reviewer)
 - Evaluates aims independence, narrative arc, risk identification, timeline realism
 - Identifies the single biggest reviewer concern
 - Provides actionable fixes ranked by severity
@@ -306,7 +350,7 @@ Apply structural feedback before proceeding to drafting.
 - Aim 2: [title] — Risk: MEDIUM
 - Aim 3: [title] — Risk: LOW
 - Timeline: [summary]
-- Reviewer feedback: [key points from Gemini]
+- Reviewer feedback: [key points from GPT-6-Astra]
 
 Proceed to section drafting? Or adjust the structure?
 ```
@@ -319,7 +363,7 @@ Options for the user:
 - Reply **"back"** → return to Phase 1 to adjust the gap/positioning
 - Reply **"stop"** → save current structure to `grant-proposal/DRAFT_NOTES.md`
 
-**State**: Write `GRANT_STATE.json` with `phase: 2`, aims summary, and the completed reviewer `thread_id` if you ran the reviewer directly.
+**State**: Write `GRANT_STATE.json` with `phase: 2`, aims summary, and Codex agent_id.
 
 ### Phase 3: Section Drafting
 
@@ -327,7 +371,7 @@ Draft each section according to the grant type template. Write **complete prose*
 
 **What this does:**
 - Writes all required sections in the agency-specific language and tone
-- Pulls content from `idea-stage/IDEA_REPORT.md`, FINAL_PROPOSAL.md, and literature notes
+- Pulls content from idea-stage/IDEA_REPORT.md, FINAL_PROPOSAL.md, and literature notes
 - Uses `/paper-illustration` for figure generation (if user requests)
 - Leaves `[TODO]` only for PI-specific information, `[AMOUNT]` for budget figures
 - Outputs `grant-proposal/GRANT_PROPOSAL.md`
@@ -404,7 +448,7 @@ Which should I generate? (e.g., "1 and 3", "all", "skip")
 
 #### For Each Section
 
-1. **Pull relevant content** from `idea-stage/IDEA_REPORT.md`, FINAL_PROPOSAL.md, literature notes
+1. **Pull relevant content** from idea-stage/IDEA_REPORT.md, FINAL_PROPOSAL.md, literature notes
 2. **Write complete prose** — no `[TODO]` except for PI-specific information
 3. **Include figure/table placeholders** where appropriate (e.g., `[Figure 1: System architecture]`)
 4. **Cite references properly** — use citation keys, will build bibliography later
@@ -415,25 +459,41 @@ Which should I generate? (e.g., "1 and 3", "all", "skip")
 Invoke `/research-review` on the complete draft for grant-type-specific evaluation:
 
 ```
-/research-review "Complete [GRANT_TYPE] [GRANT_SUBTYPE] proposal draft. Evaluate as a [GRANT_TYPE] review panelist using official criteria. [PASTE FULL PROPOSAL TEXT]"
+/research-review "Read the grant review bundle at grant-proposal/codex_panel_review_bundle_round_1.md and evaluate it as a [GRANT_TYPE] [GRANT_SUBTYPE] review panelist using the official criteria."
 ```
 
 **What this does:**
-- Gemini acts as a grant review panelist
+- Gemini review acts as a grant review panelist
 - Scores each section 1-5 using agency-specific criteria
 - Identifies fatal flaws and recommends funding/revisions/rejection
 - Provides ranked action items for improvement
 - All feedback saved to `grant-proposal/GRANT_REVIEW.md`
 
-> ⚠️ **External review fallback**: If `gemini-review` MCP is unavailable or Gemini credentials are missing, skip external review. Note "External review skipped — gemini-review unavailable." in `GRANT_REVIEW.md`. The proposal is still usable without external review.
+> ⚠️ **Codex subagent fallback**: If `mcp__gemini-review__review_start` is not available (the `gemini-review` MCP bridge is not registered), skip external review. Note "External review skipped — no Codex subagent available. Consider running `/auto-review-loop-llm` separately." in GRANT_REVIEW.md. The proposal is still usable without external review.
 
-If `/research-review` is invoked (preferred), it handles the external review internally. If you run the reviewer directly, use `mcp__gemini-review__review_start` for Round 1 and `mcp__gemini-review__review_reply_start` for follow-up rounds.
+If `/research-review` is invoked (preferred), it handles the Codex call internally. If calling Codex directly (e.g., to maintain thread context from Phase 2):
 
 #### Round 1 (full draft review):
 
+Write `grant-proposal/codex_panel_review_bundle_round_1.md` containing the
+criteria below plus the absolute path to `grant-proposal/GRANT_PROPOSAL.md`,
+then keep the Codex subagent prompt short:
+
 ```
-mcp__gemini-review__review_start:
+mcp__gemini-review__review_reply_start:
+  agent_id: [from Phase 2]
+  # inherits the thread's model/effort — do not re-send
   prompt: |
+    Read the grant review bundle at <absolute path to
+    grant-proposal/codex_panel_review_bundle_round_1.md> and follow all
+    instructions in it.
+```
+
+After this start call, immediately save the returned `jobId` and poll `mcp__gemini-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+
+Bundle contents:
+
+```
     Review this complete [GRANT_TYPE] [GRANT_SUBTYPE] proposal draft.
 
     Act as a [GRANT_TYPE] review panelist. Evaluate using the official criteria:
@@ -451,19 +511,34 @@ mcp__gemini-review__review_start:
     - Single most impactful change to improve funding chances?
     - Any fatal flaws?
 
-    [PASTE FULL PROPOSAL TEXT]
+    Proposal draft path (read this file yourself): <absolute path to
+    grant-proposal/GRANT_PROPOSAL.md>
 ```
-
-After this start call, immediately save the returned `jobId` and poll `mcp__gemini-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the review output, and save the completed `threadId` in `GRANT_STATE.json` if you want to continue the same dialogue in Round 2.
 
 #### Round 2+ (after revisions):
 
 If MAX_REVIEW_ROUNDS > 1 and revisions were applied:
 
+Write `grant-proposal/codex_panel_review_bundle_round_N.md` containing the
+change log, any raw diff / changed-file paths worth inspecting, and the
+absolute path to the current `grant-proposal/GRANT_PROPOSAL.md`, then reuse the
+same short MCP prompt pattern:
+
 ```
 mcp__gemini-review__review_reply_start:
-  threadId: [saved completed threadId from Round 1]
+  agent_id: [saved from Round 1]
+  # inherits the thread's model/effort — do not re-send
   prompt: |
+    Read the grant review bundle at <absolute path to
+    grant-proposal/codex_panel_review_bundle_round_N.md> and follow all
+    instructions in it.
+```
+
+After this start call, immediately save the returned `jobId` and poll `mcp__gemini-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+
+Bundle contents:
+
+```
     [Round N review of revised [GRANT_TYPE] [GRANT_SUBTYPE] proposal]
 
     Since your last review, I have applied the following changes:
@@ -474,10 +549,9 @@ mcp__gemini-review__review_reply_start:
     Please re-evaluate. Same format: section scores, overall assessment, remaining weaknesses.
     Focus on whether the CRITICAL and MAJOR issues from Round 1 have been adequately addressed.
 
-    [PASTE REVISED PROPOSAL TEXT]
+    Revised proposal path (read this file yourself): <absolute path to
+    grant-proposal/GRANT_PROPOSAL.md>
 ```
-
-After this start call, immediately save the returned `jobId` and poll `mcp__gemini-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the updated review output.
 
 ### Phase 5: Revision & Output
 
@@ -488,7 +562,7 @@ Parse reviewer feedback into severity levels:
 - **MAJOR** — significant weaknesses. Fix before submission.
 - **MINOR** — suggestions for improvement. Fix if time allows.
 
-Implement CRITICAL and MAJOR fixes. If MAX_REVIEW_ROUNDS > 1, re-submit for another round via `send_input`.
+Implement CRITICAL and MAJOR fixes. If MAX_REVIEW_ROUNDS > 1, re-submit for another round via `mcp__gemini-review__review_reply_start`.
 
 #### 5.2 Generate Output
 
@@ -542,7 +616,7 @@ Before declaring done:
 - Language: [language]
 - Aims: [N] aims covering [summary]
 - Timeline: [N] years
-- Review score: [summary from Gemini]
+- Review score: [summary from GPT-6-Astra]
 - Output: grant-proposal/GRANT_PROPOSAL.md
 
 Files saved to grant-proposal/. Please review and customize:
@@ -557,13 +631,6 @@ What would you like to do next?
 - "done" → finalize
 ```
 
-## Output Protocols
-
-> Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
-
 ## Key Rules
 
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
@@ -576,7 +643,7 @@ What would you like to do next?
 - **Preliminary data de-risks.** Include any pilot results, existing datasets, or prior publications that demonstrate feasibility.
 - **Reviewer-facing structure.** Bold key sentences. Use numbered lists for clarity. Make the reviewer's job easy.
 - **Cultural norms matter.** KAKENHI expects 社会的意義; NSF expects Broader Impacts; NSFC expects 国际前沿 positioning. Missing these is a red flag for reviewers.
-- **Feishu notifications are optional.** If `~/.codex/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final output. If absent, skip silently.
+- **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final output. If absent, skip silently.
 
 ## Parameter Pass-Through
 
@@ -595,7 +662,7 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 | `max review rounds` | 2 | External review cycles | — |
 | `sources` | all | Literature sources | → `/research-lit` |
 | `arxiv download` | false | Download arXiv PDFs | → `/research-lit` |
-| `reviewer model` | gemini-review | Gemini reviewer bridge | → reviewer thread |
+| `reviewer model` | gpt-6-astra | Codex review model | → Codex subagent |
 | `auto proceed` | false | Skip checkpoints | — |
 
 ## Composing with Other Skills
@@ -626,3 +693,10 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 ```
 /idea-discovery → /experiment-bridge → /auto-review-loop → /paper-writing → submit
 ```
+
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](../shared-references/output-language.md)** — respect the project's language setting

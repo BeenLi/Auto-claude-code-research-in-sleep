@@ -79,8 +79,8 @@ because the prose endorsed the hardcoded form.
 # and `|| true` consumes a non-zero awk exit so chain evaluation
 # continues. Run `chmod +x` not required: the block uses `[ -f ]`.
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
-    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
 fi
 # Layer 4: global pointer file, written by the installer/updater at
 # ~/.aris/repo (#366) — covers global copy-installs with no project manifest.

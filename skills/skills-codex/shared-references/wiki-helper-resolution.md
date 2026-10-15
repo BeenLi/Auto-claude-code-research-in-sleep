@@ -10,7 +10,7 @@ left a real user's `research-wiki/` empty for a week.
 
 ```bash
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null)}"
+ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null)}"
 # Layer 4: global pointer file written by the installer/updater at
 # ~/.aris/repo (#366) — covers global copy-installs with no project manifest.
 if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
@@ -73,7 +73,7 @@ Four locations correspond to four legitimate install / dev paths:
 |---|---|
 | `.aris/tools/research_wiki.py` | After running `bash tools/install_aris.sh` in the user project (Phase 0 symlink, added in #174 / #192) |
 | `tools/research_wiki.py` | (a) Manual copy of the helper into the user project (a documented temporary workaround); (b) running a SKILL from inside the ARIS repo itself |
-| `$ARIS_REPO/tools/research_wiki.py` | Env var explicitly set, or auto-resolved from `.aris/installed-skills.txt`'s `repo_root` field |
+| `$ARIS_REPO/tools/research_wiki.py` | Env var explicitly set, or auto-resolved from `.aris/installed-skills-codex.txt`'s `repo_root` field |
 | `$ARIS_REPO/tools/research_wiki.py` via `~/.aris/repo` | Global pointer file written by `install_aris*.{sh,ps1}` / `smart_update*.{sh,ps1}` (#366); the only layer that resolves for a **global copy-install** (`~/.claude/skills/research-wiki`) where none of the first three apply — there is no project-local `.aris/`, no `tools/` copy, and no manifest to read `ARIS_REPO` from |
 
 Order matters: the symlinked install is preferred because the symlink
@@ -108,7 +108,7 @@ The `${ARIS_REPO:-$(awk ...)}` substitution propagates the inner
 `awk` exit code to `set -e` even when stderr is suppressed with
 `2>/dev/null`. `awk` returns non-zero (2 on most macOS systems) when
 its input file does not exist — which is the common case (no
-`.aris/installed-skills.txt` yet). With `set -e` enabled, the chain
+`.aris/installed-skills-codex.txt` yet). With `set -e` enabled, the chain
 will exit silently with code 2 before reaching the `[ -f ... ]`
 checks, masking the real failure mode and breaking the manual-copy
 fallback.
@@ -117,8 +117,8 @@ If a SKILL author wants strict-mode safety, restructure the manifest
 read instead:
 
 ```bash
-if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
-    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
 fi
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: "research-refine"
-description: "Turn a vague research direction into a problem-anchored, elegant, platform-aware, implementation-oriented method plan via iterative GPT-5.5 review. Use when the user says \"refine my approach\", \"帮我细化方案\", \"decompose this problem\", \"打磨idea\", \"refine research plan\", \"细化研究方案\", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea."
+description: "Turn a vague research direction into a problem-anchored, elegant, platform-aware, implementation-oriented method plan via iterative Claude review through claude-review MCP. Use when the user says \"refine my approach\", \"帮我细化方案\", \"decompose this problem\", \"打磨idea\", \"refine research plan\", \"细化研究方案\", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea."
 ---
 
 > Override for Codex users who want **Claude Code**, not a second Codex agent, to act as the reviewer. Install this package **after** `skills/skills-codex/*`.
@@ -26,10 +26,10 @@ Four principles dominate this skill:
 User input (PROBLEM + vague APPROACH)
   -> Phase 0 (Claude): Freeze Problem Anchor
   -> Phase 1 (Claude): Scan grounding papers -> identify technical gap -> choose the sharpest route -> write focused proposal
-  -> Phase 2 (Codex/GPT-5.5): Review for fidelity, specificity, contribution quality, and platform leverage
+  -> Phase 2 (Codex/GPT-6-Astra): Review for fidelity, specificity, contribution quality, and platform leverage
   -> Phase 3 (Claude): Anchor check + simplicity check -> revise method -> rewrite full proposal
-  -> Phase 4 (Codex, same thread): Re-evaluate revised proposal
-  -> Repeat Phase 3-4 until OVERALL SCORE >= 9 or MAX_ROUNDS reached
+  -> Phase 4 (Codex, same agent): Re-evaluate revised proposal
+  -> Repeat Phase 3-4 until OVERALL SCORE >= 9, READY, no drift, and handoff refresh passes, or MAX_ROUNDS reached
   -> Phase 5: Save full history to refine-logs/
   -> Optional handoff: /experiment-plan for a detailed execution-ready experiment roadmap
 ```
@@ -55,7 +55,7 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
 {
   "phase": "review",
   "round": 1,
-  "threadId": "019cd392-...",
+  "thread_id": "019cd392-...",
   "last_score": 6.5,
   "last_verdict": "REVISE",
   "status": "in_progress",
@@ -69,11 +69,11 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
 |-------|--------|---------|
 | `phase` | `"anchor"` / `"proposal"` / `"review"` / `"refine"` / `"done"` | Last **completed** phase |
 | `round` | 0–MAX_ROUNDS | Current round number |
-| `threadId` | string or null | Reviewer thread ID for `codex-reply` continuity |
+| `thread_id` | string or null | Reviewer agent id for `mcp__claude_review__review_reply_start` continuity |
 | `last_score` | number or null | Most recent overall score from reviewer |
 | `last_verdict` | string or null | Most recent verdict (READY / REVISE / RETHINK) |
 | `status` | `"in_progress"` / `"completed"` | Loop status |
-| `timestamp` | ISO 8601 | When state was last written |
+| `timestamp` | UTC ISO-8601 timestamp ending in Z | When state was last written |
 
 **Write rules:**
 - **Write after each phase completes** (not before). Overwrite each time — only the latest state matters.
@@ -113,7 +113,7 @@ Before starting any phase, check whether a previous run left a checkpoint:
 2. **On resume**, read the state file and recover context:
    - Read all existing `refine-logs/round-*.md` files to restore prior work
    - Read `refine-logs/score-history.md` if it exists
-   - Recover `threadId` for reviewer thread continuity
+   - Recover `thread_id` for reviewer thread continuity
    - Log to the user: `"Checkpoint found. Resuming after phase: {phase}, round: {round}."`
    - **Jump to the next phase** based on the saved `phase` value:
 
@@ -140,7 +140,7 @@ Write:
 
 If later reviewer feedback would change the problem being solved, mark that as **drift** and push back or adapt carefully.
 
-**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "threadId": null, "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<now>"}`.
+**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "thread_id": null, "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<UTC ISO-8601 timestamp ending in Z>"}`.
 
 ### Phase 1: Build the Initial Proposal
 
@@ -193,7 +193,7 @@ Cover:
 3. **Complexity budget**: what is frozen or reused, what is new, and what tempting additions are intentionally excluded.
 4. **System graph**: modules, data flow, inputs, outputs.
 5. **Data path design**: what hardware state, buffer, queue, or pipeline register is used; where in the Tx/Rx path does the new mechanism insert?
-6. **Implementation plan**: RTL vs HLS vs P4, pipeline stages, clock domain, critical path estimate, FPGA/ASIC synthesis target.
+6. **Implementation plan**: RTL vs HLS vs P4, pipeline stages, clock domain, critical path estimate, FPGA/ASIC synthesis target. The default FPGA target is the part in `../shared-references/lab-resources.yaml` (VCU118, XCVU9P).
 7. **Runtime data path**: how the mechanism operates at the target rate and what control signals flow between host, accelerator, memory, NIC, storage, and runtime.
 8. **Why the mechanism stays small**: why a larger hardware block is unnecessary (area/power budget argument).
 9. **Exact role of any platform primitive**: if you use an accelerator primitive, HBM/CXL tier, DPU offload engine, P4 match-action table, FPGA IP block, storage datapath, or RDMA verb extension, specify its role concretely.
@@ -318,11 +318,28 @@ Use this structure:
 
 ### Phase 2: External Method Review (Round 1)
 
-Send the full proposal to GPT-5.5 for an **elegance-first, platform-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
+Send the proposal to GPT-6-Astra for an **elegance-first, platform-aware,
+method-first** review. The reviewer should spend most of the critique budget
+on the method itself, not on expanding the experiment menu. For Codex subagent, do
+not inline the whole rubric + proposal once the prompt becomes large. Instead,
+write `refine-logs/codex_round_1_review_bundle.md` containing the instructions
+below plus the absolute path to `refine-logs/round-0-initial-proposal.md`, then
+keep the MCP prompt short:
 
 ```
 mcp__claude_review__review_start:
+  config: {"model_reasoning_effort": "xhigh"}
   prompt: |
+    Read the review bundle at <absolute path to
+    refine-logs/codex_round_1_review_bundle.md> and follow all instructions in
+    it.
+```
+
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+
+Bundle contents:
+
+```
     You are a senior computer architecture / systems researcher reviewing for MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM.
     Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system.
     This is an early-stage, mechanism-first research proposal.
@@ -345,9 +362,8 @@ mcp__claude_review__review_start:
     Read the Problem Anchor first. If your suggested fix would change the problem being solved,
     call that out explicitly as drift instead of treating it as a normal revision request.
 
-    === PROPOSAL ===
-    [Paste the FULL proposal from Phase 1]
-    === END PROPOSAL ===
+    Proposal path (read this file yourself): <absolute path to
+    refine-logs/round-0-initial-proposal.md>
 
     Score these 7 dimensions from 1-10:
 
@@ -359,14 +375,20 @@ mcp__claude_review__review_start:
 
     4. **Platform Leverage**: Does the proposal use modern platform capabilities (accelerators, memory hierarchy, CXL/HBM, DPU offload engines, FPGA IP blocks, P4 match-action, RDMA verb extensions, storage datapaths, or runtime hooks) appropriately, instead of defaulting to host-CPU software?
 
-    5. **Feasibility**: Can this mechanism be implemented and validated with the stated resources (analytical model / gem5 / htsim / RTL or HLS simulator / FPGA or DPU microbenchmark / trace replay)?
+    5. **Implementation Feasibility**: Can this refined mechanism be implemented and validated with the stated resources (analytical model / gem5 / htsim / RTL or HLS simulator / FPGA or DPU microbenchmark / trace replay)? This is not the same as `evaluation_feasibility_score`, which is the earlier Workflow 1 handoff readiness score.
 
     6. **Validation Focus**: Are the proposed experiments minimal but sufficient to validate the core claims? Is there unnecessary benchmark bloat?
 
     7. **Venue Readiness**: If executed well, would the contribution feel sharp and timely enough for MICRO/ISCA/HPCA/NSDI?
 
     **OVERALL SCORE** (1-10): Weighted toward Problem Fidelity, Method Specificity, Contribution Quality, and Platform Leverage.
-    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Platform Leverage 15%, Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
+    Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Platform Leverage 15%, Implementation Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
+    (This weighted-axis rubric is the repo's working precedent for
+    `shared-references/taste-calibration.md`; if curated known-good/known-bad
+    past proposals are available — e.g. from research-wiki's accepted/rejected
+    idea history — score 3 of each on these axes FIRST to anchor the scale, and
+    name in the review which anchor the proposal sits closest to. If no curated
+    anchors are supplied, say `CALIBRATION: none` and do not invent anchors.)
 
     For each dimension scoring < 7, provide:
     - The specific weakness
@@ -380,20 +402,18 @@ mcp__claude_review__review_start:
     - **Verdict**: READY / REVISE / RETHINK
 
     Verdict rule:
-    - READY: overall score >= 9, no meaningful drift, one focused dominant contribution, and no obvious complexity bloat remains
+    - READY: overall score >= 9, no meaningful drift, one focused dominant contribution, no obvious complexity bloat remains, and Implementation Feasibility is backed by concrete implementation evidence
     - REVISE: the direction is promising but not yet at READY bar
     - RETHINK: the core mechanism or framing is still fundamentally off
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
-
-**CRITICAL: Save the `threadId`** from this call for all later rounds.
+**CRITICAL: Save the returned `jobId`**, poll `mcp__claude_review__review_status` until `done=true`, then save the completed `threadId` from the status result for all later rounds.
 
 **CRITICAL: Save the FULL raw response** verbatim.
 
 Save review to `refine-logs/round-1-review.md` with the raw response in a `<details>` block.
 
-**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": 1, "threadId": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
+**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": 1, "thread_id": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
 
 ### Phase 3: Parse Feedback and Revise the Method
 
@@ -404,8 +424,8 @@ Extract:
 - **Problem Fidelity**
 - **Method Specificity**
 - **Contribution Quality**
-- **Frontier Leverage**
-- **Feasibility**
+- **Platform Leverage**
+- **Implementation Feasibility**
 - **Validation Focus**
 - **Venue Readiness**
 - **Overall score**
@@ -420,12 +440,12 @@ Update `refine-logs/score-history.md`:
 ```markdown
 # Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Implementation Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | X                | X                  | X                    | X                 | X           | X                | X               | X       | REVISE  |
 ```
 
-**STOP CONDITION**: If overall score >= SCORE_THRESHOLD, verdict is READY, and there is no unresolved drift warning, skip to Phase 5.
+**STOP CONDITION**: If overall score >= SCORE_THRESHOLD, verdict is READY, and there is no unresolved drift warning, run Phase 4.5 Handoff Refresh before Phase 5. Do not mark the selected idea ready unless Phase 4.5 passes.
 
 #### Step 3.2: Revise With an Anchor Check and a Simplicity Check
 
@@ -499,13 +519,27 @@ Save to `refine-logs/round-N-refinement.md`:
 
 ### Phase 4: Re-evaluation (Round 2+)
 
-Send the revised proposal back to GPT-5.5 in the **same thread**:
+Send the revised proposal back to GPT-6-Astra in the **same agent**. Again, keep
+the MCP payload short: write `refine-logs/codex_round_N_review_bundle.md`
+containing the re-evaluation instructions below, the key changes, and the
+absolute path to `refine-logs/round-N-refinement.md`, then ask Codex to read
+that bundle file.
 
 ```
 mcp__claude_review__review_reply_start:
-  threadId: [saved from Phase 2]
+  agent_id: [saved from Phase 2]
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
+    Read the re-evaluation bundle at <absolute path to
+    refine-logs/codex_round_N_review_bundle.md> and follow all instructions in
+    it.
+```
+
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+
+Bundle contents:
+
+```
     [Round N re-evaluation]
 
     I revised the proposal based on your feedback.
@@ -517,9 +551,8 @@ mcp__claude_review__review_reply_start:
     2. [Method change 2]
     3. [Simplification / modernization / pushback if any]
 
-    === REVISED PROPOSAL ===
-    [Paste the FULL revised proposal]
-    === END REVISED PROPOSAL ===
+    Revised proposal path (read this file yourself): <absolute path to
+    refine-logs/round-N-refinement.md>
 
     Please:
     - Re-score the same 7 dimensions and overall
@@ -528,21 +561,62 @@ mcp__claude_review__review_reply_start:
     - State whether the method is simpler or still overbuilt
     - State whether the platform leverage is now appropriate or still host-CPU / software-only / forced hardware
     - Focus new critiques on missing micro-architectural detail, weak hardware integration point, unsupported performance claim, pseudo-novelty, or unnecessary hardware complexity
-    - Use the same verdict rule: READY only if overall score >= 9 and no blocking issue remains
+    - Use the same verdict rule: READY only if overall score >= 9, no blocking issue remains, and Implementation Feasibility is backed by concrete implementation evidence
 
-    Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items.
+    Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items. Use the dimension name **Implementation Feasibility**, not plain **Feasibility**.
 ```
-
-After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 Save review to `refine-logs/round-N-review.md`.
 
-**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": N, "threadId": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
+**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": N, "thread_id": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
 
 Then return to Phase 3 until:
 
-- **Overall score >= SCORE_THRESHOLD** and verdict is READY and no unresolved drift
+- **Overall score >= SCORE_THRESHOLD** and verdict is READY and no unresolved drift, then Phase 4.5 handoff refresh passes
 - or **MAX_ROUNDS reached**
+
+### Phase 4.5: Handoff Refresh
+
+Before writing `FINAL_PROPOSAL.md` or allowing `/experiment-plan` to proceed,
+refresh the Workflow 1 handoff fields against the final refined method. This
+prevents stale `idea-creator` assumptions from silently crossing into Workflow
+1.5.
+
+Re-evaluate and write back to `idea-stage/IDEA_REPORT.md`:
+
+- `core_baseline`
+- `canon_mapping`
+- `baseline_artifact_readiness` with `score`, `status`,
+  `verification_status`, `evidence`, and `adapter_notes`
+- `evaluation_feasibility_score`
+- `evaluation_feasibility_breakdown` with `platform_workload_access`,
+  `evaluation_adapter_cost`, and `first_signal_runtime`
+- `metrics`
+- `target_validation_style`
+- `evaluation_target_clarity`
+- `refine_overall_score`
+- `refine_verdict`
+- `drift_status`
+- `handoff_refresh_status`
+
+Rules:
+
+- If `core_baseline` or `canon_mapping` changes, write `handoff_delta` and rerun
+  the new-baseline verification path from `/idea-creator`; set
+  `baseline_verification_delta: new_baseline_lookup` when new evidence is
+  introduced.
+- If the baseline is unchanged, set `baseline_verification_delta:
+  verified_by_research_lit (re-confirmed)` when the original evidence still
+  supports the final method.
+- Set `handoff_refresh_status: passed` only when the refreshed fields still
+  satisfy `skills/shared-references/idea-handoff-schema.md`.
+- Set `drift_status: preserved` if the Problem Anchor and handoff assumptions
+  survived unchanged; `corrected` if a drift was fixed before exit; `drifted`
+  if a blocking mismatch remains.
+- If handoff refresh fails, keep the best current `FINAL_PROPOSAL.md` as a
+  record, but set `refine_verdict: REVISE` or `RETHINK` and do not allow
+  Workflow 1 exit. `/idea-discovery` should try the next priority idea or mark
+  `main_blocker: refine_did_not_converge`.
 
 ### Phase 5: Final Report and Logs
 
@@ -618,7 +692,7 @@ If the final verdict is not READY, still write the best current final version he
 
 ## Score Evolution
 
-| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
+| Round | Problem Fidelity | Method Specificity | Contribution Quality | Platform Leverage | Implementation Feasibility | Validation Focus | Venue Readiness | Overall | Verdict |
 |-------|------------------|--------------------|----------------------|-------------------|-------------|------------------|-----------------|---------|---------|
 | 1     | ...              | ...                | ...                  | ...               | ...         | ...              | ...             | ...     | ...     |
 
@@ -651,7 +725,7 @@ If the final verdict is not READY, still write the best current final version he
 <details>
 <summary>Round 1 Review</summary>
 
-[Full verbatim response from GPT-5.5]
+[Full verbatim response from GPT-6-Astra]
 
 </details>
 
@@ -718,7 +792,7 @@ Suggested next step: /experiment-plan
 - **Review the mechanism, not the parts count.** A long module list is not novelty.
 - **Pushback is encouraged.** If reviewer feedback causes drift or unnecessary complexity, argue back with evidence.
 - **ALWAYS use `config: {"model_reasoning_effort": "xhigh"}`** for all Codex review calls.
-- **Save `threadId` from Phase 2** and use `send_input` for later rounds.
+- **Save the completed `threadId` from Phase 2** and use `mcp__claude_review__review_reply_start` plus `mcp__claude_review__review_status` for later rounds.
 - **Do not fabricate results.** Only describe expected evidence and planned experiments.
 - **Be specific about validation and workload assumptions.** Vague "we'll simulate it" is not enough.
 - **Document everything.** Save every raw review, every anchor check, every simplicity check, and every major method change.

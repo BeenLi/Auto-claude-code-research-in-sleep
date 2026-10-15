@@ -85,8 +85,8 @@ primary output — fail with explicit remediation.
 
 ```bash
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
-    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
 fi
 if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
     ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
@@ -172,7 +172,7 @@ use `--arxiv-id`. Otherwise fall back to manual metadata:
 ```bash
 if [ -d research-wiki/ ] and query category was "research paper":
     cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-    ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null)}"
+    ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null)}"
     if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
       ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
     fi

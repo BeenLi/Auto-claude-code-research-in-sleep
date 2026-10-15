@@ -1,18 +1,50 @@
 ---
 name: "research-review"
-description: "Get a deep critical review of research from GPT via Codex MCP. Use when user says \"review my research\", \"help me review\", \"get external review\", or wants critical feedback on research ideas, papers, or experimental results."
+description: "Get a deep critical review of research from an external reviewer backend (Codex or manual). Use when user says \"review my research\", \"help me review\", \"get external review\", or wants critical feedback on research ideas, papers, or experimental results."
 ---
 
 > Override for Codex users who want **Claude Code**, not a second Codex agent, to act as the reviewer. Install this package **after** `skills/skills-codex/*`.
 
-# Research Review via Codex MCP (xhigh reasoning)
+# Research Review via External Reviewer Backend (xhigh reasoning)
 
-Get a multi-round critical review of research work from an external LLM with maximum reasoning depth.
+> 🔒 **Do not wrap this skill in `/loop`, `/schedule`, or `CronCreate`.** It is
+> verdict-bearing — it produces a cross-model review verdict, multi-round with
+> reviewer thread continuity. An external timer re-fires the verdict on
+> wall-clock time and breaks the reviewer's round-to-round memory: zero new
+> signal, full token cost. Schedule the *external wait that precedes it* (work
+> ready → then review once), not the verdict. See
+> [`shared-references/external-cadence.md`](../shared-references/external-cadence.md).
+
+Get a multi-round critical review of research work from the selected external reviewer backend with maximum reasoning depth.
 
 ## Constants
 
 - **REVIEWER_MODEL = `claude-review`** — Claude reviewer invoked through the local `claude-review` MCP bridge. Set `CLAUDE_REVIEW_MODEL` if you need a specific Claude model override.
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.5 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
+
+## Reviewer Calling Convention
+
+When calling the reviewer, branch on REVIEWER_BACKEND:
+
+**If REVIEWER_BACKEND = `codex`:**
+  Use `mcp__claude_review__review_start` for new review threads.
+  Use `mcp__claude_review__review_reply_start` for follow-up rounds (reuse the completed `threadId`).
+
+**If REVIEWER_BACKEND = `manual`:**
+  Use `mcp__manual_review__review` for new review threads with:
+    prompt: [exact same prompt that would go to Codex]
+    config: {"model_reasoning_effort": "xhigh", "executor_model": "<actual executor model>", "require_reviewer_model": true}
+  Save the returned `thread_id`.
+  Use `mcp__manual_review__review_reply` for follow-up rounds with:
+    agent_id: [saved manual-review agent_id]
+    prompt: [follow-up prompt]
+    config: {"model_reasoning_effort": "xhigh", "executor_model": "<actual executor model>", "require_reviewer_model": true}
+
+Content fidelity: the manual reviewer should see the same substantive review
+brief Codex would read. If the manual UI supports file upload / attachment,
+reuse the same brief file; otherwise paste the brief contents inline because
+remote web UIs cannot read your local filesystem paths. Review tracing applies
+equally to both backends.
 
 ## Context: $ARGUMENTS
 
@@ -26,28 +58,37 @@ Get a multi-round critical review of research work from an external LLM with max
   ```
 - This gives Codex access to `mcp__claude_review__review_start`, `mcp__claude_review__review_reply_start`, and `mcp__claude_review__review_status`.
 
-  ```bash
-  claude mcp add codex -s user -- codex mcp-server
-  ```
-- This gives Claude Code access to `spawn_agent` and `send_input` tools
-
 ## Workflow
 
 ### Step 1: Gather Research Context
+
 Before calling the external reviewer, compile a comprehensive briefing:
+
 1. Read project narrative documents (e.g., STORY.md, README.md, paper drafts)
 2. Read any memory/notes files for key findings and experiment history
 3. Identify: core claims, methodology, key results, known weaknesses
 
+<br />
+
 ### Step 2: Initial Review (Round 1)
-Send a detailed prompt with high-rigor review:
+Send a detailed prompt with xhigh reasoning, using the selected backend. For
+the `codex` backend, keep the MCP payload short: write the full briefing to
+`RESEARCH_REVIEW_REQUEST.md`, then point Codex at that file.
+
+*For codex backend:*
 
 ```
 mcp__claude_review__review_start:
+  config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    [Full research context + specific questions]
+    Read the review brief at <absolute path to RESEARCH_REVIEW_REQUEST.md>.
+    Executor notes are not evidence beyond the files they cite, so verify the
+    referenced artifacts before judging.
     Please act as a senior computer architecture / systems reviewer (MICRO/ISCA/HPCA/ASPLOS/NSDI/SIGCOMM level).
     Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system. Runtime/serving claims are in scope only when tied to a concrete hardware bottleneck.
+    Start from the assumption that the work is broken somewhere — your job is
+    to find where. Be adversarial. Trust nothing the author tells you — verify
+    everything yourself.
 
     Identify:
     1. Logical gaps or unjustified claims (e.g., missing area/power analysis, unrealistic throughput assumptions)
@@ -57,22 +98,80 @@ mcp__claude_review__review_start:
        - Comparison with the closest hardware/system baseline for the selected layer
        - Generalizability: does the result hold across representative LLM infrastructure workloads?
     3. Narrative weaknesses: Is the problem clearly motivated with real system bottleneck numbers?
-    4. Whether the hardware contribution is sufficient (area/power overhead acceptable? throughput competitive?)
-    5. Whether the chosen AI infrastructure layer and validation backend are coherent. For RDMA/NIC compression, also check RoCEv2/DCQCN/credit flow control and Rx decompression expansion pressure.
-    Please be brutally honest.
+    4. Whether the architecture/system contribution is sufficient (area/power or CPU/latency overhead acceptable? throughput competitive?)
+    5. Whether the chosen AI infrastructure layer and validation backend are coherent, including any protocol, flow-control, or datapath interactions specific to the selected layer.
+
+    === SCOPE LIMITS (these bound what you PROPOSE, never what you look for) ===
+    Report anything that is actually wrong here — including a rare-looking case, if
+    this repo actually produces it. Then keep the fix in scope:
+    1. This is a RESEARCH-WORKFLOW tool, not a security paper. Verification is
+       welcome; over-defense is not. Assume a cooperating operator on their own
+       machine — a malicious local user is NOT in the threat model.
+    2. Do NOT propose SHA / hash / content-fingerprint / digest-binding schemes.
+       Reporting a real defect in hashing code that already exists is fine.
+    3. NO speculative machinery: do not add feature flags, migration frameworks,
+       compat layers, wrappers, pins, or similar mechanisms unless evidence shows
+       a current repo defect they fix or an explicit existing invariant they must
+       preserve. "Load-bearing", "compatibility", and "not scaffolding" are labels,
+       not evidence. Point to the failing path/artifact or invariant, and check the
+       proposal's factual premises, such as whether a named package version exists.
+    4. NO corner-case obsession: exotic encodings, symlink races, RTL text and
+       millisecond races are out of scope unless you can show the case arises here.
+    5. Where a rubric or checklist is genuinely needed, do not over-mechanize
+       judgement. A clear sentence a human reads beats a scored table nobody
+       maintains.
+    Exception: code that runs remote commands, starts a network service, or installs
+    an MCP server runs on the user's machine with their credentials — trust-boundary
+    findings there are in scope and the default is strict.
+    Say plainly when something is correct. Do not manufacture findings.
+    Be brutally honest. If, after genuinely trying to break it, the work
+    holds up and is ready, say so clearly.
 ```
 
 After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
+The review brief should contain the full research context, the specific
+questions, and the primary artifact / raw-result paths the reviewer should
+inspect. Idea-specific reviewer checks (e.g., RoCEv2/DCQCN/credit flow control
+and Rx decompression expansion pressure for a NIC-compression idea) belong in
+`RESEARCH_REVIEW_REQUEST.md`, derived from the active research contract — do
+not hard-code them into this skill.
+
+*For manual backend:* use `mcp__manual_review__review` with the same brief
+contents. If the manual-review UI supports attachments, attach
+`RESEARCH_REVIEW_REQUEST.md`; otherwise paste the brief inline. Save the
+returned `thread_id`.
+
 ### Step 3: Iterative Dialogue (Rounds 2-N)
-Use `mcp__claude_review__review_reply_start` with the saved completed `threadId`, then poll `mcp__claude_review__review_status` with the returned `jobId` until `done=true` to continue the conversation:
+For `codex` backend: use `mcp__claude_review__review_reply_start` with the returned `thread_id`.
+For `manual` backend: use `mcp__manual_review__review_reply` with the same `thread_id`.
+Use the appropriate tool to continue the conversation. For Codex follow-up
+rounds, write an updated brief such as `RESEARCH_REVIEW_ROUND_2.md` and send
+only the path:
+
+```
+mcp__claude_review__review_reply_start:
+  agent_id: [saved reviewer agent_id from Step 2]
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
+    Read the updated review brief at <absolute path to
+    RESEARCH_REVIEW_ROUND_2.md>.
+    Focus on unresolved weaknesses and whether the revision actually fixed them.
+```
+
+After this start call, immediately save the returned `jobId` and poll `mcp__claude_review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
+
+For manual follow-up rounds, attach that same updated brief if possible;
+otherwise paste it inline.
 
 For each round:
+
 1. **Respond** to criticisms with evidence/counterarguments
 2. **Ask targeted follow-ups** on the most actionable points
 3. **Request specific deliverables**: experiment designs, paper outlines, claims matrices
 
 Key follow-up patterns:
+
 - "If we reframe X as Y, does that change your assessment?"
 - "What's the minimum experiment to satisfy concern Z?"
 - "Please design the minimal additional experiment package with the highest acceptance lift per simulator/prototype week"
@@ -80,13 +179,17 @@ Key follow-up patterns:
 - "Give me a results-to-claims matrix for possible experimental outcomes"
 
 ### Step 4: Convergence
+
 Stop iterating when:
+
 - Both sides agree on the core claims and their evidence requirements
 - A concrete experiment plan is established
 - The narrative structure is settled
 
 ### Step 5: Document Everything
+
 Save the full interaction and conclusions to a review document in the project root:
+
 - Round-by-round summary of criticisms and responses
 - Final consensus on claims, narrative, and experiments
 - Claims matrix (what claims are allowed under each possible outcome)
@@ -95,33 +198,57 @@ Save the full interaction and conclusions to a review document in the project ro
 
 Update project memory/notes with key review conclusions.
 
+> **Composed mode** — if invoked with `— composed: <canonical-report-path>` (an
+> orchestrator like `/idea-discovery` passes this), do **not** write a standalone review
+> `.md` in the project root. The raw conversation is already persisted to `.aris/traces/…`
+> (see *Review Tracing* below — that audit copy is kept in every mode); fold the review
+> *conclusions* (consensus, claims matrix, prioritized TODOs) into the orchestrator's
+> canonical report and cite the trace path there. **Default (no `— composed:` directive):
+> behave exactly as above — write the standalone review document.** Never infer composed
+> mode from a report file merely existing. Full rules:
+> [`shared-references/output-composition.md`](../shared-references/output-composition.md).
+
 ## Key Rules
 
-- ALWAYS use `config: {"model_reasoning_effort": "xhigh"}` for reviews
-- Send comprehensive context in Round 1 — the external model cannot read your files
+- ALWAYS pin `model: REVIEWER_MODEL` + `config: {"model_reasoning_effort": "xhigh"}` for new Codex review threads; follow-up rounds keep `config: {"model_reasoning_effort": "xhigh"}`
+- That pin is the **Codex** backend's. For `manual`, use the identity-bearing config from the Reviewer Calling Convention above; `model`, `sandbox` and `cwd` are Codex-only
+- Put comprehensive context in the review brief. Codex can read local files
+  when you pass an absolute path; manual reviewers usually cannot, so attach or
+  paste the same brief there.
 - Be honest about weaknesses — hiding them leads to worse feedback
 - Push back on criticisms you disagree with, but accept valid ones
 - Focus on ACTIONABLE feedback — "what experiment would fix this?"
-- Document the threadId for potential future resumption
+- Document the agent_id for potential future resumption
 - The review document should be self-contained (readable without the conversation)
 
 ## Prompt Templates
 
 ### For initial review:
+
 "I'm going to present a computer architecture research project for your critical review. Please act as a senior MICRO/ISCA/HPCA/ASPLOS reviewer. Domain: AI infrastructure for LLM across compute, memory/storage/data movement, interconnect/network, or runtime/system..."
 
 ### For experiment design:
+
 "Please design the minimal additional experiment package that gives the highest acceptance lift. Focus on: (1) which claims need real hardware measurement vs simulation, (2) what micro-benchmark or trace workloads cover the key cases, (3) what overhead analysis (area/power/latency/bandwidth) a reviewer would require. Be very specific about configurations."
 
 ### For paper structure:
+
 "Please turn this into a concrete paper outline with section-by-section claims and figure plan. Include: motivation with real bottleneck numbers, micro-architecture diagram, end-to-end system integration, evaluation methodology, and comparison to prior art."
 
 ### For claims matrix:
+
 "Please give me a results-to-claims matrix: what claim is allowed under each possible outcome of experiments X and Y? (e.g., if throughput improvement < 10%, can we still claim latency benefit?)"
 
 ### For mock review:
+
 "Please write a mock MICRO/ISCA review with: Summary, Strengths, Weaknesses, Questions for Authors, Score (1-6 scale), Confidence, and What Would Move Toward Accept."
 
 ## Review Tracing
 
-After each `spawn_agent` or `send_input` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each reviewer call (`mcp__claude_review__review_start`, `mcp__claude_review__review_reply_start`, `mcp__manual_review__review`, or `mcp__manual_review__review_reply`), save the trace following `shared-references/review-tracing.md` (Policy C — forensic; never silently skip). Use `save_trace.sh` (resolved per the chain in `shared-references/integration-contract.md` §2) or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+  A verdict-bearing manual response MUST begin with
+  `Reviewer-Model: <exact-model-id>` — pass the model THIS session is actually
+  running as in `executor_model`. Missing, unknown, or same-family identity
+  cannot acquit; emit `REVIEW_UNAVAILABLE` rather than guessing. If the executor
+  model cannot be named, manual review's cross-family claim is unprovable — say
+  so in the report instead of asserting it.

@@ -90,8 +90,8 @@ and a **local Codex app-server MCP bridge** as the raster renderer.
   # Layers 1-4: shared-runtime chain via shim at tools/paper_illustration_image2.py.
   if [ -z "$IMAGE2_HELPER" ]; then
     cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-    if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
-        ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
+    if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+        ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
     fi
     if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
         ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true

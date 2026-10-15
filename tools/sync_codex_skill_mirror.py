@@ -91,6 +91,8 @@ def transform_codex_text(text: str) -> str:
         ("saved thread", "saved agent"),
         ("Save the agent_id", "Save the agent id"),
         ("returned agent_id", "returned agent id"),
+        # install_aris.sh --target codex writes its own manifest name.
+        (".aris/installed-skills.txt", ".aris/installed-skills-codex.txt"),
     ]
     for old, new in replacements:
         text = text.replace(old, new)

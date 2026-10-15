@@ -23,7 +23,18 @@ changes: 0
 clean
 ```
 
-The sync script copies main skills and `shared-references` into `skills/skills-codex/`, removes stale mirror skills, and applies the small Codex wording/tool-name adaptations. It does not rewrite the Claude or Gemini review overlay packages.
+The sync script copies main skills and `shared-references` into `skills/skills-codex/`, removes stale mirror skills, and applies the small Codex wording/tool-name adaptations (including the Codex install manifest name, `.aris/installed-skills-codex.txt`). It does not rewrite the Claude or Gemini review overlay packages.
+
+## Regenerate the Review Overlays
+
+Both overlay packages are generated from the Codex mirror, so run this after the mirror sync:
+
+```bash
+python3 tools/generate_codex_claude_review_overrides.py                      # both overlays
+python3 tools/generate_codex_claude_review_overrides.py --reviewer gemini    # just one
+```
+
+It rewrites every Codex reviewer call in `skills/skills-codex-claude-review/` and `skills/skills-codex-gemini-review/` to the `claude-review` / `gemini-review` MCP tools, and removes overlay skills that left its target list. The overlay `README*.md` files are hand-written and left alone.
 
 ## Unified Project Install
 

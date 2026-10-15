@@ -81,7 +81,7 @@ Resolve script-backed adapters (`arxiv_fetch.py`, `semantic_scholar_fetch.py`,
 `deepxiv_fetch.py`, `exa_search.py`, `openalex_fetch.py`) through the canonical
 chain in `shared-references/integration-contract.md` §2 rather than assuming
 `tools/`: `.aris/tools/`, then `tools/`, then `$ARIS_REPO/tools/` (with
-`$ARIS_REPO` taken from the environment, `.aris/installed-skills.txt`, or the
+`$ARIS_REPO` taken from the environment, `.aris/installed-skills-codex.txt`, or the
 `~/.aris/repo` pointer). An unresolved helper, or one that exits non-zero, is a
 per-source skip: warn, record it in Source Audit, and continue.
 
@@ -433,7 +433,7 @@ step silently.
 Resolve the helper using the shared contract in
 `shared-references/wiki-helper-resolution.md`: prefer `.aris/tools/research_wiki.py`,
 then `tools/research_wiki.py`, then `$ARIS_REPO/tools/research_wiki.py` (with
-`$ARIS_REPO` taken from the environment, `.aris/installed-skills.txt`, or the
+`$ARIS_REPO` taken from the environment, `.aris/installed-skills-codex.txt`, or the
 `~/.aris/repo` pointer). If no
 helper is found, warn and skip wiki ingest only; do not skip the literature
 review output.

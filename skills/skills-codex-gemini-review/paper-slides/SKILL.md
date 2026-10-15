@@ -1,11 +1,9 @@
 ---
-name: paper-slides
+name: "paper-slides"
 description: "Generate conference presentation slides (beamer LaTeX → PDF + editable PPTX) from a compiled paper, with speaker notes and full talk script. Use when user says \"做PPT\", \"做幻灯片\", \"make slides\", \"conference talk\", \"presentation slides\", \"生成slides\", \"写演讲稿\", or wants beamer slides for a conference talk."
-argument-hint: [paper-directory-or-talk-length]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__gemini-review__review, mcp__gemini-review__review_start, mcp__gemini-review__review_reply_start, mcp__gemini-review__review_status
 ---
 
-> Override for Codex users who want **Gemini**, not a Codex-MCP reviewer, to act as the reviewer. Install this package **after** `skills/skills-codex/*`.
+> Override for Codex users who want **Gemini**, not a second Codex agent, to act as the reviewer. Install this package **after** `skills/skills-codex/*`.
 
 # Paper Slides: From Paper to Conference Talk
 
@@ -26,12 +24,56 @@ Unlike posters (single page, visual-first), slides tell a **temporal story**: ea
 - **SPEAKER_NOTES = true** — Generate `\note{}` blocks in beamer and corresponding PPTX notes. Set `false` for clean slides without notes.
 - **PAPER_DIR = `paper/`** — Directory containing the compiled paper.
 - **OUTPUT_DIR = `slides/`** — Output directory for all slide files.
-- **REVIEWER_MODEL = `gemini-review`** — Gemini reviewer invoked through the local `gemini-review` MCP bridge for slide review.
+- **REVIEWER_MODEL = `gemini-review`** — Gemini reviewer invoked through the local `gemini-review` MCP bridge. Set `GEMINI_REVIEW_MODEL` if you need a specific Gemini model override.
 - **AUTO_PROCEED = false** — At each checkpoint, **always wait for explicit user confirmation**.
 - **COMPILER = `latexmk`** — LaTeX build tool.
 - **ENGINE = `pdflatex`** — LaTeX engine. Use `xelatex` for CJK text.
 
 > 💡 Override: `/paper-slides "paper/" — talk_type: oral, venue: ICML, minutes: 20, aspect: 4:3`
+
+## Optional: Style reference (`— style-ref: <source>`, opt-in)
+
+Lets the user steer the talk's **structural** rhythm (story beats, theorem density, figure density inherited from the source paper) toward a reference paper. **Default OFF — when the user does not pass `— style-ref`, do nothing differently from before.**
+
+Only when `— style-ref: <source>` appears in `$ARGUMENTS`, run the helper FIRST:
+
+```bash
+# Resolve $STYLE_HELPER via the canonical strict-safe chain (see
+# shared-references/integration-contract.md §2). Policy A — gate:
+# unresolved helper means --style-ref cannot be satisfied, so abort.
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
+    ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
+fi
+STYLE_HELPER=".aris/tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || STYLE_HELPER="tools/extract_paper_style.py"
+[ -f "$STYLE_HELPER" ] || { [ -n "${ARIS_REPO:-}" ] && STYLE_HELPER="$ARIS_REPO/tools/extract_paper_style.py"; }
+[ -f "$STYLE_HELPER" ] || {
+  echo "ERROR: extract_paper_style.py not resolved at .aris/tools/, tools/, \$ARIS_REPO/tools/, or via ~/.aris/repo." >&2
+  echo "       Fix: rerun bash tools/install_aris.sh or smart_update.sh (refreshes ~/.aris/repo), export ARIS_REPO, or copy the helper to tools/." >&2
+  echo "       --style-ref cannot be satisfied; aborting." >&2
+  exit 1
+}
+STYLE_STATUS=0
+CACHE=$(python3 "$STYLE_HELPER" --source "<source>") || STYLE_STATUS=$?
+case "$STYLE_STATUS" in
+  0) ;;                                       # use $CACHE/style_profile.md as structural guidance
+  2) echo "warning: style-ref skipped (missing optional dep)" >&2 ;;
+  3) echo "error: --style-ref source failed; aborting slides" >&2 ; exit 1 ;;
+  *) echo "error: helper failed unexpectedly; aborting slides" >&2 ; exit 1 ;;
+esac
+```
+
+Sources accepted: local TeX dir / file, local PDF, arXiv id, http(s) URL. Overleaf URLs/IDs are rejected — clone via `/overleaf-sync setup <id>` first and pass the local clone path.
+
+**Strict rules** (full contract in `tools/extract_paper_style.py` docstring):
+
+- Use `style_profile.md` to align section-budget tendency and theorem-environment density. Talk-type slide count above still takes precedence.
+- **Never copy speaker-note prose, slide titles, or examples** from anything reachable through the cache. The talk content is from the user's paper, not the reference.
+- **Never pass `— style-ref` (or the cache contents) to the GPT-6-Astra reviewer sub-agent** — the reviewer must judge the talk's clarity on its own merits.
 
 ## Talk Type → Slide Count
 
@@ -44,7 +86,7 @@ Unlike posters (single page, visual-first), slides tell a **temporal story**: ea
 
 ## Venue Color Schemes
 
-Same as `/paper-poster`:
+Same as `/paper-poster-html`:
 
 | Venue | Primary | Accent | Background | Text |
 |-------|---------|--------|------------|------|
@@ -64,9 +106,9 @@ Persist state to `slides/SLIDES_STATE.json` after each phase:
   "venue": "NeurIPS",
   "talk_type": "spotlight",
   "slide_count": 10,
-  "codex_thread_id": "019cfcf4-...",
+  "codex_agent_id": "019cfcf4-...",
   "status": "in_progress",
-  "timestamp": "2026-03-18T07:00:00Z"
+  "timestamp": "2026-03-18T15:00:00"
 }
 ```
 
@@ -316,12 +358,13 @@ If page count differs significantly from outline (>2 slides off), investigate.
 
 **State**: Write `SLIDES_STATE.json` with `phase: 4`.
 
-### Phase 5: Gemini Review
+### Phase 5: Codex subagent Review
 
-Send the slide outline + selected LaTeX frames to Gemini:
+Send the slide outline + selected LaTeX frames to Gemini review:
 
 ```
 mcp__gemini-review__review_start:
+  config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     Review this [TALK_TYPE] presentation ([TALK_MINUTES] min) for [VENUE].
 
@@ -347,11 +390,11 @@ mcp__gemini-review__review_start:
     - Overall: Ready to present? (Yes / Needs revision / Major issues)
 ```
 
-After this start call, immediately save the returned `jobId` and poll `mcp__gemini-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the slide review.
+After this start call, immediately save the returned `jobId` and poll `mcp__gemini-review__review_status` with a bounded `waitSeconds` until `done=true`. Treat the completed status payload's `response` as the reviewer output, and save the completed `threadId` for any follow-up round.
 
 Apply fixes. Recompile if LaTeX was changed.
 
-> ⚠️ If `gemini-review` MCP is not available or Gemini credentials are missing, skip external review and proceed to Phase 6. Note the skip in `SLIDES_STATE.json`.
+> ⚠️ If `mcp__gemini-review__review_start` is not available (the `gemini-review` MCP bridge is not registered), skip external review and proceed to Phase 6. Note the skip in `SLIDES_STATE.json`.
 
 Save review to `slides/SLIDES_REVIEW.md`.
 
@@ -526,7 +569,7 @@ The paper and code are available at the QR code on screen. I'm happy to take que
   ├── main.pdf              # Compiled slides (primary output)
   ├── presentation.pptx     # Editable PowerPoint
   ├── SLIDE_OUTLINE.md      # Slide-by-slide outline
-  ├── SLIDES_REVIEW.md      # Gemini review feedback
+  ├── SLIDES_REVIEW.md      # GPT-6-Astra review feedback
   ├── speaker_notes.md      # Per-slide speaker notes
   ├── TALK_SCRIPT.md        # Full word-for-word talk script + Q&A
   ├── SLIDES_STATE.json     # State persistence
@@ -542,12 +585,25 @@ Next steps:
 
 **State**: Write `SLIDES_STATE.json` with `phase: 8, status: "completed"`.
 
-## Output Protocols
+## Recommended Follow-up: `/slides-polish`
 
-> Follow these shared protocols for all output files:
-> - **[Output Versioning Protocol](../../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
-> - **[Output Manifest Protocol](../../shared-references/output-manifest.md)** — log every output to MANIFEST.md
-> - **[Output Language Protocol](../../shared-references/output-language.md)** — respect the project's language setting
+After this skill produces the initial Beamer + PPTX, the typical drift is
+**typography proportion + per-slide layout**, not content. Run
+`/slides-polish` as a focused post-generation polish phase: it does
+per-page Codex review against a reference visual (e.g., a prior academic
+talk), bumps PPTX fonts to projector-readable sizes, fixes text-frame
+overflow, and applies a fix-pattern catalog (italic style leaks, em-dash
+spacing, image aspect ratio, Chinese-font hints, anonymity placeholders).
+
+`/slides-polish` is read-only on content (no claim / number / citation
+edits) and preserves speaker notes verbatim. Invocation:
+
+```
+/slides-polish slides/ — reference: <ref-pdf> [— style: generic | why-rf | <venue>]
+```
+
+Skip it for short decks (< 5 slides) or when a complete redesign is
+needed (re-run `/paper-slides` instead).
 
 ## Key Rules
 
