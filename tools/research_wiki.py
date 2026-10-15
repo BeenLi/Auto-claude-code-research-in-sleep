@@ -30,6 +30,24 @@ Usage:
     python3 research_wiki.py sync <wiki_root> --arxiv-ids id1,id2,id3
     python3 research_wiki.py sync <wiki_root> --from-file ids.txt
     python3 research_wiki.py sync-obsidian <wiki_root> --paper-notes-dir <dir> [--dry-run]
+
+    # Claim layer (PROVE/JUDGE output ledger, born at /proof-checker):
+    python3 research_wiki.py add_claim <wiki_root> --slug b1-main-ub \
+        --name "..." --status sound-modulo-imports --provenance <run path> \
+        --statement "..." --scope "..." --evidence "..." \
+        --addresses G2,G10 --extends paper:slug --uses paper:slug \
+        --depends-on claim:other --refutes claim:bad
+
+    # Idea layer (/idea-creator write-back):
+    python3 research_wiki.py upsert_idea <wiki_root> --slug <id> --title "..." \
+        --stage proposed --outcome pending --thesis "..." --risks "..." \
+        --based-on paper:slug --target-gaps G2 \
+        [--park-reason <reason> --revisit-condition "..."]
+
+    # Experiment layer (/result-to-claim verdict owner):
+    python3 research_wiki.py add_experiment <wiki_root> --slug exp-001 \
+        --idea idea:<id> --verdict yes --confidence high --metrics "..." \
+        --reasoning "..." --provenance <run dir> --update-on-exist
 """
 
 # `from __future__ import annotations` defers annotation evaluation so that
@@ -46,8 +64,11 @@ import os
 import re
 import shutil
 import sqlite3
+import subprocess
 import sys
 import tempfile
+import time
+import unicodedata
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
@@ -124,15 +145,48 @@ def utc_iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _arxiv_user_agent() -> str:
+    """Descriptive User-Agent for arXiv API calls.
+
+    arXiv rate-limits the default ``Python-urllib/x.y`` agent far more
+    aggressively than a named client; sending a descriptive UA (with an
+    optional contact address) lands requests in arXiv's more lenient pool.
+    The contact is read from ``ARIS_VERIFY_EMAIL`` — the same env var the
+    /research-lit skill already uses for the CrossRef polite pool — so no
+    address is hard-coded. Falls back to a contactless UA when unset.
+    """
+    contact = os.environ.get("ARIS_VERIFY_EMAIL", "").strip()
+    base = ("ARIS-research-wiki/1.0 "
+            "(+https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)")
+    return f"{base} (mailto:{contact})" if contact else base
+
+
 def slugify(title: str, author_last: str = "", year: int = 0) -> str:
-    """Generate a canonical slug: author_last + year + keyword."""
-    # Extract first meaningful word from title
+    """Generate a canonical slug: author_last + year + keyword.
+
+    Letters outside ASCII are kept. Stripping them used to collapse every
+    Chinese paper to `<year>_untitled`, so two different papers by the same
+    author in the same year produced the same slug and the second was silently
+    dropped as a duplicate. ASCII titles and authors slugify exactly as before;
+    accented Latin letters (e.g. Müller) are now kept instead of dropped.
+    Existing pages keep their paths — only newly minted slugs change.
+    """
     stop_words = {"a", "an", "the", "of", "for", "in", "on", "with", "via", "and", "to", "by"}
-    words = re.sub(r"[^a-z0-9\s]", "", title.lower()).split()
+    # `[^\w\s]|_` keeps letters/digits in any script while still dropping the
+    # underscore that \w would otherwise let through (ASCII behavior unchanged).
+    normalized_title = unicodedata.normalize("NFC", title.lower())
+    words = re.sub(r"[^\w\s]|_", "", normalized_title, flags=re.UNICODE).split()
     keywords = [w for w in words if w not in stop_words and len(w) > 2]
     keyword = "_".join(keywords[:3]) if keywords else "untitled"
+    # Scripts without spaces yield one long token; cap it so the filename stays sane.
+    if not keyword.isascii():
+        keyword = keyword[:48]
 
-    author = re.sub(r"[^a-z]", "", author_last.lower()) if author_last else "unknown"
+    if author_last:
+        normalized_author = unicodedata.normalize("NFC", author_last.lower())
+        author = "".join(ch for ch in normalized_author if ch.isalpha())
+    else:
+        author = "unknown"
     yr = str(year) if year else "0000"
     return f"{author}{yr}_{keyword}"
 
@@ -149,18 +203,18 @@ def init_wiki(wiki_root: str):
         path = root / f
         if not path.exists():
             if f == "index.md":
-                path.write_text("# Research Wiki Index\n\n_Auto-generated. Do not edit._\n")
+                path.write_text("# Research Wiki Index\n\n_Auto-generated. Do not edit._\n", encoding="utf-8")
             elif f == "log.md":
-                path.write_text("# Research Wiki Log\n\n_Append-only timeline._\n")
+                path.write_text("# Research Wiki Log\n\n_Append-only timeline._\n", encoding="utf-8")
             elif f == "gap_map.md":
-                path.write_text("# Gap Map\n\n_Field gaps with stable IDs._\n")
+                path.write_text("# Gap Map\n\n_Field gaps with stable IDs._\n", encoding="utf-8")
             elif f == "query_pack.md":
-                path.write_text("# Query Pack\n\n_Auto-generated for /idea-creator. Max 8000 chars._\n")
+                path.write_text("# Query Pack\n\n_Auto-generated for /idea-creator. Max 8000 chars._\n", encoding="utf-8")
 
     # Create empty edges file
     edges_path = root / "graph" / "edges.jsonl"
     if not edges_path.exists():
-        edges_path.write_text("")
+        edges_path.write_text("", encoding="utf-8")
 
     append_log(wiki_root, "Wiki initialized")
     print(f"Research wiki initialized at {root}")
@@ -171,6 +225,11 @@ def add_edge(wiki_root: str, from_id: str, to_id: str, edge_type: str, evidence:
     VALID_TYPES = {
         "extends", "contradicts", "addresses_gap", "inspired_by",
         "tested_by", "supports", "invalidates", "supersedes",
+        # Claim-layer edge types (additive, used by add_claim):
+        #   claim --depends_on--> claim   (proof-obligation dependency)
+        #   claim --refutes--> claim      (a claim that falsifies another)
+        #   claim --uses--> paper         (imports a result/ingredient)
+        "depends_on", "refutes", "uses",
     }
     if edge_type not in VALID_TYPES:
         print(f"Warning: unknown edge type '{edge_type}'. Valid: {VALID_TYPES}", file=sys.stderr)
@@ -180,7 +239,7 @@ def add_edge(wiki_root: str, from_id: str, to_id: str, edge_type: str, evidence:
     # Dedup check
     existing_edges = []
     if edges_path.exists():
-        for line in edges_path.read_text().strip().split("\n"):
+        for line in _read_wiki_text(edges_path).strip().split("\n"):
             if line.strip():
                 try:
                     existing_edges.append(json.loads(line))
@@ -224,7 +283,7 @@ def add_edge(wiki_root: str, from_id: str, to_id: str, edge_type: str, evidence:
         "added": utc_iso_now(),
     }
 
-    with open(edges_path, "a") as f:
+    with open(edges_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(edge, ensure_ascii=False) + "\n")
 
     print(f"Edge added: {from_id} --{edge_type}--> {to_id}")
@@ -247,9 +306,16 @@ def _extract_projection_fields(content: str) -> dict[str, str]:
             else:
                 fields[key] = value
     if not fields.get("one_line"):
+        # Matches the thesis heading at any level (`#` or `##`); the local
+        # manual-ingest renderer emits `## One-line thesis` inside PROJECT NOTES.
         sections = _markdown_sections(_split_frontmatter(content)[1])
         if "One-line thesis" in sections:
-            fields["one_line"] = _compact_markdown_text(sections["One-line thesis"])
+            # Skip the scaffold placeholder an un-enriched page still carries.
+            thesis_lines = "\n".join(
+                line for line in sections["One-line thesis"].splitlines()
+                if not line.strip().startswith("_TODO")
+            )
+            fields["one_line"] = _compact_markdown_text(thesis_lines)
     return fields
 
 
@@ -268,12 +334,83 @@ def _first_body_summary(content: str, max_chars: int = 220) -> str:
     return " ".join(lines)[:max_chars].strip()
 
 
-def _section_summary(content: str, headings: list[str], max_chars: int = 180) -> str:
+def _is_placeholder_text(text: str) -> bool:
+    """True for scaffold placeholders such as `_TODO: ..._` left by the renderers."""
+    stripped = text.strip()
+    return not stripped or stripped.startswith("_TODO")
+
+
+def _section_summary(content: str, headings: list[str], max_chars: int = 180,
+                     fallback: bool = True) -> str:
     sections = _markdown_sections(_split_frontmatter(content)[1])
     for heading in headings:
         if heading in sections:
-            return _compact_markdown_text(sections[heading], max_chars=max_chars)
-    return _first_body_summary(content, max_chars=max_chars)
+            summary = _compact_markdown_text(sections[heading], max_chars=max_chars)
+            if _is_placeholder_text(summary):
+                continue
+            return summary
+    return _first_body_summary(content, max_chars=max_chars) if fallback else ""
+
+
+# RESEARCH_BRIEF.md `## ` headings in /idea-creator priority order
+# (templates/RESEARCH_BRIEF_TEMPLATE.md).
+_BRIEF_SECTIONS = [
+    ("Problem", "Problem Statement"),
+    ("Constraints", "Constraints"),
+    ("Direction", "What I'm Looking For"),
+    ("Background", "Background"),
+    ("Non-goals", "Non-Goals"),
+    ("Domain Knowledge", "Domain Knowledge"),
+    ("Existing Results", "Existing Results (if any)"),
+]
+
+
+def _brief_project_direction(raw: str) -> str:
+    """Structured extraction of the project direction from RESEARCH_BRIEF.md.
+
+    Parses the template's `## ` sections so the fields /idea-creator needs most
+    (problem, constraints, direction) survive; a flat slice of the top of the
+    brief never reached Constraints or Direction. Deterministic, no LLM. Falls
+    back to a flat 600-char slice when the brief uses none of the known headings
+    (custom template or free-form brief) so it is never silently dropped.
+    """
+    sections_map: dict[str, str] = {}
+    current_heading = ""
+    current_lines: list[str] = []
+    for line in raw.split("\n"):
+        if line.startswith("## "):
+            if current_heading:
+                sections_map[current_heading] = "\n".join(current_lines).strip()
+            current_heading = line[3:].strip()
+            current_lines = []
+        elif current_heading:
+            current_lines.append(line)
+    if current_heading:
+        sections_map[current_heading] = "\n".join(current_lines).strip()
+
+    def _section(name: str) -> str:
+        # Exact match first, then a tolerant match so template drift
+        # ("Existing Results" vs "Existing Results (if any)", trailing
+        # punctuation, case) still resolves to the intended section.
+        text = sections_map.get(name, "").strip()
+        if not text:
+            want = name.lower().rstrip(":").strip()
+            for key, value in sections_map.items():
+                candidate = key.lower().rstrip(":").strip()
+                if candidate == want or candidate.startswith(want) or want.startswith(candidate):
+                    text = value.strip()
+                    if text:
+                        break
+        return text
+
+    parts = []
+    for label, heading in _BRIEF_SECTIONS:
+        text = _section(heading)
+        if text:
+            parts.append(f"**{label}**\n\n{text}")
+    if parts:
+        return "\n\n".join(parts)
+    return raw.strip()[:600]
 
 
 def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
@@ -281,14 +418,17 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
     root = Path(wiki_root)
     sections = []
 
+    # 1. Project direction — structured extraction from RESEARCH_BRIEF.md.
+    # No per-field cap; the max_chars assembly loop below is the only safety net.
     brief_path = root.parent / "RESEARCH_BRIEF.md"
     if brief_path.exists():
-        brief = brief_path.read_text()[:300]
-        sections.append(f"## Project Direction\n{brief}\n")
+        brief = _brief_project_direction(_read_wiki_text(brief_path))
+        if brief:
+            sections.append(f"## Project Direction\n{brief}\n")
 
     gap_path = root / "gap_map.md"
     if gap_path.exists():
-        gaps = gap_path.read_text()[:1200]
+        gaps = _read_wiki_text(gap_path)[:1200]
         if gaps.strip() and gaps.strip() != "# Gap Map\n\n_Field gaps with stable IDs._":
             sections.append(f"## Open Gaps\n{gaps}\n")
 
@@ -296,13 +436,21 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
     if ideas_dir.exists():
         failed = []
         for path in sorted(ideas_dir.glob("*.md")):
-            content = path.read_text()
             meta = _load_frontmatter(path)
-            outcome = _as_text(meta.get("outcome"))
-            if outcome not in {"negative", "mixed"} and "outcome: negative" not in content and "outcome: mixed" not in content:
+            # Gate on the FRONTMATTER outcome only (not a full-text substring): a
+            # `pending` idea whose body discusses an "outcome: negative" failure
+            # mode must NOT be banlisted.
+            if _as_text(meta.get("outcome")) not in {"negative", "mixed"}:
                 continue
+            content = _read_wiki_text(path)
             title = _as_text(meta.get("title")) or path.stem
-            failure = _section_summary(content, ["Failure Notes", "Lessons", "Failure"], max_chars=200)
+            # /result-to-claim fills "Failure / Risk Notes" + "Lessons Learned" on a
+            # negative idea; upsert_idea pages carry "Key risks".
+            failure = _section_summary(
+                content,
+                ["Failure Notes", "Failure / Risk Notes", "Lessons Learned", "Lessons",
+                 "Failure", "Key risks"],
+                max_chars=200)
             failed.append(f"- **{title}**: {failure}")
         if failed:
             sections.append(f"## Failed Ideas (avoid repeating)\n{chr(10).join(failed)[:1400]}\n")
@@ -311,7 +459,7 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
     if papers_dir.exists():
         paper_summaries = []
         for path in sorted(papers_dir.glob("*.md")):
-            content = path.read_text()
+            content = _read_wiki_text(path)
             meta = _load_frontmatter(path)
             node_id = _as_text(meta.get("node_id")) or f"paper:{path.stem}"
             title = _as_text(meta.get("title")) or path.stem
@@ -324,7 +472,9 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
             prefix = f"- [{node_id}] {title}"
             if obsidian_path:
                 prefix += f" ({obsidian_path})"
-            paper_summaries.append(f"{prefix}: {'; '.join(parts)[:420]}")
+            # Omit the ": " suffix when the page has no projected fields yet.
+            suffix = f": {'; '.join(parts)[:420]}" if parts else ""
+            paper_summaries.append(f"{prefix}{suffix}")
         if paper_summaries:
             sections.append(f"## Key Papers ({len(paper_summaries)} total)\n{chr(10).join(paper_summaries[:12])[:2200]}\n")
 
@@ -332,13 +482,17 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
     if claims_dir.exists():
         claim_summaries = []
         for path in sorted(claims_dir.glob("*.md")):
-            content = path.read_text()
+            content = _read_wiki_text(path)
             meta = _load_frontmatter(path)
             node_id = _as_text(meta.get("node_id")) or f"claim:{path.stem}"
             status = _as_text(meta.get("status")) or "unknown"
-            title = _as_text(meta.get("title")) or path.stem
-            summary = _first_body_summary(content, max_chars=220)
-            claim_summaries.append(f"- [{node_id}] {status}: {title}. {summary}")
+            # add_claim pages carry `name:`; older hand-written pages carry `title:`.
+            title = _as_text(meta.get("title")) or _as_text(meta.get("name")) or path.stem
+            # add_claim pages (node_type: claim) keep the statement in a section;
+            # their first body line is only the status badge, so don't fall back to it.
+            summary = _section_summary(content, ["Statement"], max_chars=220,
+                                       fallback=_as_text(meta.get("node_type")) != "claim")
+            claim_summaries.append(f"- [{node_id}] {status}: {title}." + (f" {summary}" if summary else ""))
         if claim_summaries:
             sections.append(f"## Claims ({len(claim_summaries)} total)\n{chr(10).join(claim_summaries)[:1200]}\n")
 
@@ -346,15 +500,35 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
     if experiments_dir.exists():
         experiment_summaries = []
         for path in sorted(experiments_dir.glob("*.md")):
-            content = path.read_text()
+            content = _read_wiki_text(path)
             meta = _load_frontmatter(path)
             node_id = _as_text(meta.get("node_id")) or f"exp:{path.stem}"
             title = _as_text(meta.get("title")) or path.stem
-            setup = _section_summary(content, ["Setup", "Experiment Setup", "实验设置"], max_chars=160)
-            result = _section_summary(content, ["Result", "Results", "Main Result", "核心结果"], max_chars=180)
-            linked = _as_text(meta.get("linked_claim") or meta.get("claim") or meta.get("idea"))
-            tail = f"; linked={linked}" if linked else ""
-            experiment_summaries.append(f"- [{node_id}] {title}: setup={setup}; result={result}{tail}")
+            verdict = _as_text(meta.get("verdict"))
+            setup_headings = ["Setup", "Experiment Setup", "实验设置"]
+            body_sections = _markdown_sections(_split_frontmatter(content)[1])
+            if any(heading in body_sections for heading in setup_headings):
+                setup = _section_summary(content, setup_headings, max_chars=160)
+            else:
+                # add_experiment pages carry setup in frontmatter, not a section.
+                setup = ", ".join(
+                    f"{key}={_as_text(meta.get(key))}"
+                    for key in ("hardware", "duration") if _as_text(meta.get(key)))
+                if not setup and not verdict:
+                    setup = _first_body_summary(content, max_chars=160)
+            result = _section_summary(
+                content, ["Result", "Results", "Main Result", "核心结果", "Metrics", "Reasoning"],
+                max_chars=180, fallback=not verdict)
+            linked = _as_text(meta.get("linked_claim") or meta.get("claim")
+                              or meta.get("idea") or meta.get("idea_id"))
+            fields = [f"setup={setup}"] if setup else []
+            if result:
+                fields.append(f"result={result}")
+            if verdict:
+                fields.append(f"verdict={verdict}")
+            if linked:
+                fields.append(f"linked={linked}")
+            experiment_summaries.append(f"- [{node_id}] {title}: {'; '.join(fields)}")
         if experiment_summaries:
             sections.append(f"## Experiments ({len(experiment_summaries)} total)\n{chr(10).join(experiment_summaries)[:1400]}\n")
 
@@ -373,7 +547,12 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
         else:
             remaining = max_chars - len(pack) - 20
             if remaining > 100:
-                pack += section[:remaining] + "\n...(truncated)\n"
+                chunk = section[:remaining]
+                # Snap to the last line break to avoid a mid-sentence cut.
+                last_nl = chunk.rfind("\n")
+                if last_nl > remaining // 2:
+                    chunk = chunk[:last_nl]
+                pack += chunk + "\n...(truncated)\n"
             break
 
     # The query_pack is injected verbatim into /idea-creator. Scan it (don't
@@ -394,7 +573,7 @@ def rebuild_query_pack(wiki_root: str, max_chars: int = 8000):
             )
 
     pack_path = root / "query_pack.md"
-    pack_path.write_text(pack)
+    pack_path.write_text(pack, encoding="utf-8")
     print(f"query_pack.md rebuilt: {len(pack)} chars")
 
 
@@ -406,13 +585,27 @@ def get_stats(wiki_root: str):
         d = root / subdir
         return len(list(d.glob("*.md"))) if d.exists() else 0
 
-    def count_by_field(subdir, field, value):
+    def field_values(subdir, field):
+        # Read the FRONTMATTER field only — not a full-text substring, so body
+        # text mentioning e.g. "outcome: negative" can't inflate the count.
         d = root / subdir
+        if not d.exists():
+            return []
+        return [_as_text(_load_frontmatter(f).get(field)) for f in d.glob("*.md")]
+
+    def count_by_field(subdir, field, value):
+        return sum(1 for v in field_values(subdir, field) if v == value)
+
+    def count_parked_ideas():
+        # /idea-creator records the pool via `update ... pool_status`; a page
+        # written with `upsert_idea --stage parked` carries it in `stage`.
+        d = root / "ideas"
         if not d.exists():
             return 0
         count = 0
         for f in d.glob("*.md"):
-            if f"{field}: {value}" in f.read_text():
+            meta = _load_frontmatter(f)
+            if "parked" in (_as_text(meta.get("pool_status")), _as_text(meta.get("stage"))):
                 count += 1
         return count
 
@@ -424,15 +617,26 @@ def get_stats(wiki_root: str):
     edges_path = root / "graph" / "edges.jsonl"
     edge_count = 0
     if edges_path.exists():
-        edge_count = sum(1 for line in edges_path.read_text().strip().split("\n") if line.strip())
+        edge_count = sum(1 for line in _read_wiki_text(edges_path).strip().split("\n") if line.strip())
+
+    # Claim statuses: the PROOF-axis vocabulary first (sorted), then any legacy
+    # values still present on older pages (e.g. `reported`), so nothing is hidden.
+    claim_status_counts: dict[str, int] = {}
+    for status in field_values("claims", "status"):
+        if status:
+            claim_status_counts[status] = claim_status_counts.get(status, 0) + 1
+    ordered = [s for s in sorted(_CLAIM_STATUSES) if s in claim_status_counts]
+    ordered += sorted(s for s in claim_status_counts if s not in _CLAIM_STATUSES)
+    claim_parts = [f"{claim_status_counts[s]} {s}" for s in ordered]
 
     print(f"📚 Research Wiki Stats")
     print(f"Papers:      {papers}")
     print(f"Ideas:       {ideas} ({count_by_field('ideas', 'outcome', 'negative')} failed, "
-          f"{count_by_field('ideas', 'outcome', 'positive')} succeeded)")
+          f"{count_by_field('ideas', 'outcome', 'positive')} succeeded, "
+          f"{count_parked_ideas()} parked)")
     print(f"Experiments: {experiments}")
-    print(f"Claims:      {claims} ({count_by_field('claims', 'status', 'supported')} supported, "
-          f"{count_by_field('claims', 'status', 'invalidated')} invalidated)")
+    print(f"Claims:      {claims}"
+          + (f" ({', '.join(claim_parts)})" if claim_parts else ""))
     print(f"Edges:       {edge_count}")
     print(f"Wiki root:   {root}")
 
@@ -556,8 +760,25 @@ def _parse_frontmatter_lines(lines: list[str]) -> dict:
     return meta
 
 
+def _read_wiki_text(path: Path) -> str:
+    """Read a wiki file as UTF-8, naming the file if it was written in a legacy codepage.
+
+    A wiki produced by an older ARIS on a non-UTF-8 locale (e.g. cp936) would
+    otherwise surface as a bare UnicodeDecodeError traceback. Silently replacing
+    bytes is not an option here: this store exists to accumulate faithfully.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raise SystemExit(
+            f"ERROR: {path} is not valid UTF-8.\n"
+            "  This wiki was likely written by an older ARIS on a non-UTF-8 locale.\n"
+            "  Convert the file to UTF-8 (back it up first), then re-run."
+        )
+
+
 def _load_frontmatter(path: Path) -> dict:
-    lines, _ = _split_frontmatter(path.read_text())
+    lines, _ = _split_frontmatter(_read_wiki_text(path))
     return _parse_frontmatter_lines(lines)
 
 
@@ -676,7 +897,8 @@ _OBSIDIAN_FIELD_SECTIONS = {
 
 
 def parse_obsidian_paper_note(path: Path, vault_root: Optional[Path] = None) -> PaperProjection:
-    text = path.read_text()
+    # Obsidian notes live outside the wiki; read them as UTF-8 (Obsidian's own encoding).
+    text = path.read_text(encoding="utf-8")
     fm_lines, body = _split_frontmatter(text)
     meta = _parse_frontmatter_lines(fm_lines)
     sections = _markdown_sections(body)
@@ -980,36 +1202,68 @@ def enrich_projection_from_zotero(projection: PaperProjection, db_path: Path) ->
     return replace(projection, **updates), conflicts
 
 
-def fetch_arxiv_metadata(arxiv_id: str, timeout: float = 15.0) -> dict:
-    """Query arXiv Atom API for one paper. Returns a metadata dict.
+def _curl_get(url: str, headers: dict, timeout: float) -> bytes | None:
+    """Re-issue a GET through ``curl`` after urllib was answered HTTP 406.
 
-    Raises RuntimeError on network failure or malformed response — callers
-    decide whether to abort the ingest or fall back to manual metadata.
+    export.arxiv.org refuses urllib from some networks for minutes at a time
+    while curl gets 200 on the same URL, so retrying urllib cannot recover.
+    Returns the body, or None when curl is missing or the request fails.
     """
-    aid = _normalize_arxiv_id(arxiv_id)
-    url = _ARXIV_API.format(ids=aid)
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            body = resp.read()
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise RuntimeError(f"arXiv API fetch failed for {aid}: {e}")
+    curl = shutil.which("curl")
+    if curl is None:
+        return None
+    cmd = [curl, "-sf", "--max-time", str(int(timeout))]
+    for key, value in headers.items():
+        cmd += ["-H", f"{key}: {value}"]
+    proc = subprocess.run(cmd + [url], capture_output=True)
+    return proc.stdout if proc.returncode == 0 else None
 
-    try:
-        root = ET.fromstring(body)
-    except ET.ParseError as e:
-        raise RuntimeError(f"arXiv API returned unparseable XML for {aid}: {e}")
 
-    entry = root.find("atom:entry", _ARXIV_NS)
-    if entry is None:
-        raise RuntimeError(f"arXiv API returned no entry for {aid}")
+def _arxiv_api_get(url: str, what: str, timeout: float = 15.0) -> bytes:
+    """GET an arXiv API URL with a descriptive User-Agent + retry/backoff.
 
+    Centralizes the rate-limit handling shared by the single and batch
+    fetchers: sends ``_arxiv_user_agent()`` (lands in arXiv's lenient pool),
+    retries up to 3 times on HTTP 429, transient network errors, and the
+    plain-text "Rate exceeded." body the API sometimes returns with 200 OK.
+    ``what`` is a label for error messages (e.g. the id or id-list).
+    """
+    headers = {"User-Agent": _arxiv_user_agent()}
+    req = urllib.request.Request(url, headers=headers)
+    for attempt in (1, 2, 3):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = resp.read()
+        except urllib.error.HTTPError as e:
+            rescued = _curl_get(url, headers, timeout) if e.code == 406 else None
+            if rescued is not None:
+                body = rescued
+            elif e.code in (406, 429) and attempt < 3:
+                time.sleep(5 * attempt)
+                continue
+            else:
+                raise RuntimeError(f"arXiv API fetch failed for {what}: {e}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            if attempt < 3:
+                time.sleep(2 * attempt)
+                continue
+            raise RuntimeError(f"arXiv API fetch failed for {what}: {e}")
+        if body.strip() == b"Rate exceeded.":
+            if attempt < 3:
+                time.sleep(5 * attempt)
+                continue
+            raise RuntimeError(f"arXiv API rate-limited for {what} after 3 attempts")
+        return body
+    return b""  # unreachable; loop either returns or raises
+
+
+def _parse_arxiv_entry(entry) -> dict:
+    """Parse one Atom <entry> element into the metadata dict shape."""
     def _txt(el, default=""):
         return el.text.strip() if el is not None and el.text else default
 
-    title = _txt(entry.find("atom:title", _ARXIV_NS))
-    title = re.sub(r"\s+", " ", title)
-    summary = _txt(entry.find("atom:summary", _ARXIV_NS))
-    summary = re.sub(r"\s+", " ", summary)
+    title = re.sub(r"\s+", " ", _txt(entry.find("atom:title", _ARXIV_NS)))
+    summary = re.sub(r"\s+", " ", _txt(entry.find("atom:summary", _ARXIV_NS)))
     published = _txt(entry.find("atom:published", _ARXIV_NS))
     year = int(published[:4]) if published[:4].isdigit() else 0
 
@@ -1022,9 +1276,14 @@ def fetch_arxiv_metadata(arxiv_id: str, timeout: float = 15.0) -> dict:
     primary = entry.find("arxiv:primary_category", _ARXIV_NS)
     primary_cat = primary.get("term") if primary is not None else ""
 
-    # Check for published journal reference
     journal_ref = _txt(entry.find("arxiv:journal_ref", _ARXIV_NS))
     venue = journal_ref if journal_ref else "arXiv"
+
+    # The <id> element holds e.g. http://arxiv.org/abs/2510.23672v1 — recover
+    # the bare, version-stripped id so batch results can be keyed back to the
+    # ids the caller asked for.
+    raw_id = _txt(entry.find("atom:id", _ARXIV_NS))
+    aid = _normalize_arxiv_id(raw_id.rsplit("/abs/", 1)[-1]) if raw_id else ""
 
     return {
         "arxiv_id": aid,
@@ -1035,6 +1294,62 @@ def fetch_arxiv_metadata(arxiv_id: str, timeout: float = 15.0) -> dict:
         "abstract": summary,
         "primary_category": primary_cat,
     }
+
+
+def fetch_arxiv_metadata(arxiv_id: str, timeout: float = 15.0) -> dict:
+    """Query arXiv Atom API for one paper. Returns a metadata dict.
+
+    Sends a descriptive User-Agent and retries up to 3 times on arXiv rate
+    limits (HTTP 429 or the plain-text "Rate exceeded." body) and transient
+    network errors. Raises RuntimeError when all retries are exhausted —
+    callers decide whether to abort the ingest or fall back to manual metadata.
+    """
+    aid = _normalize_arxiv_id(arxiv_id)
+    body = _arxiv_api_get(_ARXIV_API.format(ids=aid), aid, timeout=timeout)
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as e:
+        raise RuntimeError(f"arXiv API returned unparseable XML for {aid}: {e}")
+
+    entry = root.find("atom:entry", _ARXIV_NS)
+    if entry is None:
+        raise RuntimeError(f"arXiv API returned no entry for {aid}")
+
+    meta = _parse_arxiv_entry(entry)
+    # The single-id query is authoritative for the id even if <id> parsing
+    # came up empty (e.g. malformed feed); keep the caller's normalized id.
+    meta["arxiv_id"] = aid
+    return meta
+
+
+def fetch_arxiv_metadata_batch(arxiv_ids: list[str], timeout: float = 30.0) -> dict:
+    """Fetch metadata for many papers in ONE arXiv request via id_list.
+
+    arXiv's ``id_list`` parameter accepts a comma-separated list and returns
+    all entries in a single Atom feed, so N papers cost 1 request instead of
+    N — the structural fix for the burst-429 problem when ingesting a batch.
+    Returns ``{normalized_id: meta}``; ids the API did not return are simply
+    absent from the dict (caller decides how to handle misses).
+    """
+    norm = [_normalize_arxiv_id(a.strip()) for a in arxiv_ids if a and a.strip()]
+    if not norm:
+        return {}
+    # arXiv defaults max_results to 10, so an id_list of >10 silently returns
+    # only the first 10 entries — set max_results to the full count so all
+    # requested papers come back in the single request.
+    url = _ARXIV_API.format(ids=",".join(norm)) + f"&max_results={len(norm)}"
+    body = _arxiv_api_get(url, f"id_list[{len(norm)}]", timeout=timeout)
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as e:
+        raise RuntimeError(f"arXiv API returned unparseable XML for batch: {e}")
+
+    out: dict = {}
+    for entry in root.findall("atom:entry", _ARXIV_NS):
+        meta = _parse_arxiv_entry(entry)
+        if meta.get("arxiv_id"):
+            out[meta["arxiv_id"]] = meta
+    return out
 
 
 def _last_name(full_name: str) -> str:
@@ -1055,7 +1370,7 @@ def _find_existing_page_by_arxiv(wiki_root: Path, arxiv_id: str) -> Optional[Pat
     if not papers.exists():
         return None
     for p in papers.glob("*.md"):
-        text = p.read_text()
+        text = _read_wiki_text(p)
         # Match either the frontmatter line or a URL reference
         if re.search(r'arxiv:\s*["\']?' + re.escape(arxiv_id) + r'["\']?', text):
             return p
@@ -1302,7 +1617,8 @@ def ingest_paper(wiki_root: str, *, arxiv_id: str = "", title: str = "",
                  authors: Optional[list[str]] = None, year: int = 0,
                  venue: str = "", doi: str = "", thesis: str = "",
                  tags: Optional[list[str]] = None,
-                 update_on_exist: bool = False) -> Path:
+                 update_on_exist: bool = False,
+                 prefetched_meta: Optional[dict] = None) -> Path:
     """Canonical paper-ingest entrypoint.
 
     Preferred: pass --arxiv-id and let the helper fetch metadata. If the
@@ -1337,14 +1653,20 @@ def ingest_paper(wiki_root: str, *, arxiv_id: str = "", title: str = "",
                                   f"{existing.name} (arxiv:{aid})")
             print(f"Paper already ingested: {existing.name} (arxiv:{aid}) — skipping.")
             return existing
-        try:
-            meta = fetch_arxiv_metadata(aid)
-        except RuntimeError as e:
-            if title:  # caller provided manual fallback
-                print(f"Warning: {e} — falling back to manual metadata.", file=sys.stderr)
-                meta = {"arxiv_id": aid}
-            else:
-                raise
+        if prefetched_meta is not None:
+            # Batch path (sync): metadata already fetched in one id_list call;
+            # skip the per-id network round-trip entirely.
+            meta = dict(prefetched_meta)
+            meta.setdefault("arxiv_id", aid)
+        else:
+            try:
+                meta = fetch_arxiv_metadata(aid)
+            except RuntimeError as e:
+                if title:  # caller provided manual fallback
+                    print(f"Warning: {e} — falling back to manual metadata.", file=sys.stderr)
+                    meta = {"arxiv_id": aid}
+                else:
+                    raise
         # Manual overrides on top of fetched metadata
         if title:
             meta["title"] = title
@@ -1391,7 +1713,7 @@ def ingest_paper(wiki_root: str, *, arxiv_id: str = "", title: str = "",
             was_update = False
 
     rendered = _render_paper_page(meta, slug, thesis, tags)
-    page_path.write_text(rendered)
+    page_path.write_text(rendered, encoding="utf-8")
 
     # Rebuild derived artifacts
     rebuild_index(str(root))
@@ -1404,15 +1726,611 @@ def ingest_paper(wiki_root: str, *, arxiv_id: str = "", title: str = "",
     return page_path
 
 
+_CLAIM_STATUSES = {
+    "drafted",                 # written, not yet adversarially reviewed
+    "unproven",                # audited; proof has an open gap (not closed, not falsified)
+    "sound-modulo-imports",    # proof closes modulo flagged [unverified-axiom] imports
+    "verified",                # passed cross-model acquittal, imports discharged
+    "refuted",                 # a counterexample / jury falsified it
+    "retracted",               # withdrawn (e.g. superseded by a corrected claim)
+}
+
+
+def _claim_slugify(name: str, slug: str = "") -> str:
+    """Slug for a claim page.
+
+    A claim usually already carries a stable human ID (e.g. ``b1-main-ub``);
+    if the caller passes ``--slug`` we honor it verbatim (lower-cased, sanitized)
+    so cross-references in proofs stay stable. Otherwise we fall back to the
+    paper slugifier's keyword extraction on the claim name.
+    """
+    if slug:
+        s = re.sub(r"[^a-z0-9._-]+", "-", slug.strip().lower()).strip("-")
+        if s:
+            return s
+    # No explicit slug: reuse the title keyword extractor (no author/year).
+    return slugify(name).lstrip("_").lstrip("0").strip("_") or "claim"
+
+
+def _render_claim_page(slug: str, name: str, description: str, status: str,
+                       provenance: str, statement: str, scope: str,
+                       evidence: str, tags: list[str]) -> str:
+    """Render a claims/<slug>.md page following the research-wiki schema.
+
+    Mirrors ``_render_paper_page``: ``---`` frontmatter block then body
+    sections. ``node_type: claim`` distinguishes the node kind; ``status``
+    is one of ``_CLAIM_STATUSES``; ``provenance`` points at the PROVE/JUDGE
+    run directory that produced the claim (the honesty receipt).
+    """
+    lines = ["---"]
+    lines.append("type: claim")
+    lines.append(f"node_id: claim:{slug}")
+    lines.append(f"name: {_yaml_quote(name)}")
+    lines.append(f"description: {_yaml_quote(description)}")
+    lines.append("node_type: claim")
+    lines.append(f"status: {status}")
+    lines.append(f"provenance: {_yaml_quote(provenance)}")
+    lines.append("tags: [" + ", ".join(_yaml_quote(t) for t in tags) + "]")
+    lines.append(f"date: {datetime.now(timezone.utc).strftime('%Y-%m-%d')}")
+    lines.append(f"added: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# {name}")
+    lines.append("")
+    lines.append(f"**status:** `{status}`")
+    lines.append("")
+    lines.append("## Statement")
+    lines.append(statement.strip() if statement.strip() else "_TODO: formal statement._")
+    lines.append("")
+    lines.append("## Honest scope")
+    lines.append(scope.strip() if scope.strip()
+                 else "_TODO: what this claim does NOT say; banned wordings; flagged imports._")
+    lines.append("")
+    lines.append("## Evidence chain")
+    lines.append(evidence.strip() if evidence.strip()
+                 else "_TODO: proof obligations, jury verdicts, provenance pointers._")
+    lines.append("")
+    lines.append("## Connections")
+    lines.append("_Edges are recorded in `graph/edges.jsonl`; summarize here for human readers._")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def add_claim(wiki_root: str, slug: str, name: str, *, description: str = "",
+              status: str = "drafted", provenance: str = "",
+              statement: str = "", scope: str = "", evidence: str = "",
+              tags: list[str] | None = None,
+              addresses: list[str] | None = None,
+              extends: list[str] | None = None,
+              uses: list[str] | None = None,
+              depends_on: list[str] | None = None,
+              refutes: list[str] | None = None,
+              update_on_exist: bool = False) -> Path:
+    """Create (or update) a claims/<slug>.md node and wire its edges.
+
+    The claim layer is the PROVE/JUDGE output ledger: every theorem/headline
+    becomes a node with an HONEST ``status`` (one of ``_CLAIM_STATUSES``) and a
+    ``provenance`` pointer to the run directory. Mirrors ``ingest_paper``:
+      - writes claims/<slug>.md from the schema above
+      - dedups by slug (``update_on_exist=False`` skips an existing page)
+      - records typed edges into graph/edges.jsonl via ``add_edge``:
+          claim --addresses_gap--> gap     (--addresses G2,G10)
+          claim --extends--> paper          (--extends paper:slug)
+          claim --uses--> paper             (--uses paper:slug)
+          claim --depends_on--> claim       (--depends-on claim:slug)
+          claim --refutes--> claim          (--refutes claim:slug)
+      - rebuilds index.md + query_pack.md, appends to log.md
+    Bare gap ids (``G2``) and bare claim/paper slugs are auto-prefixed to the
+    ``gap:`` / ``claim:`` / ``paper:`` node_id namespace used by the graph.
+    """
+    root = Path(wiki_root)
+    if not (root / "claims").exists():
+        raise RuntimeError(f"{root} is not an initialized wiki (claims/ missing). "
+                           f"Run `init` first.")
+
+    if status not in _CLAIM_STATUSES:
+        raise RuntimeError(f"unknown claim status '{status}'. "
+                           f"Valid: {sorted(_CLAIM_STATUSES)}")
+
+    tags = tags or []
+    slug = _claim_slugify(name, slug)
+    node_id = f"claim:{slug}"
+
+    page_path = root / "claims" / f"{slug}.md"
+    if page_path.exists() and not update_on_exist:
+        append_log(str(root), f"add_claim: skipped existing claim "
+                              f"{page_path.name} (slug dedup)")
+        print(f"Claim already exists: {page_path.name} (slug dedup) — skipping.")
+        return page_path
+    was_update = page_path.exists()
+
+    # Quarantine claim body fields before persist (model-authored text that is
+    # re-read into agent context via index/query_pack): same Layer-1 injection
+    # hygiene as edge evidence above. Placeholder persists; raw text goes to
+    # graph/quarantine.log for human review — nothing silently dropped.
+    if quarantine is not None:
+        _q_hits = []
+
+        def _q(val, field):
+            if not val:
+                return val
+            safe, findings = quarantine(val, scope="strict",
+                                        label=f"claim {slug}.{field}")
+            if findings:
+                _q_hits.append((field, findings, val))
+            return safe
+
+        description = _q(description, "description")
+        statement = _q(statement, "statement")
+        scope = _q(scope, "scope")
+        evidence = _q(evidence, "evidence")
+        if _q_hits:
+            qlog = root / "graph" / "quarantine.log"
+            qlog.parent.mkdir(parents=True, exist_ok=True)
+            with open(qlog, "a", encoding="utf-8") as f:
+                for field, findings, raw in _q_hits:
+                    f.write(json.dumps({
+                        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "claim": node_id, "field": field,
+                        "findings": findings, "raw_text": raw,
+                    }, ensure_ascii=False) + "\n")
+            print(f"⚠️  claim field(s) quarantined "
+                  f"({', '.join(f for f, _, _ in _q_hits)}); placeholder persisted, "
+                  f"raw text preserved in graph/quarantine.log for review.",
+                  file=sys.stderr)
+
+    rendered = _render_claim_page(slug, name, description, status, provenance,
+                                  statement, scope, evidence, tags)
+    page_path.write_text(rendered, encoding="utf-8")
+
+    # Wire edges. Reuse add_edge so dedup, evidence quarantine, and the JSONL
+    # format are all identical to paper/idea edges.
+    def _norm(target: str, default_prefix: str) -> str:
+        t = target.strip()
+        if not t:
+            return ""
+        if ":" in t:  # already a namespaced node_id (gap:G2 / paper:slug / claim:x)
+            return t
+        # Bare gap ids look like G2, G10; everything else takes default prefix.
+        if default_prefix == "gap:" or re.fullmatch(r"[Gg]\d+", t):
+            return f"gap:{t.upper()}" if re.fullmatch(r"[Gg]\d+", t) else f"{default_prefix}{t}"
+        return f"{default_prefix}{t}"
+
+    def _warn_if_dangling(nid: str) -> None:
+        # Warn-only: dangling edges are recorded (a [[name]]-style forward
+        # reference is legitimate), but the operator should know.
+        if not nid:
+            return
+        kind, _, rest = nid.partition(":")
+        exists = True
+        if kind == "paper":
+            exists = (root / "papers" / f"{rest}.md").exists()
+        elif kind == "claim":
+            exists = rest == slug or (root / "claims" / f"{rest}.md").exists()
+        elif kind == "gap":
+            gm = root / "gap_map.md"
+            exists = gm.exists() and re.search(
+                rf"\b{re.escape(rest)}\b", _read_wiki_text(gm))
+        if not exists:
+            print(f"⚠️  add_claim: edge target {nid} not found in this wiki "
+                  f"(dangling edge recorded — create the node or fix the id).",
+                  file=sys.stderr)
+
+    for tgt in (addresses or []):
+        _tid = _norm(tgt, "gap:")
+        _warn_if_dangling(_tid)
+        add_edge(str(root), node_id, _tid, "addresses_gap",
+                 evidence=f"claim {slug} addresses gap")
+    for tgt in (extends or []):
+        _tid = _norm(tgt, "paper:")
+        _warn_if_dangling(_tid)
+        add_edge(str(root), node_id, _tid, "extends",
+                 evidence=f"claim {slug} extends paper")
+    for tgt in (uses or []):
+        _tid = _norm(tgt, "paper:")
+        _warn_if_dangling(_tid)
+        add_edge(str(root), node_id, _tid, "uses",
+                 evidence=f"claim {slug} uses paper")
+    for tgt in (depends_on or []):
+        _tid = _norm(tgt, "claim:")
+        _warn_if_dangling(_tid)
+        add_edge(str(root), node_id, _tid, "depends_on",
+                 evidence=f"claim {slug} depends on claim")
+    for tgt in (refutes or []):
+        _tid = _norm(tgt, "claim:")
+        _warn_if_dangling(_tid)
+        add_edge(str(root), node_id, _tid, "refutes",
+                 evidence=f"claim {slug} refutes claim")
+
+    # Rebuild derived artifacts (same as ingest_paper)
+    rebuild_index(str(root))
+    rebuild_query_pack(str(root))
+
+    action = "updated" if was_update else "added"
+    append_log(str(root), f"add_claim: {action} {node_id} [status={status}]"
+                          + (f" prov={provenance}" if provenance else ""))
+    print(f"Claim {action}: {page_path} [status={status}]")
+    return page_path
+
+
+_IDEA_OUTCOMES = {
+    "unknown",                 # not yet assessed
+    "pending",                 # proposed / awaiting pilot or experiment
+    "negative",                # tested, failed (feeds the re-ideation banlist)
+    "mixed",                   # partial result (also banlisted)
+    "positive",                # tested, succeeded
+}
+
+# Upstream stages plus the local candidate-pool stages written by /idea-creator:
+# `handed_off` (selected idea passed to Workflow 1.5) and `parked` (kept with
+# every scored field, a park_reason and a revisit_condition; not eliminated).
+_IDEA_STAGES = {"proposed", "active", "piloted", "archived", "handed_off", "parked"}
+
+
+def _idea_slugify(name: str, slug: str = "") -> str:
+    """Slug for an idea page (mirrors _claim_slugify): honor an explicit --slug
+    verbatim (sanitized), else fall back to the title keyword extractor."""
+    if slug:
+        s = re.sub(r"[^a-z0-9._-]+", "-", slug.strip().lower()).strip("-")
+        if s:
+            return s
+    return slugify(name).lstrip("_").lstrip("0").strip("_") or "idea"
+
+
+def _render_idea_page(slug, title, description, stage, outcome, thesis, risks,
+                      based_on_ids, target_gap_ids, tags,
+                      park_reason="", revisit_condition=""):
+    """Render an ideas/<slug>.md page following the research-wiki schema.
+
+    Mirrors _render_claim_page. The frontmatter `outcome` field is the one the
+    re-ideation banlist + stats read (rebuild_query_pack / get_stats), so it must
+    be one of _IDEA_OUTCOMES. Edges live in graph/edges.jsonl; the frontmatter
+    based_on / target_gaps lists mirror them for human-readable provenance.
+    """
+    lines = ["---"]
+    lines.append("type: idea")
+    lines.append(f"node_id: idea:{slug}")
+    lines.append(f"title: {_yaml_quote(title)}")
+    lines.append(f"stage: {stage}")
+    lines.append(f"outcome: {outcome}")
+    if park_reason:
+        lines.append(f"park_reason: {_yaml_quote(park_reason)}")
+    if revisit_condition:
+        lines.append(f"revisit_condition: {_yaml_quote(revisit_condition)}")
+    lines.append(f"added: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}")
+    lines.append("based_on: [" + ", ".join(_yaml_quote(i) for i in based_on_ids) + "]")
+    lines.append("target_gaps: [" + ", ".join(_yaml_quote(i) for i in target_gap_ids) + "]")
+    lines.append("tags: [" + ", ".join(_yaml_quote(t) for t in tags) + "]")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# {title}")
+    lines.append("")
+    lines.append(f"**stage:** `{stage}`  ·  **outcome:** `{outcome}`")
+    if park_reason or revisit_condition:
+        lines.append("")
+        lines.append(f"**park_reason:** `{park_reason or 'unspecified'}`  ·  "
+                     f"**revisit when:** {revisit_condition or '_unspecified_'}")
+    if description.strip():
+        lines.append("")
+        lines.append(description.strip())
+    lines.append("")
+    lines.append("## Thesis")
+    lines.append(thesis.strip() if thesis.strip() else "_TODO: the core hypothesis / direction._")
+    lines.append("")
+    lines.append("## Key risks")
+    lines.append(risks.strip() if risks.strip() else "_TODO: novelty / feasibility risks._")
+    lines.append("")
+    lines.append("## Connections")
+    lines.append("_Edges are recorded in `graph/edges.jsonl`; summarize here for human readers._")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def upsert_idea(wiki_root: str, slug: str, title: str, *, description: str = "",
+                stage: str = "proposed", outcome: str = "pending",
+                thesis: str = "", risks: str = "",
+                tags: list[str] | None = None,
+                based_on: list[str] | None = None,
+                target_gaps: list[str] | None = None,
+                update_on_exist: bool = False,
+                park_reason: str = "",
+                revisit_condition: str = "") -> Path:
+    """Create (or update) an ideas/<slug>.md node and wire its edges.
+
+    The idea layer is the research-direction ledger written by /idea-creator after
+    ideation (Phase 7). Mirrors add_claim / ingest_paper:
+      - writes ideas/<slug>.md from the schema above
+      - dedups by slug (update_on_exist=False SKIPS an existing page — so a
+        re-ideation run records NEW ideas without clobbering an existing idea whose
+        outcome /result-to-claim may have already enriched)
+      - records typed edges into graph/edges.jsonl via add_edge:
+          idea --inspired_by--> paper    (--based-on paper:slug)
+          idea --addresses_gap--> gap    (--target-gaps G2,G10)
+      - rebuilds index.md + query_pack.md, appends to log.md
+    `outcome` must be one of _IDEA_OUTCOMES (it drives the re-ideation banlist + stats).
+    `stage` must be one of _IDEA_STAGES; a `parked` idea should carry `park_reason`
+    and `revisit_condition` (a warning is printed when either is missing).
+    NOTE: /result-to-claim updates an idea's outcome by editing the page in place (to
+    preserve the rich body); it must NOT call this with update_on_exist (would clobber).
+    """
+    root = Path(wiki_root)
+    if not (root / "ideas").exists():
+        raise RuntimeError(f"{root} is not an initialized wiki (ideas/ missing). "
+                           f"Run `init` first.")
+    if outcome not in _IDEA_OUTCOMES:
+        raise RuntimeError(f"unknown idea outcome '{outcome}'. "
+                           f"Valid: {sorted(_IDEA_OUTCOMES)}")
+    if stage not in _IDEA_STAGES:
+        raise RuntimeError(f"unknown idea stage '{stage}'. "
+                           f"Valid: {sorted(_IDEA_STAGES)}")
+    if stage == "parked" and not (park_reason.strip() and revisit_condition.strip()):
+        print("⚠️  upsert_idea: a parked idea should carry both --park-reason and "
+              "--revisit-condition (recorded anyway).", file=sys.stderr)
+
+    tags = tags or []
+    slug = _idea_slugify(title, slug)
+    node_id = f"idea:{slug}"
+
+    page_path = root / "ideas" / f"{slug}.md"
+    if page_path.exists() and not update_on_exist:
+        append_log(str(root), f"upsert_idea: skipped existing idea "
+                              f"{page_path.name} (slug dedup)")
+        print(f"Idea already exists: {page_path.name} (slug dedup) — skipping.")
+        return page_path
+    was_update = page_path.exists()
+
+    # Quarantine model-authored body fields before persist (re-read into agent
+    # context via index/query_pack) — same Layer-1 injection hygiene as add_claim.
+    # Title is structural (not quarantined, like add_claim's name). Placeholder
+    # persists; raw text → graph/quarantine.log for human review.
+    if quarantine is not None:
+        _q_hits = []
+
+        def _q(val, field):
+            if not val:
+                return val
+            safe, findings = quarantine(val, scope="strict",
+                                        label=f"idea {slug}.{field}")
+            if findings:
+                _q_hits.append((field, findings, val))
+            return safe
+
+        description = _q(description, "description")
+        thesis = _q(thesis, "thesis")
+        risks = _q(risks, "risks")
+        revisit_condition = _q(revisit_condition, "revisit_condition")
+        if _q_hits:
+            qlog = root / "graph" / "quarantine.log"
+            qlog.parent.mkdir(parents=True, exist_ok=True)
+            with open(qlog, "a", encoding="utf-8") as f:
+                for field, findings, raw in _q_hits:
+                    f.write(json.dumps({
+                        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "idea": node_id, "field": field,
+                        "findings": findings, "raw_text": raw,
+                    }, ensure_ascii=False) + "\n")
+            print(f"⚠️  idea field(s) quarantined "
+                  f"({', '.join(f for f, _, _ in _q_hits)}); placeholder persisted, "
+                  f"raw text preserved in graph/quarantine.log for review.",
+                  file=sys.stderr)
+
+    def _norm(target: str, default_prefix: str) -> str:
+        t = target.strip()
+        if not t:
+            return ""
+        if ":" in t:                                  # already a namespaced node_id
+            return t
+        if default_prefix == "gap:" or re.fullmatch(r"[Gg]\d+", t):
+            return f"gap:{t.upper()}" if re.fullmatch(r"[Gg]\d+", t) else f"{default_prefix}{t}"
+        return f"{default_prefix}{t}"
+
+    def _warn_if_dangling(nid: str) -> None:
+        if not nid:
+            return
+        kind, _, rest = nid.partition(":")
+        exists = True
+        if kind == "paper":
+            exists = (root / "papers" / f"{rest}.md").exists()
+        elif kind == "gap":
+            gm = root / "gap_map.md"
+            exists = gm.exists() and re.search(
+                rf"\b{re.escape(rest)}\b", _read_wiki_text(gm))
+        if not exists:
+            print(f"⚠️  upsert_idea: edge target {nid} not found in this wiki "
+                  f"(dangling edge recorded — create the node or fix the id).",
+                  file=sys.stderr)
+
+    based_on_ids = [n for n in (_norm(t, "paper:") for t in (based_on or [])) if n]
+    target_gap_ids = [n for n in (_norm(t, "gap:") for t in (target_gaps or [])) if n]
+
+    rendered = _render_idea_page(slug, title, description, stage, outcome, thesis,
+                                 risks, based_on_ids, target_gap_ids, tags,
+                                 park_reason=park_reason.strip(),
+                                 revisit_condition=revisit_condition.strip())
+    page_path.write_text(rendered, encoding="utf-8")
+
+    # Wire edges (reuse add_edge so dedup + JSONL format match paper/claim edges).
+    for nid in based_on_ids:
+        _warn_if_dangling(nid)
+        add_edge(str(root), node_id, nid, "inspired_by", evidence=f"idea {slug} inspired by paper")
+    for nid in target_gap_ids:
+        _warn_if_dangling(nid)
+        add_edge(str(root), node_id, nid, "addresses_gap", evidence=f"idea {slug} addresses gap")
+
+    rebuild_index(str(root))
+    rebuild_query_pack(str(root))
+    action = "updated" if was_update else "added"
+    append_log(str(root), f"upsert_idea: {action} {node_id} [stage={stage} outcome={outcome}]")
+    print(f"Idea {action}: {page_path} [stage={stage} outcome={outcome}]")
+    return page_path
+
+
+_EXPERIMENT_VERDICTS = {"yes", "partial", "no"}
+_EXPERIMENT_CONFIDENCE = {"high", "medium", "low"}
+
+
+def _render_experiment_page(slug, title, idea_id, verdict, confidence, date,
+                            hardware, duration, metrics, reasoning, provenance, tags):
+    """Render an experiments/<slug>.md page (mirrors _render_claim_page). All
+    free-form frontmatter values are _yaml_quote-wrapped (newline-injection safe);
+    verdict/confidence are validated enums; metrics/reasoning live in the body."""
+    label = title.strip() or f"Experiment {slug}"
+    lines = ["---"]
+    lines.append("type: experiment")
+    lines.append(f"node_id: exp:{slug}")
+    lines.append(f"title: {_yaml_quote(label)}")
+    lines.append(f"idea_id: {_yaml_quote(idea_id)}")
+    lines.append(f"verdict: {verdict}")
+    lines.append(f"confidence: {confidence}")
+    lines.append(f"date: {_yaml_quote(date)}")
+    lines.append(f"hardware: {_yaml_quote(hardware)}")
+    lines.append(f"duration: {_yaml_quote(duration)}")
+    lines.append(f"provenance: {_yaml_quote(provenance)}")
+    lines.append(f"added: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}")
+    lines.append("tags: [" + ", ".join(_yaml_quote(t) for t in tags) + "]")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# {label}")
+    lines.append("")
+    lines.append(f"**verdict:** `{verdict}`  ·  **confidence:** `{confidence}`"
+                 + (f"  ·  tests `{idea_id}`" if idea_id else ""))
+    lines.append("")
+    lines.append("## Metrics")
+    lines.append(metrics.strip() if metrics.strip() else "_TODO: key metrics._")
+    lines.append("")
+    lines.append("## Reasoning")
+    lines.append(reasoning.strip() if reasoning.strip() else "_TODO: why this verdict._")
+    lines.append("")
+    lines.append("## Connections")
+    lines.append("_Edges are recorded in `graph/edges.jsonl`; summarize here for human readers._")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def add_experiment(wiki_root: str, slug: str, *, title: str = "", idea: str = "",
+                   verdict: str = "no", confidence: str = "medium",
+                   date: str = "", hardware: str = "", duration: str = "",
+                   metrics: str = "", reasoning: str = "", provenance: str = "",
+                   tags: list[str] | None = None,
+                   update_on_exist: bool = False) -> Path:
+    """Create (or update) an experiments/<slug>.md node and wire its edge.
+
+    The experiment layer is the pilot/run ledger written by /result-to-claim (the
+    verdict owner). Mirrors add_claim / upsert_idea:
+      - writes experiments/<slug>.md from the schema
+      - dedups by slug (update_on_exist=False SKIPS; /result-to-claim passes
+        --update-on-exist because re-judging the SAME exp must overwrite the stale
+        verdict, not keep it)
+      - records the idea --tested_by--> exp edge via add_edge (--idea idea:slug)
+      - rebuilds index + query_pack, appends to log
+    `verdict` ∈ _EXPERIMENT_VERDICTS, `confidence` ∈ _EXPERIMENT_CONFIDENCE. Ensures
+    the exp:<id> node EXISTS before /result-to-claim adds supports/invalidates edges
+    FROM it — no dangling evidence-graph edge (edge with no node).
+    """
+    root = Path(wiki_root)
+    if not (root / "experiments").exists():
+        raise RuntimeError(f"{root} is not an initialized wiki (experiments/ missing). "
+                           f"Run `init` first.")
+    if verdict not in _EXPERIMENT_VERDICTS:
+        raise RuntimeError(f"unknown experiment verdict '{verdict}'. "
+                           f"Valid: {sorted(_EXPERIMENT_VERDICTS)}")
+    if confidence not in _EXPERIMENT_CONFIDENCE:
+        raise RuntimeError(f"unknown confidence '{confidence}'. "
+                           f"Valid: {sorted(_EXPERIMENT_CONFIDENCE)}")
+
+    tags = tags or []
+    slug = re.sub(r"[^a-z0-9._-]+", "-", slug.strip().lower()).strip("-")
+    if not slug:
+        raise RuntimeError("experiment slug (exp id) is required and must be non-empty")
+    node_id = f"exp:{slug}"
+    idea_id = idea.strip()
+    if idea_id and ":" not in idea_id:
+        idea_id = f"idea:{idea_id}"
+
+    page_path = root / "experiments" / f"{slug}.md"
+    if page_path.exists() and not update_on_exist:
+        append_log(str(root), f"add_experiment: skipped existing experiment "
+                              f"{page_path.name} (slug dedup)")
+        print(f"Experiment already exists: {page_path.name} (slug dedup) — skipping.")
+        return page_path
+    was_update = page_path.exists()
+
+    # Quarantine model-authored body fields (re-read into context) — same hygiene
+    # as add_claim / upsert_idea. Enum + structural fields are not quarantined.
+    if quarantine is not None:
+        _q_hits = []
+
+        def _q(val, field):
+            if not val:
+                return val
+            safe, findings = quarantine(val, scope="strict",
+                                        label=f"experiment {slug}.{field}")
+            if findings:
+                _q_hits.append((field, findings, val))
+            return safe
+
+        metrics = _q(metrics, "metrics")
+        reasoning = _q(reasoning, "reasoning")
+        if _q_hits:
+            qlog = root / "graph" / "quarantine.log"
+            qlog.parent.mkdir(parents=True, exist_ok=True)
+            with open(qlog, "a", encoding="utf-8") as f:
+                for field, findings, raw in _q_hits:
+                    f.write(json.dumps({
+                        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "experiment": node_id, "field": field,
+                        "findings": findings, "raw_text": raw,
+                    }, ensure_ascii=False) + "\n")
+            print(f"⚠️  experiment field(s) quarantined "
+                  f"({', '.join(f for f, _, _ in _q_hits)}); placeholder persisted, "
+                  f"raw text preserved in graph/quarantine.log for review.",
+                  file=sys.stderr)
+
+    rendered = _render_experiment_page(slug, title, idea_id, verdict, confidence,
+                                       date, hardware, duration, metrics, reasoning,
+                                       provenance, tags)
+    page_path.write_text(rendered, encoding="utf-8")
+
+    # Wire the idea --tested_by--> exp edge (idea side owns it, per the schema).
+    if idea_id:
+        if idea_id.startswith("idea:") and not (root / "ideas" / f"{idea_id.split(':', 1)[1]}.md").exists():
+            print(f"⚠️  add_experiment: idea {idea_id} not found in this wiki "
+                  f"(dangling edge recorded — create the node or fix the id).",
+                  file=sys.stderr)
+        add_edge(str(root), idea_id, node_id, "tested_by", evidence=f"exp {slug} tests idea")
+
+    rebuild_index(str(root))
+    rebuild_query_pack(str(root))
+    action = "updated" if was_update else "added"
+    append_log(str(root), f"add_experiment: {action} {node_id} [verdict={verdict} confidence={confidence}]")
+    print(f"Experiment {action}: {page_path} [verdict={verdict} confidence={confidence}]")
+    return page_path
+
+
 def sync_papers(wiki_root: str, arxiv_ids: list[str], update_on_exist: bool = False) -> None:
-    """Batch backfill: ingest each arxiv id; dedup is handled per-id."""
+    """Batch backfill: ingest many arxiv ids with a SINGLE metadata request.
+
+    All ids are fetched in one ``id_list`` call (see fetch_arxiv_metadata_batch),
+    then each page is written from the pre-fetched metadata — N papers cost 1
+    arXiv request instead of N, avoiding the burst-429 problem. Ids the batch
+    did not return fall back to a per-id fetch (handles the occasional miss).
+    Dedup is still handled per-id inside ingest_paper.
+    """
+    ids = [a.strip() for a in arxiv_ids if a and a.strip()]
+    if not ids:
+        return
+    try:
+        batch = fetch_arxiv_metadata_batch(ids)
+    except RuntimeError as e:
+        print(f"Warning: batch fetch failed ({e}); falling back to per-id.", file=sys.stderr)
+        batch = {}
+
     errors = []
-    for aid in arxiv_ids:
-        aid = aid.strip()
-        if not aid:
-            continue
+    for aid in ids:
+        meta = batch.get(_normalize_arxiv_id(aid))
         try:
-            ingest_paper(wiki_root, arxiv_id=aid, update_on_exist=update_on_exist)
+            ingest_paper(wiki_root, arxiv_id=aid, update_on_exist=update_on_exist,
+                         prefetched_meta=meta)
         except RuntimeError as e:
             print(f"ERROR: {aid}: {e}", file=sys.stderr)
             errors.append((aid, str(e)))
@@ -1425,7 +2343,7 @@ def _atomic_write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
     try:
-        with os.fdopen(fd, "w") as handle:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
         os.replace(tmp_name, path)
     except Exception:
@@ -1469,7 +2387,7 @@ def _write_sync_report(report_path: Path, operations: list[dict], conflicts: lis
         lines.extend(f"- {conflict}" for conflict in conflicts)
     else:
         lines.append("- No conflicts.")
-    report_path.write_text("\n".join(lines) + "\n")
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def sync_obsidian_paper_notes(
@@ -1529,7 +2447,7 @@ def sync_obsidian_paper_notes(
                 operations.append({"action": "skipped", "title": projection.title, "target": target.name})
                 continue
             seen_targets.add(target)
-            existing_text = target.read_text()
+            existing_text = _read_wiki_text(target)
             rendered = render_wiki_paper_page(projection, target.stem, existing_text=existing_text)
             action = "unchanged" if rendered == existing_text else "updated"
         else:
@@ -1626,7 +2544,7 @@ def update_entity_field(wiki_root: str, node_id: str, field: str, value: str) ->
     if page_path is None:
         raise RuntimeError(f"entity not found: {node_id}")
 
-    text = page_path.read_text()
+    text = _read_wiki_text(page_path)
     fm_lines, body = _split_frontmatter(text)
     if not fm_lines:
         fm_lines = [f"node_id: {node_id}"]
@@ -1644,7 +2562,7 @@ def update_entity_field(wiki_root: str, node_id: str, field: str, value: str) ->
     if not replaced:
         out_lines.append(formatted)
 
-    page_path.write_text("---\n" + "\n".join(out_lines) + "\n---\n" + body)
+    page_path.write_text("---\n" + "\n".join(out_lines) + "\n---\n" + body, encoding="utf-8")
     rebuild_index(str(root))
     rebuild_query_pack(str(root))
     append_log(str(root), f"update: {node_id} {field}={value}")
@@ -1657,7 +2575,7 @@ def _read_edges(wiki_root: Path) -> list[dict]:
     edges = []
     if not edges_path.exists():
         return edges
-    for line in edges_path.read_text().splitlines():
+    for line in _read_wiki_text(edges_path).splitlines():
         if not line.strip():
             continue
         try:
@@ -1693,6 +2611,11 @@ def _section_empty_count(text: str) -> int:
     return empty
 
 
+# Open claim statuses that lint flags after 14 days: `drafted` / `unproven` are the
+# open PROOF-axis statuses; `reported` is the legacy status on older local pages.
+_STALE_CLAIM_STATUSES = {"drafted", "unproven", "reported"}
+
+
 def _format_issue_list(items: list[str]) -> list[str]:
     if not items:
         return ["- No issues found."]
@@ -1722,13 +2645,17 @@ def lint_wiki(wiki_root: str) -> Path:
         if edge_counts.get(node_id, 0) == 0:
             orphans.append(f"`{node_id}` has zero graph edges ({path.relative_to(root)})")
 
-        if node_id.startswith("claim:") and str(meta.get("status", "")).strip() == "reported":
+        claim_status = str(meta.get("status", "")).strip()
+        if node_id.startswith("claim:") and claim_status in _STALE_CLAIM_STATUSES:
             timestamp = _parse_iso_datetime(meta.get("updated") or meta.get("added"))
             if timestamp and now - timestamp > timedelta(days=14):
                 age = (now - timestamp).days
-                stale_claims.append(f"`{node_id}` is still reported after {age} days")
+                stale_claims.append(f"`{node_id}` is still {claim_status} after {age} days")
 
-        if node_id.startswith("idea:") and str(meta.get("stage", "")).strip() == "proposed":
+        # A parked / eliminated pool idea is intentionally untested (pool_status is
+        # written by /idea-creator through `update`), so it is not a dead idea.
+        if (node_id.startswith("idea:") and str(meta.get("stage", "")).strip() == "proposed"
+                and _as_text(meta.get("pool_status")) not in {"parked", "eliminated"}):
             tested = any(
                 (edge.get("from") == node_id and edge.get("type") == "tested_by")
                 or (edge.get("to") == node_id and edge.get("type") in {"supports", "invalidates"})
@@ -1737,7 +2664,7 @@ def lint_wiki(wiki_root: str) -> Path:
             if not tested:
                 dead_ideas.append(f"`{node_id}` is still proposed and has no test edge")
 
-        empty_sections = _section_empty_count(path.read_text())
+        empty_sections = _section_empty_count(_read_wiki_text(path))
         if empty_sections >= 3:
             sparse_pages.append(f"`{node_id}` has {empty_sections} sparse sections")
 
@@ -1795,7 +2722,9 @@ def lint_wiki(wiki_root: str) -> Path:
         "",
         *_format_issue_list(stale_claims),
         "",
-        "Suggested fix: update claim status to supported, invalidated, or partial.",
+        "Suggested fix: re-audit with /proof-checker to settle the PROOF status "
+        "(verified, sound-modulo-imports, refuted, or retracted); experiment support "
+        "belongs in supports/invalidates edges, not in the status field.",
         "",
         "## Contradictions",
         "",
@@ -1830,7 +2759,7 @@ def lint_wiki(wiki_root: str) -> Path:
         ])
 
     report_path = root / "LINT_REPORT.md"
-    report_path.write_text("\n".join(report_lines) + "\n")
+    report_path.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
     print(f"Lint report written: {report_path}")
     return report_path
 
@@ -1850,15 +2779,20 @@ def rebuild_index(wiki_root: str) -> None:
         for f in sorted(d.glob("*.md")):
             meta = _load_paper_frontmatter(f)
             node_id = meta.get("node_id", f.stem)
-            title = meta.get("title", f.stem)
+            # Claims use `name:` (papers/ideas/experiments use `title:`); fall back
+            # across both so each node type renders its human label.
+            title = meta.get("title") or meta.get("name") or f.stem
             year = meta.get("year", "")
-            entries.append(f"- `{node_id}` — {title}" + (f" ({year})" if year else ""))
+            # Surface a claim's PROOF status inline (papers have a year instead).
+            status = meta.get("status", "")
+            suffix = f" ({year})" if year else (f" [{status}]" if status else "")
+            entries.append(f"- `{node_id}` — {title}{suffix}")
         if entries:
             lines.append(f"## {header} ({len(entries)})")
             lines.extend(entries)
             lines.append("")
 
-    (root / "index.md").write_text("\n".join(lines) + "\n")
+    (root / "index.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def append_log(wiki_root: str, message: str):
@@ -1868,10 +2802,10 @@ def append_log(wiki_root: str, message: str):
     entry = f"- `{ts}` {message}\n"
 
     if log_path.exists():
-        with open(log_path, "a") as f:
+        with open(log_path, "a", encoding="utf-8") as f:
             f.write(entry)
     else:
-        log_path.write_text(f"# Research Wiki Log\n\n{entry}")
+        log_path.write_text(f"# Research Wiki Log\n\n{entry}", encoding="utf-8")
 
 
 def main():
@@ -1953,6 +2887,85 @@ def main():
     p_ing.add_argument("--update-on-exist", action="store_true",
                        help="Overwrite an existing page instead of skipping (default: skip)")
 
+    # add_claim — create a claim node (PROVE/JUDGE output ledger, born at /proof-checker)
+    p_claim = subparsers.add_parser("add_claim",
+                                    help="Create (or update) a claims/<slug>.md node")
+    p_claim.add_argument("wiki_root")
+    p_claim.add_argument("--slug", default="",
+                         help="Stable claim id, e.g. b1-main-ub (honored verbatim)")
+    p_claim.add_argument("--name", required=True,
+                         help="Human-readable claim name/headline")
+    p_claim.add_argument("--description", default="",
+                         help="One-line description for the index/frontmatter")
+    p_claim.add_argument("--status", default="drafted",
+                         help="One of: " + ", ".join(sorted(_CLAIM_STATUSES)))
+    p_claim.add_argument("--provenance", default="",
+                         help="Run directory that produced this claim (honesty receipt)")
+    p_claim.add_argument("--statement", default="", help="Formal statement (body)")
+    p_claim.add_argument("--scope", default="",
+                         help="Honest scope: what the claim does NOT say / banned wordings")
+    p_claim.add_argument("--evidence", default="",
+                         help="Evidence chain: obligations, verdicts, provenance pointers")
+    p_claim.add_argument("--tags", default="", help="Comma-separated tag list")
+    p_claim.add_argument("--addresses", default="",
+                         help="Comma-separated gap ids this claim addresses, e.g. G2,G10")
+    p_claim.add_argument("--extends", default="",
+                         help="Comma-separated paper node_ids/slugs this claim extends")
+    p_claim.add_argument("--uses", default="",
+                         help="Comma-separated paper node_ids/slugs this claim uses")
+    p_claim.add_argument("--depends-on", dest="depends_on", default="",
+                         help="Comma-separated claim node_ids/slugs this claim depends on")
+    p_claim.add_argument("--refutes", default="",
+                         help="Comma-separated claim node_ids/slugs this claim refutes")
+    p_claim.add_argument("--update-on-exist", action="store_true",
+                         help="Overwrite an existing claim instead of skipping (default: skip)")
+
+    # upsert_idea — create/update an idea node (idea-creator Phase 7 write-back)
+    p_idea = subparsers.add_parser("upsert_idea",
+                                   help="Create (or update) an ideas/<slug>.md node")
+    p_idea.add_argument("wiki_root")
+    p_idea.add_argument("--slug", default="",
+                        help="Stable idea id (honored verbatim); else derived from --title")
+    p_idea.add_argument("--title", required=True, help="Human-readable idea title")
+    p_idea.add_argument("--description", default="",
+                        help="One-line description for the index/frontmatter")
+    p_idea.add_argument("--stage", default="proposed",
+                        help="One of: " + " | ".join(sorted(_IDEA_STAGES)))
+    p_idea.add_argument("--outcome", default="pending",
+                        help="One of: " + ", ".join(sorted(_IDEA_OUTCOMES)))
+    p_idea.add_argument("--thesis", default="", help="Core hypothesis / direction (body)")
+    p_idea.add_argument("--risks", default="", help="Novelty / feasibility risks (body)")
+    p_idea.add_argument("--tags", default="", help="Comma-separated tag list")
+    p_idea.add_argument("--based-on", dest="based_on", default="",
+                        help="Comma-separated paper node_ids/slugs that inspired this idea")
+    p_idea.add_argument("--target-gaps", dest="target_gaps", default="",
+                        help="Comma-separated gap ids this idea addresses, e.g. G2,G10")
+    p_idea.add_argument("--park-reason", dest="park_reason", default="",
+                        help="Why the idea is parked (with --stage parked), e.g. low_overall_merit")
+    p_idea.add_argument("--revisit-condition", dest="revisit_condition", default="",
+                        help="What must change before a parked idea is re-scored")
+    p_idea.add_argument("--update-on-exist", action="store_true",
+                        help="Overwrite an existing idea instead of skipping (default: skip)")
+
+    # add_experiment — create/update an experiment node (result-to-claim Step 5 #1)
+    p_exp = subparsers.add_parser("add_experiment",
+                                  help="Create (or update) an experiments/<slug>.md node")
+    p_exp.add_argument("wiki_root")
+    p_exp.add_argument("--slug", required=True, help="Stable experiment id, e.g. exp-001")
+    p_exp.add_argument("--title", default="", help="Human-readable label (default: 'Experiment <slug>')")
+    p_exp.add_argument("--idea", default="", help="Idea node_id/slug this experiment tests (wires idea --tested_by--> exp)")
+    p_exp.add_argument("--verdict", default="no", help="One of: " + ", ".join(sorted(_EXPERIMENT_VERDICTS)))
+    p_exp.add_argument("--confidence", default="medium", help="One of: " + ", ".join(sorted(_EXPERIMENT_CONFIDENCE)))
+    p_exp.add_argument("--date", default="", help="Run date")
+    p_exp.add_argument("--hardware", default="", help="Hardware used")
+    p_exp.add_argument("--duration", default="", help="Wall-clock / GPU-hours")
+    p_exp.add_argument("--metrics", default="", help="Key metrics (body)")
+    p_exp.add_argument("--reasoning", default="", help="Why this verdict (body)")
+    p_exp.add_argument("--provenance", default="", help="Run dir / EXPERIMENT_AUDIT pointer (honesty receipt)")
+    p_exp.add_argument("--tags", default="", help="Comma-separated tag list")
+    p_exp.add_argument("--update-on-exist", action="store_true",
+                       help="Overwrite an existing experiment (the verdict owner /result-to-claim passes this on a re-judge)")
+
     # sync — batch backfill
     p_sync = subparsers.add_parser("sync",
                                     help="Batch ingest from a list of arXiv IDs")
@@ -2014,6 +3027,40 @@ def main():
                      authors=authors, year=args.year, venue=args.venue,
                      doi=args.doi, thesis=args.thesis, tags=tags,
                      update_on_exist=args.update_on_exist)
+    elif args.command in {"add_claim", "upsert_idea", "add_experiment"}:
+        def _split(s: str) -> list[str]:
+            return [x.strip() for x in s.split(",") if x.strip()]
+        try:
+            if args.command == "add_claim":
+                add_claim(args.wiki_root, args.slug, args.name,
+                          description=args.description, status=args.status,
+                          provenance=args.provenance, statement=args.statement,
+                          scope=args.scope, evidence=args.evidence,
+                          tags=_split(args.tags),
+                          addresses=_split(args.addresses), extends=_split(args.extends),
+                          uses=_split(args.uses), depends_on=_split(args.depends_on),
+                          refutes=_split(args.refutes),
+                          update_on_exist=args.update_on_exist)
+            elif args.command == "upsert_idea":
+                upsert_idea(args.wiki_root, args.slug, args.title,
+                            description=args.description, stage=args.stage,
+                            outcome=args.outcome, thesis=args.thesis, risks=args.risks,
+                            tags=_split(args.tags), based_on=_split(args.based_on),
+                            target_gaps=_split(args.target_gaps),
+                            update_on_exist=args.update_on_exist,
+                            park_reason=args.park_reason,
+                            revisit_condition=args.revisit_condition)
+            else:
+                add_experiment(args.wiki_root, args.slug, title=args.title, idea=args.idea,
+                               verdict=args.verdict, confidence=args.confidence,
+                               date=args.date, hardware=args.hardware,
+                               duration=args.duration, metrics=args.metrics,
+                               reasoning=args.reasoning, provenance=args.provenance,
+                               tags=_split(args.tags),
+                               update_on_exist=args.update_on_exist)
+        except RuntimeError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
     elif args.command == "sync":
         ids: list[str] = []
         if args.arxiv_ids:
@@ -2023,7 +3070,7 @@ def main():
             if not fp.exists():
                 print(f"--from-file not found: {fp}", file=sys.stderr)
                 sys.exit(2)
-            for line in fp.read_text().splitlines():
+            for line in fp.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if line and not line.startswith("#"):
                     ids.append(line)

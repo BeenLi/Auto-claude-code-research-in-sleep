@@ -27,7 +27,7 @@ commands are needed.
 | Setting | Default | Notes |
 | --- | --- | --- |
 | `sources` | `all` | Default sources only: Zotero, Obsidian, local PDFs, arXiv, DBLP/proceedings, WebSearch. Optional sources below require explicit opt-in. |
-| `paper library` | `papers/`, then `literature/` | Inline `paper library: /path` wins. Scan at most 20 PDFs, prioritizing relevant filenames. |
+| `paper library` | `papers/`, then `literature/`, then the path under `## Paper Library` in `CLAUDE.md` | Inline `paper library: /path` wins. Scan at most 20 PDFs, prioritizing relevant filenames. |
 | `arxiv download` | `false` | Metadata only unless enabled. Download only top ranked arXiv papers. |
 | `max download` | `5` | Applies only when `arxiv download: true`. |
 | `reviewer` | `codex` | Optional override: `reviewer: oracle-pro`; see `shared-references/reviewer-routing.md`. |
@@ -76,6 +76,14 @@ directive.
 
 For exact commands, DBLP/program URL patterns, and adapter-specific fallback
 details, use `references/search-sources.md`.
+
+Resolve script-backed adapters (`arxiv_fetch.py`, `semantic_scholar_fetch.py`,
+`deepxiv_fetch.py`, `exa_search.py`, `openalex_fetch.py`) through the canonical
+chain in `shared-references/integration-contract.md` §2 rather than assuming
+`tools/`: `.aris/tools/`, then `tools/`, then `$ARIS_REPO/tools/` (with
+`$ARIS_REPO` taken from the environment, `.aris/installed-skills.txt`, or the
+`~/.aris/repo` pointer). An unresolved helper, or one that exits non-zero, is a
+per-source skip: warn, record it in Source Audit, and continue.
 
 ### Retrieval Rules
 
@@ -212,6 +220,23 @@ fragment-matched collections at any depth before keyword search. Prefer
 curated/user sources, then direct venue/arXiv coverage, then optional adapters,
 then WebSearch fallback. Maintain a Source Audit row for every attempted source.
 
+If `local` is requested and every paper-library path misses, say so before
+moving on — do not skip silently. A user whose PDFs live in a reference manager
+otherwise assumes `sources: all` covered them. Emit this line and record it in
+Source Audit, then continue:
+
+`WARN: local contributed nothing — no PDFs found in papers/, literature/, or a configured paper library. To include yours, pass "paper library: /path" or add a "## Paper Library" heading to CLAUDE.md followed by the directory path.`
+
+A script-backed adapter (arXiv, Semantic Scholar, DeepXiv, Exa, OpenAlex)
+contributes when its helper resolved and exited 0, even with an empty result
+list. Zotero, Obsidian, local PDFs, DBLP/proceedings pages, and Gemini
+contribute when they returned at least one usable result. WebSearch contributes
+when it was requested and actually invoked, even with an empty result set. If
+no requested source contributed, stop before Step 2.5 with an
+empty-aggregate error that lists each source's skip reason and suggests a wider
+`sources:` list; do not save an empty literature review. Otherwise log the
+contributing sources (e.g., `Sources contributed: zotero, arxiv, web`).
+
 ### 2.5. Verify Candidate Papers
 
 Before analyzing or citing candidate papers, verify paper existence with the
@@ -243,10 +268,44 @@ Handling rules:
 - If there are zero verified papers, treat the verifier verdict as `WARN` and
   produce a degraded review only if the user explicitly wants a scoping summary;
   otherwise stop before saving durable literature outputs.
+- Never fabricate a DOI or arXiv ID from memory. Leave an unknown identifier
+  `null` in `candidate_papers.json`; the helper falls through to title search.
+- Never silently drop a paper whose status is not `verified`. Keep it in
+  Section 1 with its `Verification` value so the user can audit search quality.
+- If the verdict carries the `high_hallucination_rate` warning, surface it
+  verbatim and recommend re-running with narrower queries.
+- Do not promote `verify_pending` to `verified`; show the pending state and
+  retry in the next session.
+- Optional: `ARIS_VERIFY_EMAIL=you@institution.edu` moves CrossRef lookups to
+  the polite pool, and `SEMANTIC_SCHOLAR_API_KEY` lifts Semantic Scholar rate
+  limits.
 
 ### 3. Analyze Papers
 
-For every relevant paper, extract and write into Section 1:
+> **Fan-out (tier-aware).** Per-paper extraction is pure breadth — each paper
+> is independent — so it parallelizes cleanly. **Tier 1** (Workflow): spawn
+> one Claude subagent per paper (or per small batch). **Tier 2** (Agent tool,
+> no Workflow): the same per-paper subagents via the Agent tool. **Tier 3**:
+> iterate sequentially. Shards follow the *extraction* envelope in
+> [`shared-references/fan-out-pattern.md`](../shared-references/fan-out-pattern.md):
+> `{shard_id: "<paper-or-batch id>", entries: [{dedup_key, ...Section 1
+> fields below..., verification}]}`, where `dedup_key` is the DOI / arXiv ID /
+> normalized-title key already assigned during de-duplication. Shards are
+> read-only: they return entries, and the executor merges them into Section 1.
+>
+> The admission "jury" here is **not a model** — it is the deterministic
+> Step 2.5 `verify_papers.py` gate, so the cross-model-family rule is satisfied
+> (a process is not a model family — see
+> [`acceptance-gate.md`](../shared-references/acceptance-gate.md)). Shards
+> extract, never adjudicate: they report what each paper says and its
+> verification status verbatim, they do not decide which papers count, and
+> they never drop a paper for any status other than `verified`. Synthesis
+> (Step 4) is interpretive aggregation over the admitted set and stays with
+> the executor.
+
+For every relevant paper in `.aris/verify-papers/verified_papers.json`
+(`verified`, `unverified`, `verify_pending`, and `error` alike), extract and
+write into Section 1:
 
 - Problem, method, key result, limitations, and relevance.
 - Source labels and whether it was already known or newly added.
@@ -345,9 +404,26 @@ idea-stage/LITERATURE_REVIEW_{YYYYMMDD_HHmmssZ}.md
 idea-stage/LITERATURE_REVIEW.md
 ```
 
-Use UTC timestamps. Write the timestamped file first, copy the same content to
-the fixed latest copy, and append both rows to `MANIFEST.md` with stage
-`idea-discovery`. Downstream skills always read `idea-stage/LITERATURE_REVIEW.md`.
+Use UTC timestamps and write both files as UTF-8. Write the timestamped file
+first, copy the same content to the fixed latest copy, and append both rows to
+`MANIFEST.md` with stage `idea-discovery`. Downstream skills always read
+`idea-stage/LITERATURE_REVIEW.md`.
+
+> **Composed mode** — if invoked with `— composed: <canonical-report-path>` (an
+> orchestrator like `/idea-discovery` passes this), **still write both review
+> files above**: `idea-stage/LITERATURE_REVIEW.md` is the machine-readable
+> Landscape Pack handoff that `/idea-creator` requires, not a duplicate
+> summary — treat it like the research wiki, a persistent store the report
+> links to. What changes: skip the `MANIFEST.md` rows (the orchestrator owns
+> any manifest), and return a short landscape summary — Source Audit skips,
+> Section 2 clusters, Section 2.5 `NE-*` rows, Section 3 gaps, and Section 4
+> row counts — for the orchestrator to fold into its canonical report as a
+> "Literature Landscape" section that cites `idea-stage/LITERATURE_REVIEW.md`
+> instead of copying Section 4. Step 6 (research-wiki ingest) still runs.
+> **Default (no `— composed:` directive): behave exactly as above — standalone,
+> write files as documented.** Never infer composed mode from a report file
+> merely existing on disk. Full rules:
+> [`shared-references/output-composition.md`](../shared-references/output-composition.md).
 
 ### 6. Update Research Wiki
 
@@ -356,7 +432,9 @@ step silently.
 
 Resolve the helper using the shared contract in
 `shared-references/wiki-helper-resolution.md`: prefer `.aris/tools/research_wiki.py`,
-then `tools/research_wiki.py`, then `$ARIS_REPO/tools/research_wiki.py`. If no
+then `tools/research_wiki.py`, then `$ARIS_REPO/tools/research_wiki.py` (with
+`$ARIS_REPO` taken from the environment, `.aris/installed-skills.txt`, or the
+`~/.aris/repo` pointer). If no
 helper is found, warn and skip wiki ingest only; do not skip the literature
 review output.
 

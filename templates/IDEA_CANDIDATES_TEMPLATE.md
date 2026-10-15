@@ -21,6 +21,7 @@ Parked ideas keep their `park_reason` and `revisit_condition` in `IDEA_REPORT.md
 
 Use `skills/shared-references/idea-handoff-schema.md` for field domains.
 
+- **Method (what we actually do)**:
 - **Idea shape**:
 - **core_baseline**:
 - **baseline_verification_delta**:

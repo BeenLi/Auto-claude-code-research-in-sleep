@@ -275,6 +275,126 @@ incoming summary
         self.assertIn("created: 1", strict.stdout)
         self.assertIn("updated: 1", loose.stdout)
 
+    # The three node-layer writers are called by other skills with fixed flag
+    # names (proof-checker -> add_claim, idea-creator -> upsert_idea,
+    # result-to-claim -> add_experiment). These lock that CLI contract.
+
+    def test_add_claim_cli_matches_proof_checker_call_site(self):
+        result = self.run_helper(
+            "add_claim", str(self.wiki),
+            "--slug", "thm-main-ub", "--name", "Main upper bound",
+            "--status", "sound-modulo-imports",
+            "--provenance", ".aris/traces/proof-checker/run01/",
+            "--statement", "TTFT is bounded by the prefill term.",
+            "--scope", "Single node only.",
+            "--evidence", "PROOF_AUDIT.json PASS modulo one import",
+            "--update-on-exist",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        page = (self.wiki / "claims" / "thm-main-ub.md").read_text()
+        self.assertIn("status: sound-modulo-imports", page)
+        self.assertIn("claim:thm-main-ub", (self.wiki / "index.md").read_text())
+
+        rejected = self.run_helper("add_claim", str(self.wiki), "--slug", "c-bad",
+                                   "--name", "Bad", "--status", "supported")
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn("unknown claim status", rejected.stderr)
+        self.assertFalse((self.wiki / "claims" / "c-bad.md").exists())
+
+    def test_upsert_idea_cli_records_parked_pool_fields(self):
+        result = self.run_helper(
+            "upsert_idea", str(self.wiki),
+            "--slug", "kv-cxl", "--title", "KV cache on CXL",
+            "--stage", "parked", "--outcome", "pending",
+            "--thesis", "Spill cold KV blocks to a CXL expander.",
+            "--risks", "CXL latency may dominate.",
+            "--based-on", "paper:smith2025_kv", "--target-gaps", "G1",
+            "--park-reason", "designed_not_run",
+            "--revisit-condition", "A CXL expander is listed in lab-resources.yaml",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        page = self.wiki / "ideas" / "kv-cxl.md"
+        content = page.read_text()
+        self.assertIn("stage: parked", content)
+        self.assertIn('park_reason: "designed_not_run"', content)
+        self.assertIn("revisit_condition:", content)
+        edges = (self.wiki / "graph" / "edges.jsonl").read_text()
+        self.assertIn('"type": "inspired_by"', edges)
+        self.assertIn('"to": "gap:G1"', edges)
+
+        missing = self.run_helper("upsert_idea", str(self.wiki), "--slug", "p2",
+                                  "--title", "Parked without reason", "--stage", "parked")
+        self.assertEqual(missing.returncode, 0, msg=missing.stderr)
+        self.assertIn("--park-reason", missing.stderr)
+
+        bad_stage = self.run_helper("upsert_idea", str(self.wiki), "--slug", "p3",
+                                    "--title", "X", "--stage", "eliminated")
+        self.assertNotEqual(bad_stage.returncode, 0)
+
+    def test_idea_creator_flow_upsert_then_update_pool_fields(self):
+        # /idea-creator Phase 7: upsert_idea with upstream flags, then `update`
+        # writes the local candidate-pool fields onto the same page.
+        result = self.run_helper(
+            "upsert_idea", str(self.wiki),
+            "--slug", "kv-tier", "--title", "Tiered KV cache",
+            "--stage", "proposed", "--outcome", "pending",
+            "--thesis", "Keep hot KV blocks in HBM.",
+            "--risks", "If the outcome: negative path happens, PCIe dominates.",
+            "--based-on", "paper:smith2025_kv", "--target-gaps", "G1",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        for field, value in [("pool_status", "parked"),
+                             ("park_reason", "low_overall_merit"),
+                             ("revisit_condition", "A CXL expander is in lab-resources.yaml")]:
+            upd = self.run_helper("update", str(self.wiki), "idea:kv-tier",
+                                  "--field", field, "--value", value)
+            self.assertEqual(upd.returncode, 0, msg=upd.stderr)
+
+        page = self.wiki / "ideas" / "kv-tier.md"
+        content = page.read_text(encoding="utf-8")
+        self.assertIn("pool_status: parked", content)
+        self.assertIn("park_reason: low_overall_merit", content)
+        self.assertIn('revisit_condition: "A CXL expander is in lab-resources.yaml"', content)
+        self.assertIn("outcome: pending", content)
+        self.assertIn('based_on: ["paper:smith2025_kv"]', content)
+        self.assertIn("## Key risks", content)
+
+        # A re-ideation run skips the existing page, so the pool fields survive.
+        again = self.run_helper("upsert_idea", str(self.wiki), "--slug", "kv-tier",
+                                "--title", "Tiered KV cache")
+        self.assertEqual(again.returncode, 0, msg=again.stderr)
+        self.assertIn("pool_status: parked", page.read_text(encoding="utf-8"))
+
+        # The risks text mentions "outcome: negative" but the frontmatter says pending.
+        pack = (self.wiki / "query_pack.md").read_text(encoding="utf-8")
+        self.assertNotIn("Failed Ideas", pack)
+        stats = self.run_helper("stats", str(self.wiki))
+        self.assertIn("0 failed, 0 succeeded, 1 parked", stats.stdout)
+
+        # A parked pool idea is untested on purpose; lint must not call it dead.
+        lint = self.run_helper("lint", str(self.wiki))
+        self.assertEqual(lint.returncode, 0, msg=lint.stderr)
+        report = (self.wiki / "LINT_REPORT.md").read_text(encoding="utf-8")
+        self.assertNotIn("`idea:kv-tier` is still proposed", report)
+
+    def test_add_experiment_cli_matches_result_to_claim_call_site(self):
+        result = self.run_helper(
+            "add_experiment", str(self.wiki),
+            "--slug", "exp-001", "--idea", "idea:kv-cxl",
+            "--verdict", "partial", "--confidence", "high",
+            "--date", "2026-10-15", "--hardware", "8xH100", "--duration", "2h",
+            "--metrics", "p95 TTFT -12%", "--reasoning", "only long contexts improve",
+            "--provenance", "EXPERIMENT_AUDIT.md", "--update-on-exist",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("verdict: partial", (self.wiki / "experiments" / "exp-001.md").read_text())
+        self.assertIn('"from": "idea:kv-cxl", "to": "exp:exp-001", "type": "tested_by"',
+                      (self.wiki / "graph" / "edges.jsonl").read_text())
+
+        bad = self.run_helper("add_experiment", str(self.wiki), "--slug", "exp-002",
+                              "--verdict", "positive")
+        self.assertNotEqual(bad.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

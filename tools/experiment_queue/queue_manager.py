@@ -25,23 +25,28 @@ State file format (queue_state.json):
   "phases": [{"name": "...", "depends_on": [...], "status": "..."}],
   "jobs": [
     {
-      "id": "s200_N64_n50K",
-      "phase": "distill",
+      "id": "rx_ratio_2.0",
+      "phase": "sanity",
       "status": "running",  # pending|running|completed|failed_retryable|stuck
       "resource_slot": "sim0",
-      "screen_name": "EQ_s200_N64_n50K",
+      "screen_name": "EQ_rx_ratio_2.0",
       "pid": 12345,
       "attempts": 1,
       "started": "...",
       "completed": null,
-      "expected_output": "figures/pcdistill_sw_N64_n50K_...json",
+      "expected_output": "results/rx_ratio_2.0.json",
       "error": null
     }, ...
   ]
 }
+
+`failed_other` is never persisted: step() parks it as `stuck` the moment it is
+detected. `failed_oom` and `failed_other` may still appear in state files written
+by the older GPU-only scheduler; both are handled on resume.
 """
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -143,8 +148,12 @@ def free_gpus(allowed, threshold_mib=DEFAULT_GPU_FREE_THRESHOLD_MIB):
 
 
 def screen_exists(name):
-    out, _ = run(f"screen -ls | grep -F '.{name}\\t'")
-    return name in out
+    # `screen -ls` lists sessions as "<TAB><pid>.<name><TAB>(Detached)". Match the
+    # real whitespace in Python: the old f-string grep pattern ended in '\t' as two
+    # characters (backslash, t), so it never matched and every healthy job was
+    # judged dead and killed at the first poll.
+    out, _ = run("screen -ls")
+    return re.search(rf"^\s*\d+\.{re.escape(name)}\s", out, re.MULTILINE) is not None
 
 
 def kill_screen(name):
@@ -172,11 +181,8 @@ def output_exists(path_pattern, cwd):
     if not path_pattern:
         return False
     full = os.path.join(cwd, path_pattern) if not os.path.isabs(path_pattern) else path_pattern
-    out, _ = run(f"ls {shlex.quote(full)} 2>/dev/null | wc -l")
-    try:
-        return int(out.strip()) > 0
-    except ValueError:
-        return False
+    # glob in Python: shell-quoting the whole path disabled wildcard expansion.
+    return bool(glob.glob(full))
 
 
 def required_outputs_exist(outputs, cwd):
@@ -222,11 +228,24 @@ def available_resource_slots(manifest, state):
     return [slot for slot in slots if slot["id"] not in taken]
 
 
+def _normalize_depends_on(value):
+    """Return depends_on as a list of phase names.
+
+    A bare string (`depends_on: sanity`) would otherwise be iterated character
+    by character, so the dependent phase never becomes ready and the queue hangs.
+    """
+    return [value] if isinstance(value, str) else (value or [])
+
+
 def load_state(state_file, manifest):
     """Load state from disk or initialize from manifest."""
     if Path(state_file).exists():
         with open(state_file) as f:
-            return json.load(f)
+            state = json.load(f)
+        # A state file written before the fix may carry the bare-string shape.
+        for phase in state.get("phases", []):
+            phase["depends_on"] = _normalize_depends_on(phase.get("depends_on"))
+        return state
     # Initialize from manifest
     state = {
         "meta": {
@@ -236,7 +255,7 @@ def load_state(state_file, manifest):
         },
         "phases": [
             {"name": p.get("name", f"phase_{i}"),
-             "depends_on": p.get("depends_on", []),
+             "depends_on": _normalize_depends_on(p.get("depends_on")),
              "status": "pending"}
             for i, p in enumerate(manifest.get("phases", []))
         ],
@@ -362,17 +381,14 @@ def job_status_check(job, log_dir, cwd):
             _, rc = run(f"kill -0 {job['pid']} 2>/dev/null")
             if rc == 0:
                 return "running", None
-            # Python died but screen alive → stale
+            # Process exited but the screen lingers → stale; step() kills the screen.
+            return "failed_other", "Process exited without expected output (stale screen)"
         else:
             # No pid known; trust screen for now
             return "running", None
 
-    # 4. Screen gone, no output → failed_other
-    if not screen_name or not screen_exists(screen_name):
-        return "failed_other", "Screen exited without expected output"
-
-    # Default: running
-    return "running", None
+    # 4. Screen gone (or never recorded), no output → failed_other
+    return "failed_other", "Screen exited without expected output"
 
 
 def pending_jobs_in_active_phases(state, manifest):
@@ -426,6 +442,12 @@ def step(manifest, state, state_file, log_dir):
 
     # 2. Retry transient failures that have waited long enough
     for job in state["jobs"]:
+        if job["status"] == "failed_other":
+            # Step 1 already parks fresh failed_other as stuck; this only catches a
+            # resumed state file written by the older scheduler, which persisted
+            # failed_other with no exit — all_done() would never become true.
+            job["status"] = "stuck"
+            continue
         if job["status"] not in ("failed_retryable", "failed_oom"):
             continue
         if job["attempts"] >= max_oom_attempts:

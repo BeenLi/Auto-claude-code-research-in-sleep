@@ -1,7 +1,7 @@
 ---
 name: research-refine
 description: 'Turn a vague research direction into a problem-anchored, elegant, platform-aware, implementation-oriented method plan via iterative GPT-6-Astra review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
 # Research Refine: Problem-Anchored, Elegant, Frontier-Aware Plan Refinement
@@ -381,6 +381,12 @@ Bundle contents:
 
     **OVERALL SCORE** (1-10): Weighted toward Problem Fidelity, Method Specificity, Contribution Quality, and Platform Leverage.
     Use this weighting: Problem Fidelity 15%, Method Specificity 25%, Contribution Quality 25%, Platform Leverage 15%, Implementation Feasibility 10%, Validation Focus 5%, Venue Readiness 5%.
+    (This weighted-axis rubric is the repo's working precedent for
+    `shared-references/taste-calibration.md`; if curated known-good/known-bad
+    past proposals are available — e.g. from research-wiki's accepted/rejected
+    idea history — score 3 of each on these axes FIRST to anchor the scale, and
+    name in the review which anchor the proposal sits closest to. If no curated
+    anchors are supplied, say `CALIBRATION: none` and do not invent anchors.)
 
     For each dimension scoring < 7, provide:
     - The specific weakness
@@ -416,7 +422,7 @@ Extract:
 - **Problem Fidelity**
 - **Method Specificity**
 - **Contribution Quality**
-- **Frontier Leverage**
+- **Platform Leverage**
 - **Implementation Feasibility**
 - **Validation Focus**
 - **Venue Readiness**

@@ -14,8 +14,12 @@
 
 ## Recommended Ideas
 
+[One or two sentences: how many ideas were generated, the pool counts
+(selected / backup / parked / eliminated), and why Idea 1 leads.]
+
 ### Idea 1: [title] -- RECOMMENDED
 
+- **Method (what we actually do)**: [2-4 concrete steps: what we build, modify, simulate, or measure]
 - **Idea shape**: [compact summary of gap, mechanism/study, and why the answer matters]
 - **negative_evidence_response**: [n/a | evades: NE-* (...) | addresses: NE-* (...) | conflicts: NE-* (...)]
 - **Status** (`pool_status`): selected
@@ -33,6 +37,7 @@
 
 ### Idea 2: [title] -- BACKUP
 
+- **Method (what we actually do)**:
 - **Idea shape**:
 - **negative_evidence_response**:
 - **Status** (`pool_status`): backup
@@ -62,6 +67,24 @@ Evidence only. Close prior work lowers the merit score instead.
 | Idea | Category | Evidence | Revisit condition |
 |------|----------|----------|-------------------|
 | [idea] | [already_done / refuted_by_NE-*] | [citation or NE-* row] | [condition] |
+
+## Novelty Verification
+
+Written by Phase 3 (`/novelty-check`). One row per idea that was checked.
+
+| Idea | Verdict | Closest work | Differentiation | Trace |
+|------|---------|--------------|-----------------|-------|
+| [idea] | [PROCEED / PROCEED WITH CAUTION / ABANDON] | [paper, venue year] | [what differs] | [`.aris/traces/novelty-check/...`] |
+
+## External Critical Review
+
+Written by Phase 4 (`/research-review`).
+
+- **Bottom line**: [the reviewer's stance on the selected idea]
+- **Score**: [score]
+- **Top risks and the tests they choose**: [risk -> test]
+- **Plan changes**: [what changed in the selected idea or plan]
+- **Trace**: [`.aris/traces/research-review/...`]
 
 ## Evaluation Handoff Summary
 

@@ -376,7 +376,6 @@ def test_negative_review_stays_done_and_blocked_without_granting_receipt(monkeyp
         assert state["gates"][gate.GATE_NAME]["verdict"] == "BLOCKED"
 
 
-@pytest.mark.skip(reason="local fork: skills/idea-discovery is customized (sync bucket 3); the per-stage evidence gate is not wired into it yet. Remove this skip when it is.")
 def test_idea_discovery_mirrors_require_the_evidence_gate():
     mainline = (
         REPO_ROOT / "skills" / "idea-discovery" / "SKILL.md"

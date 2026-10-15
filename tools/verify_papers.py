@@ -120,6 +120,13 @@ S2_MIN_INTERVAL_SEC = 1.05
 S2_ATTEMPTS = 3
 _s2_last_call = 0.0
 
+def _arxiv_user_agent() -> str:
+    # export.arxiv.org rate-limits anonymous urllib harder; a named agent cuts 429s.
+    contact = os.environ.get("ARIS_VERIFY_EMAIL", "").strip()
+    base = "ARIS-verify-papers/1.0 (+https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)"
+    return f"{base} (mailto:{contact})" if contact else base
+
+
 DEFAULT_BATCH_SIZE = 40
 DEFAULT_FUZZY_THRESHOLD = 0.6
 DEFAULT_CACHE_TTL_DAYS = 30
@@ -226,8 +233,8 @@ def load_cache(path: Path, ttl_days: int) -> dict[str, dict[str, Any]]:
     if not path or not path.is_file():
         return {}
     try:
-        raw = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return {}
     now = time.time()
     cutoff = now - ttl_days * 86400
@@ -238,7 +245,7 @@ def save_cache(path: Path, cache: dict[str, dict[str, Any]]) -> None:
     if not path:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
+    path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 # --------------------------------------------------------------------------
@@ -323,7 +330,7 @@ def _verify_arxiv_batch_with_retry(batch: list[str]) -> dict[str, str]:
     base_ids = [normalize_arxiv_id(x)[0] for x in batch]
     url = f"{ARXIV_API}?id_list={','.join(base_ids)}&max_results={len(base_ids)}"
     for attempt in range(3):
-        status, body = http_get(url, timeout=30)
+        status, body = http_get(url, headers={"User-Agent": _arxiv_user_agent()}, timeout=30)
         if status == 200 and body is not None:
             found = set()
             for bid in base_ids:
@@ -597,7 +604,7 @@ def parse_input(args: argparse.Namespace) -> list[PaperInput]:
         if args.input == "-":
             raw = sys.stdin.read()
         else:
-            raw = Path(args.input).read_text()
+            raw = Path(args.input).read_text(encoding="utf-8")
         data = json.loads(raw)
         if not isinstance(data, list):
             raise ValueError("input must be a JSON array of paper objects")
@@ -606,7 +613,7 @@ def parse_input(args: argparse.Namespace) -> list[PaperInput]:
         ids = [x.strip() for x in args.arxiv_ids.split(",") if x.strip()]
         return [PaperInput(id=f"arxiv-{i}", arxiv_id=x) for i, x in enumerate(ids)]
     if args.titles_file:
-        path = sys.stdin if args.titles_file == "-" else open(args.titles_file)
+        path = sys.stdin if args.titles_file == "-" else open(args.titles_file, encoding="utf-8")
         try:
             titles = [line.strip() for line in path if line.strip()]
         finally:
@@ -674,7 +681,7 @@ def _emit_error_payload(
     )
     if output_path and output_path != "-":
         try:
-            Path(output_path).write_text(payload)
+            Path(output_path).write_text(payload, encoding="utf-8")
         except OSError:
             # Last resort: still surface payload on stdout so callers can read it.
             print(payload)
@@ -752,7 +759,7 @@ def main() -> int:
     payload = json.dumps(output, indent=2, ensure_ascii=False)
     if args.output and args.output != "-":
         try:
-            Path(args.output).write_text(payload)
+            Path(args.output).write_text(payload, encoding="utf-8")
         except OSError as e:
             return _emit_error_payload(
                 "ERROR", "output_write_failed", f"{args.output}: {e}", None

@@ -16,6 +16,8 @@ The `/experiment-queue` skill installs helper scripts on the SSH host under `~/.
 .aris/tools/experiment_queue/ -> tools/experiment_queue/ -> $ARIS_REPO/tools/experiment_queue/
 ```
 
+`ARIS_REPO` comes from the environment, else the project's `.aris/installed-skills.txt`, else the one-line global pointer file `~/.aris/repo` (#366).
+
 Manual install, when needed:
 
 ```bash
@@ -72,6 +74,15 @@ phases:
         - sender_retransmission_policy
 ```
 
+## Phase Dependencies
+
+```yaml
+  - name: sweep
+    depends_on: [sanity]          # a LIST, even for a single dependency
+```
+
+`queue_manager.py` normalizes a bare string on load, but write lists. A phase launches once every job in the phases it depends on is terminal, and terminal means `completed` or `stuck`: check `queue_state.json` for `stuck` jobs before trusting a dependent phase. Paths in `outputs.required` and `expected_output` may use shell globs.
+
 ## gem5 + Broadcom/csg-htsim Co-simulation
 
 The first co-simulation target is Rx decompression expansion pressure:
@@ -125,6 +136,10 @@ ssh <server> "nohup python3 \"\$HOME/.aris_queue/queue_manager.py\" \\
 ```
 
 Use `--log-dir`, not `--log`; per-job logs in `--log-dir` drive failure detection.
+
+Job states: `pending → running → completed`; transient failures go `failed_retryable → pending` until `oom_retry.max_attempts`, then `stuck`; a screen that exits without the required outputs, or lingers after its process died, ends `stuck`. The scheduler exits when every job is `completed` or `stuck`.
+
+Resuming reuses `queue_state.json`. A state file written before the 2026-10 scheduler fix holds healthy jobs the old code mis-judged as dead and parked as `stuck`; they are not retried. Delete it, copy the current `queue_manager.py` to the server, and start the run again.
 
 Monitor:
 
