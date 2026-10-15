@@ -93,6 +93,9 @@ and a **local Codex app-server MCP bridge** as the raster renderer.
     if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills.txt ]; then
         ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills.txt 2>/dev/null) || true
     fi
+    if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-gemini.txt ]; then
+        ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-gemini.txt 2>/dev/null) || true
+    fi
     if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
         ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
     fi

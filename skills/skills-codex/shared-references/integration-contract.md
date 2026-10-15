@@ -82,6 +82,9 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
     ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
 fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-gemini.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-gemini.txt 2>/dev/null) || true
+fi
 # Layer 4: global pointer file, written by the installer/updater at
 # ~/.aris/repo (#366) — covers global copy-installs with no project manifest.
 if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
@@ -92,6 +95,13 @@ HELPER=".aris/tools/<helper>"
 [ -f "$HELPER" ] || { [ -n "${ARIS_REPO:-}" ] && HELPER="$ARIS_REPO/tools/<helper>"; }
 [ -f "$HELPER" ] || HELPER=""
 ```
+
+Each install target writes its own manifest: Claude installs
+`.aris/installed-skills-codex.txt`, Gemini installs (`install_aris.sh --target
+gemini`, which also use this main `skills/` tree)
+`.aris/installed-skills-gemini.txt`. Main-tree resolvers therefore read both,
+Claude's first. The Codex mirror reads `.aris/installed-skills-codex.txt`;
+`tools/sync_codex_skill_mirror.py` rewrites the Claude manifest name for it.
 
 After the resolver runs, `$HELPER` is either the resolved absolute or
 relative path, or the empty string. Use a semantic variable name in

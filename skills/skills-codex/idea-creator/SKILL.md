@@ -141,6 +141,7 @@ verification"):
 ```bash
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null)}"
+ARIS_REPO="${ARIS_REPO:-$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-gemini.txt 2>/dev/null)}"
 VERIFY_SCRIPT=".aris/tools/verify_papers.py"
 [ -f "$VERIFY_SCRIPT" ] || VERIFY_SCRIPT="tools/verify_papers.py"
 [ -f "$VERIFY_SCRIPT" ] || { [ -n "${ARIS_REPO:-}" ] && VERIFY_SCRIPT="$ARIS_REPO/tools/verify_papers.py"; }
@@ -212,6 +213,9 @@ ARIS_REPO="${ARIS_REPO:-}"
 ARIS_HOME="${HOME:-}"
 if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
   ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-gemini.txt ]; then
+  ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-gemini.txt 2>/dev/null) || true
 fi
 if [ -z "${ARIS_REPO:-}" ] && [ -n "$ARIS_HOME" ] && [ -f "$ARIS_HOME/.aris/repo" ]; then
   ARIS_REPO=$(cat "$ARIS_HOME/.aris/repo" 2>/dev/null) || true

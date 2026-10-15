@@ -97,15 +97,39 @@ insights over generic metadata when synthesizing consensus or gaps.
 
 Run optional adapters only when explicitly listed in `sources:`.
 
+Resolve each fetcher through the canonical chain in
+`../../shared-references/integration-contract.md` §2 — never a bare
+`tools/...` path, which only works from inside the ARIS repo. A fetcher that
+does not resolve is a per-source skip with a WARN, not a run failure.
+
 ```bash
-python3 tools/arxiv_fetch.py search "QUERY" --max 10
-python3 tools/semantic_scholar_fetch.py search "QUERY" --max 10 --fields-of-study "Computer Science,Engineering" --publication-types "JournalArticle,Conference"
-python3 tools/deepxiv_fetch.py search "QUERY" --max 10
-python3 tools/deepxiv_fetch.py paper-brief ARXIV_ID
-python3 tools/deepxiv_fetch.py paper-head ARXIV_ID
-python3 tools/exa_search.py search "QUERY" --max 10 --category "research paper" --content highlights
-python3 tools/exa_search.py search "QUERY" --max 10 --content highlights
-python3 tools/openalex_fetch.py search "QUERY" --max 10 --year "2022-" --type article --sort relevance
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-codex.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-codex.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f .aris/installed-skills-gemini.txt ]; then
+    ARIS_REPO=$(awk -F'\t' '$1=="repo_root"{print $2; exit}' .aris/installed-skills-gemini.txt 2>/dev/null) || true
+fi
+if [ -z "${ARIS_REPO:-}" ] && [ -f "$HOME/.aris/repo" ]; then
+    ARIS_REPO=$(cat "$HOME/.aris/repo" 2>/dev/null) || true
+fi
+# Prints the first existing path for one helper; WARN + non-zero when none exists.
+aris_helper() {
+    for p in ".aris/tools/$1" "tools/$1" "${ARIS_REPO:+$ARIS_REPO/tools/$1}"; do
+        [ -n "$p" ] && [ -f "$p" ] && { printf '%s\n' "$p"; return 0; }
+    done
+    echo "WARN: $1 not found in .aris/tools, tools or \$ARIS_REPO/tools; skipping this source" >&2
+    return 1
+}
+
+H=$(aris_helper arxiv_fetch.py) && python3 "$H" search "QUERY" --max 10
+H=$(aris_helper semantic_scholar_fetch.py) && python3 "$H" search "QUERY" --max 10 --fields-of-study "Computer Science,Engineering" --publication-types "JournalArticle,Conference"
+H=$(aris_helper deepxiv_fetch.py) && python3 "$H" search "QUERY" --max 10
+H=$(aris_helper deepxiv_fetch.py) && python3 "$H" paper-brief ARXIV_ID
+H=$(aris_helper deepxiv_fetch.py) && python3 "$H" paper-head ARXIV_ID
+H=$(aris_helper exa_search.py) && python3 "$H" search "QUERY" --max 10 --category "research paper" --content highlights
+H=$(aris_helper exa_search.py) && python3 "$H" search "QUERY" --max 10 --content highlights
+H=$(aris_helper openalex_fetch.py) && python3 "$H" search "QUERY" --max 10 --year "2022-" --type article --sort relevance
 ```
 
 Semantic Scholar 429: retry once, then skip. OpenAlex requires `requests`.

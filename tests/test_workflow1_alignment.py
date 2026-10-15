@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -1080,3 +1081,17 @@ def test_research_playbook_matches_current_workflow1_sections() -> None:
     assert "Section 5 `Landscape Pack`" not in playbook
     assert "Section 5 Landscape Pack" not in playbook
     assert "Section 4 `Competitive Landscape`" not in playbook
+
+
+def test_main_blocker_values_used_by_skills_are_in_the_schema_domain() -> None:
+    schema = read("skills/shared-references/idea-handoff-schema.md")
+    row = next(line for line in schema.splitlines() if line.startswith("| `main_blocker` |"))
+    domain_cell = re.split(r"(?<!\\)\|", row)[2]   # the domain cell separates values with escaped pipes
+    domain = set(re.findall(r"`([a-z_]+)`", domain_cell))
+    used = set()
+    for path in sorted((REPO_ROOT / "skills").rglob("*.md")) + sorted((REPO_ROOT / "templates").glob("*.md")):
+        if "skills-codex" in path.parts or "_unused_skills_backup" in path.parts:
+            continue
+        used |= set(re.findall(r"main_blocker[`\"]?[:=] ?[`\"]?([a-z_]+)", path.read_text(encoding="utf-8")))
+    assert used, "expected skills to name at least one main_blocker value"
+    assert used <= domain, f"main_blocker values missing from idea-handoff-schema.md: {sorted(used - domain)}"
