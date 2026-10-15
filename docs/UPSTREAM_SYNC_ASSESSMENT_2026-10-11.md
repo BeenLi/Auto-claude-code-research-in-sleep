@@ -350,3 +350,17 @@ upstream remote 已添加为 `upstream`（`https://github.com/wanshuiyin/Auto-cl
 - **Gemini 安装清单**：Gemini 安装（`install_aris.sh --target gemini`）用主线 `skills/`，写的是 `.aris/installed-skills-gemini.txt`，而主线 resolver 只读 `.aris/installed-skills.txt`（upstream 同样如此）。现在主线里 35 处读 Claude 清单的地方（25 处 `if … fi` 块、10 处单行 `${ARIS_REPO:-$(awk …)}`）之后都紧跟一次 Gemini 清单回退；`integration-contract.md` §2 写明三种安装各自的清单名。新增 `tests/test_install_manifest_resolution.py`：静态检查每处 Claude 清单读取都有 Gemini 回退（对改动前的文件会报 35 处），并实际执行 §2 的 resolver 块，确认只有 Gemini 清单时也能解析出 `ARIS_REPO`。
 - **`search-sources.md` 的 `tools/` 硬编码**：可选检索适配器改用 §2 的解析链（`.aris/tools/` → `tools/` → `$ARIS_REPO/tools/`，`ARIS_REPO` 来自两份清单或 `~/.aris/repo`），未解析到的 fetcher 只跳过该来源并打 WARN。已在 bash 和 zsh 下实测。
 - **`main_blocker` 取值**：`idea-handoff-schema.md` 的取值列表补上 `refine_did_not_converge`（research-refine 与 idea-discovery 一直在写这个值），并加了说明。新增测试：skill 与模板里出现的所有 `main_blocker` 值都必须在 schema 的取值列表里。
+
+## 12. 桶外推荐项（2026-10-15）
+
+桶 1–3 之后，对 upstream/main（26b95cf，此后无新提交）逐文件比对：本地自合并点以来未改、upstream 改过的文件只剩 CONTRIBUTING 的错字和一张图片，说明 skill 与工具层面已吸收完整。剩余差异大多是本地有意的定制。本节记录随后取用的几项。
+
+- **`tests/test_reviewer_pins.py`**：每个新建 Codex 评审调用块都必须固定模型，推理强度不低于 xhigh。对 `research-review` 修复前的版本（ad6d3bf，未固定模型、实际落到 gpt-6.1-sol low）会报错。
+- **`tests/test_argument_hint_lint.py`**：`argument-hint` 必须是单行字符串。对桶 2 之前的 skill 树会报 102 处。
+- **`skills/wiki-enrich`**：补全 research-wiki 论文页 `PROJECT NOTES` 里的 `_TODO._` 段落。已确认本地渲染的论文页章节与 TODO 标记与它的预期一致。本地适配：禁止写入 `OBSIDIAN PROJECTION` 块（由 `sync-obsidian` 重写）；项目上下文先读 `idea-stage/docs/research_contract.md`；补了 Gemini 清单回退。`research-wiki` 的论文页说明里加了指向它的一句。
+- **`skills/research-implement-feature`**：先跑通端到端主干，再逐项加功能；未定的决定先写进假设账本。依赖全部在本地，评审调用已固定 gpt-6-astra xhigh。
+- **`research-review` 升到 ultra**：Codex 新线程用 `ultra`，manual 后端仍为 xhigh。`reviewer-routing.md` 本来就把它列在深度审计档，此前本地 skill 与之矛盾。codex-exec 桥的 `codex-reply` 只沿用线程创建时的模型与强度，所以后续轮次原先写的 `config: xhigh` 本就无效，已改为说明注释。
+- **`.github/workflows/test-suite.yml`**：推送和 PR 时在 Linux 与 macOS（bash 3.2）上跑全量测试，依赖 pytest、httpx、requests。在只装这三个包的 venv 里实测 745 passed、4 skipped（MiniMax 在线测试）。upstream 的 inventory / lint 两个工作流未取：它们断言 upstream 的 skill 集合。
+- **覆盖包生成器**：标题和正文里的 Codex 推理强度说法（`xhigh` / `ultra` reasoning、"Codex subagent (ultra)"）改写为覆盖包评审方的说法。
+
+未取：`proof-orchestrator`、`interview-cheatsheet`、`aris-monitor`、`corpus_write_guard` hook、安装时写 `~/.aris/repo`、桶 4 与桶 5，以及 upstream 新增的文档与教程。

@@ -25,7 +25,7 @@ Shared references:
 
 - **REVIEWER_MODEL = `gemini-review`** — Gemini reviewer invoked through the local `gemini-review` MCP bridge. Set `GEMINI_REVIEW_MODEL` if you need a specific Gemini model override.
 - **SECOND_GENERATOR_MODEL = `gpt-6.1-sol`** — Phase 2 runs the brainstorm bundle a second time on this model (Codex backend only, same `xhigh` effort) and takes the union. It generates candidates; it never judges them.
-- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
+- **REVIEWER_BACKEND = `codex`** — Default: Gemini via `gemini-review` MCP. Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 
 

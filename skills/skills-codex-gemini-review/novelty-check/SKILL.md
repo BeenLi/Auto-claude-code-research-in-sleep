@@ -43,7 +43,7 @@ For EACH core claim, search using ALL available sources:
 3. **Read abstracts**: For each potentially overlapping paper, WebFetch its abstract and related work section
 
 ### Phase C: Cross-Model Verification
-Call REVIEWER_MODEL via Codex subagent (`mcp__gemini-review__review_start`) with xhigh reasoning.
+Call REVIEWER_MODEL via Codex subagent (`mcp__gemini-review__review_start`) with high-rigor review.
 When the method description plus the Phase-B paper list is more than a short
 note, avoid pasting it inline into the MCP prompt. Write a dossier file such as
 `NOVELTY_DOSSIER.md` (or a project-local equivalent) containing the method

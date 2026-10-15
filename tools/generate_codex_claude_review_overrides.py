@@ -219,6 +219,10 @@ def transform_body(text: str, r: Reviewer) -> str:
     text = text.replace("(no OpenAI API key)", f"(the `{r.bridge}` MCP bridge is not registered)")
     text = text.replace("(reuse agent_id)", "(reuse the completed `threadId`)")
     text = text.replace("saved agent_id", "saved completed `threadId`")
+    # Codex effort tiers (xhigh / ultra) mean nothing to this reviewer's bridge.
+    text = re.sub(r"\((?:ultra|xhigh) reasoning\)", "(high-rigor review)", text)
+    text = re.sub(r"with (?:ultra|xhigh) reasoning", "with high-rigor review", text)
+    text = re.sub(r"Default: Codex subagent \((?:ultra|xhigh)\)\.", f"Default: {r.name} via `{r.bridge}` MCP.", text)
     for old, new in (("spawn_agent", r.start), ("send_input", r.reply)):
         text = text.replace(f"`{old}`", f"`{new}`").replace(f"{old}:", f"{new}:")
     return append_async_notes(text, r)

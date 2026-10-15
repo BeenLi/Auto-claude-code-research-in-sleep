@@ -5,7 +5,7 @@ argument-hint: "[topic-or-scope]"
 allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, spawn_agent, send_input, mcp__manual_review__review, mcp__manual_review__review_reply
 ---
 
-# Research Review via External Reviewer Backend (xhigh reasoning)
+# Research Review via External Reviewer Backend (ultra reasoning)
 
 > 🔒 **Do not wrap this skill in `/loop`, `/schedule`, or `CronCreate`.** It is
 > verdict-bearing — it produces a cross-model review verdict, multi-round with
@@ -19,8 +19,8 @@ Get a multi-round critical review of research work from the selected external re
 
 ## Constants
 
-- REVIEWER_MODEL = `gpt-6-astra` — Default model for the Codex backend. Must be an OpenAI model (e.g., `gpt-6-astra`, `o3`, `gpt-4o`). Manual backend uses a model the user chooses — it must be a recognized model from a different family (OpenAI, Anthropic, Google, DeepSeek, Moonshot/Kimi, Qwen).
-- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (xhigh). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
+- REVIEWER_MODEL = `gpt-6-astra` — Default model for the Codex backend, reasoning effort `ultra` (deep-audit tier). Must be an OpenAI model (e.g., `gpt-6-astra`, `o3`, `gpt-4o`). Manual backend uses a model the user chooses — it must be a recognized model from a different family (OpenAI, Anthropic, Google, DeepSeek, Moonshot/Kimi, Qwen).
+- **REVIEWER_BACKEND = `codex`** — Default: Codex subagent (ultra). Override with `— reviewer: oracle-pro` for Oracle MCP, or `— reviewer: manual` for Manual Review MCP. If manual-review MCP is unavailable, stop and print the install command; do not fall back to Codex. See `shared-references/reviewer-routing.md`.
 
 ## Reviewer Calling Convention
 
@@ -70,7 +70,7 @@ Before calling the external reviewer, compile a comprehensive briefing:
 <br />
 
 ### Step 2: Initial Review (Round 1)
-Send a detailed prompt with xhigh reasoning, using the selected backend. For
+Send a detailed prompt with ultra reasoning, using the selected backend. For
 the `codex` backend, keep the MCP payload short: write the full briefing to
 `RESEARCH_REVIEW_REQUEST.md`, then point Codex at that file.
 
@@ -79,7 +79,7 @@ the `codex` backend, keep the MCP payload short: write the full briefing to
 ```
 spawn_agent:
   model: REVIEWER_MODEL
-  config: {"model_reasoning_effort": "xhigh"}
+  config: {"model_reasoning_effort": "ultra"}
   prompt: |
     Read the review brief at <absolute path to RESEARCH_REVIEW_REQUEST.md>.
     Executor notes are not evidence beyond the files they cite, so verify the
@@ -150,7 +150,7 @@ only the path:
 ```text
 send_input:
   agent_id: [saved reviewer agent_id from Step 2]
-  config: {"model_reasoning_effort": "xhigh"}
+  # replies inherit the thread's model/effort (REVIEWER_MODEL, ultra)
   prompt: |
     Read the updated review brief at <absolute path to
     RESEARCH_REVIEW_ROUND_2.md>.
@@ -206,7 +206,7 @@ Update project memory/notes with key review conclusions.
 
 ## Key Rules
 
-- ALWAYS pin `model: REVIEWER_MODEL` + `config: {"model_reasoning_effort": "xhigh"}` for new Codex review threads; follow-up rounds keep `config: {"model_reasoning_effort": "xhigh"}`
+- ALWAYS pin `model: REVIEWER_MODEL` + `config: {"model_reasoning_effort": "ultra"}` for new Codex review threads (deep-audit tier; capability fallback per `shared-references/reviewer-routing.md`, never below `xhigh`); follow-up rounds inherit the thread's model and effort
 - That pin is the **Codex** backend's. For `manual`, use the identity-bearing config from the Reviewer Calling Convention above; `model`, `sandbox` and `cwd` are Codex-only
 - Put comprehensive context in the review brief. Codex can read local files
   when you pass an absolute path; manual reviewers usually cannot, so attach or
